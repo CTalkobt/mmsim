@@ -14,6 +14,4 @@ TEST_CASE(rom_loader_placeholder) {
     ASSERT(result == false);
 }
 
-int main() {
-    return runAllTests();
-}
+// No main here

@@ -37,7 +37,7 @@ TEST_BIN = $(BINDIR)/mmemu-tests
 CLI_SRCS = src/cli/main.cpp
 GUI_SRCS = src/gui/main.cpp
 MCP_SRCS = src/mcp/main.cpp
-TEST_SRCS = tests/test_smoke.cpp
+TEST_SRCS = tests/test_main.cpp tests/test_smoke.cpp tests/test_flatmembus.cpp tests/test_cpu6502.cpp
 
 # Library Sources (wildcards for future files)
 LIBMEM_SRCS       = $(wildcard src/libmem/*.cpp)
