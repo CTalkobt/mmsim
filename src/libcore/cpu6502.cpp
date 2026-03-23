@@ -1,5 +1,6 @@
 #include "cpu6502.h"
 #include "libtoolchain/idisasm.h"
+#include "libdebug/execution_observer.h"
 #include <cstdio>
 #include <cstring>
 
@@ -105,7 +106,10 @@ uint8_t MOS6502::read(uint16_t addr) {
 }
 
 void MOS6502::write(uint16_t addr, uint8_t val) {
-    if (m_bus) m_bus->write8(addr, val);
+    if (m_bus) {
+        // std::cout << "MOS6502::write addr=$" << std::hex << addr << std::dec << std::endl;
+        m_bus->write8(addr, val);
+    }
 }
 
 void MOS6502::push(uint8_t val) {
@@ -612,7 +616,11 @@ int MOS6502::opSEC(uint16_t addr) { (void)addr; m_state.p |= FLAG_C; return 0; }
 int MOS6502::opSED(uint16_t addr) { (void)addr; m_state.p |= FLAG_D; return 0; }
 int MOS6502::opSEI(uint16_t addr) { (void)addr; m_state.p |= FLAG_I; return 0; }
 
-int MOS6502::opSTA(uint16_t addr) { write(addr, m_state.a); return 0; }
+int MOS6502::opSTA(uint16_t addr) {
+    // std::cout << "MOS6502::opSTA addr=$" << std::hex << addr << std::dec << std::endl;
+    write(addr, m_state.a);
+    return 0;
+}
 int MOS6502::opSTX(uint16_t addr) { write(addr, m_state.x); return 0; }
 int MOS6502::opSTY(uint16_t addr) { write(addr, m_state.y); return 0; }
 
@@ -745,7 +753,11 @@ int MOS6502::step() {
         extraCycles += (this->*(info.fn))(addr);
     }
 
-    if (observer) observer->onStep();
+    if (observer) {
+        DisasmEntry entry;
+        disassembleEntry(m_bus, pc, &entry);
+        observer->onStep(this, m_bus, entry);
+    }
 
     int total = info.cycles + extraCycles;
     m_state.cycles += total;

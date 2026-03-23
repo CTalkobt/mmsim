@@ -18,6 +18,16 @@ All notable changes to this project will be documented in this file.
     - Added `MachineDescriptor`, `CpuSlot`, and `BusSlot` structures for data-driven machine composition.
     - Implemented `MachineRegistry` for dynamic registration and creation of machine presets.
     - Created `tests/test_cpu6502.cpp` to verify instruction accuracy, status flags, and state snapshots.
+- **libdebug — Debug Infrastructure (Phase 4):**
+    - Implemented `ExecutionObserver` interface for monitoring CPU execution and memory events.
+    - Implemented `BreakpointList` supporting EXEC, READ_WATCH, and WRITE_WATCH breakpoints.
+    - Implemented `TraceBuffer` for cycle-accurate execution history.
+    - Implemented `DebugContext` for managing debug sessions, breakpoints, and system-wide snapshots.
+    - Added support for diffing memory states between snapshots.
+    - Created `tests/test_debug.cpp` to verify breakpoint logic, tracing, and snapshot integrity.
+- **Utility & Performance:**
+    - Implemented a generic `CircularBuffer<T>` template for high-performance fixed-capacity logging.
+    - Refactored `FlatMemoryBus` write-log and `TraceBuffer` execution log to use `CircularBuffer`, eliminating $O(N)$ removal overhead.
 - **libtoolchain — Disassembler and Assembler (Phase 3):**
     - Implemented `IDisassembler` interface and `DisasmEntry` for detailed instruction metadata.
     - Implemented `Disassembler6502` with support for symbol resolution and control-flow detection.
@@ -44,6 +54,9 @@ All notable changes to this project will be documented in this file.
     - Created `STYLEGUIDE.md` to establish project-wide coding conventions.
 
 ### Changed
+- **Directory Reorganization:**
+    - Moved global `include/` directory to `src/include/` to centralize all source-related files.
+    - Updated `Makefile` and `GEMINI.md` to reflect the new header search paths.
 - **Style Alignment:**
     - Updated all architectural specifications (`.plan/arch.md`) and roadmaps (`.plan/todo.md`) to use `camelCase` for variable and function names as per the new style guide.
     - Refactored placeholder headers in `src/` to follow `camelCase` and `PascalCase` conventions.

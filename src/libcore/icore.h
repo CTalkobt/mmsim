@@ -43,14 +43,7 @@ struct RegDescriptor {
     const char* alias;      // e.g., "F" for 6502 "P"
 };
 
-/**
- * Execution Observer (Stub for now).
- */
-class ExecutionObserver {
-public:
-    virtual ~ExecutionObserver() {}
-    virtual void onStep() = 0;
-};
+class ExecutionObserver;
 
 /**
  * Abstract interface for a CPU core.

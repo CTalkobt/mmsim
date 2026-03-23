@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <cstddef>
 
+class ExecutionObserver;
+
 /**
  * Role of a specific bus in the system.
  */
@@ -70,4 +72,6 @@ public:
     virtual void getWrites(uint32_t *addrs, uint8_t *before,
                             uint8_t *after, int max)                        const {}
     virtual void clearWriteLog() {}
+
+    ExecutionObserver* observer = nullptr;
 };

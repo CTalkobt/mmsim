@@ -1,4 +1,5 @@
 #include "memory_bus.h"
+#include "libdebug/execution_observer.h"
 #include <cstring>
 #include <algorithm>
 
@@ -31,11 +32,15 @@ const RomOverlay* FlatMemoryBus::findOverlay(uint32_t addr) const {
 
 uint8_t FlatMemoryBus::read8(uint32_t addr) {
     addr &= m_config.addrMask;
+    uint8_t val;
     const RomOverlay* overlay = findOverlay(addr);
     if (overlay) {
-        return overlay->data[addr - overlay->base];
+        val = overlay->data[addr - overlay->base];
+    } else {
+        val = m_data[addr];
     }
-    return m_data[addr];
+    if (observer) observer->onMemoryRead(this, addr, val);
+    return val;
 }
 
 void FlatMemoryBus::write8(uint32_t addr, uint8_t val) {
@@ -46,27 +51,19 @@ void FlatMemoryBus::write8(uint32_t addr, uint8_t val) {
     
     if (overlay) {
         if (overlay->writable) {
-            // This is a bit tricky: if it's writable overlay, where does it write?
-            // For now, let's assume it writes to the underlying data if it's a "shadow" 
-            // or if the overlay data itself is somehow meant to be modified (but it's const uint8_t*).
-            // Usually, writable=false means writes are dropped.
-            // If writable=true, we might want to write to the underlying m_data.
             m_data[addr] = val;
         } else {
             // ROM: write ignored
+            if (observer) observer->onMemoryWrite(this, addr, before, val);
             return;
         }
     } else {
         m_data[addr] = val;
     }
 
-    if (before != val) {
-        m_writeLog.push_back({addr, before, val});
-        // Limit write log size? roadmap doesn't specify, but let's keep it sane.
-        if (m_writeLog.size() > 10000) {
-            m_writeLog.erase(m_writeLog.begin());
-        }
-    }
+    if (observer) observer->onMemoryWrite(this, addr, before, val);
+    
+    m_writeLog.push({addr, before, val});
 }
 
 uint8_t FlatMemoryBus::peek8(uint32_t addr) {

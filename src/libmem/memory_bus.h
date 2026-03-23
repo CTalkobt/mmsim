@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ibus.h"
+#include "util/circular_buffer.h"
 #include <vector>
 #include <string>
 
@@ -62,7 +63,7 @@ private:
     size_t      m_size;
 
     std::vector<RomOverlay> m_overlays;
-    std::vector<WriteLogEntry> m_writeLog;
+    CircularBuffer<WriteLogEntry> m_writeLog;
 
     const RomOverlay* findOverlay(uint32_t addr) const;
 };
