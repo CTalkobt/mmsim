@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <cstdint>
 
 /**
  * Result of an assembly operation.
@@ -50,6 +51,18 @@ public:
      * @return Result structure with status and paths.
      */
     virtual AssemblerResult assemble(const std::string& sourcePath, const std::string& outputPath) = 0;
+
+    /**
+     * Assemble a single line of assembly code into a provided buffer.
+     * @param line The source line (e.g., "LDA #$02").
+     * @param buf The destination buffer for opcode bytes.
+     * @param bufsz Size of the destination buffer.
+     * @return Number of bytes written to the buffer, or -1 on error.
+     */
+    virtual int assembleLine(const std::string& line, uint8_t* buf, int bufsz) {
+        (void)line; (void)buf; (void)bufsz;
+        return -1; // Default: not supported by backend
+    }
 
 protected:
     AssemblerConfig m_config;

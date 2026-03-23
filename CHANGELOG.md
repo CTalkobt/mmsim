@@ -18,6 +18,15 @@ All notable changes to this project will be documented in this file.
     - Added `MachineDescriptor`, `CpuSlot`, and `BusSlot` structures for data-driven machine composition.
     - Implemented `MachineRegistry` for dynamic registration and creation of machine presets.
     - Created `tests/test_cpu6502.cpp` to verify instruction accuracy, status flags, and state snapshots.
+- **libtoolchain — Disassembler and Assembler (Phase 3):**
+    - Implemented `IDisassembler` interface and `DisasmEntry` for detailed instruction metadata.
+    - Implemented `Disassembler6502` with support for symbol resolution and control-flow detection.
+    - Implemented `IAssembler` interface with support for configurable backend metadata.
+    - Implemented `KickAssemblerBackend` for integration with external Java-based tools.
+    - Implemented `Assembler6502` native mini-assembler for single-line instruction support.
+    - Implemented `SymbolTable` and `SourceMap` for mapping between machine code and source labels/locations.
+    - Added `BaseDisassembler` for default delegation to CPU core disassembly.
+    - Created `tests/test_disasm6502.cpp` to verify disassembly and symbol resolution.
 - **libdebug — Debug Infrastructure (Phase 4):**
     - Implemented `ExecutionObserver` interface for monitoring CPU execution and memory events.
     - Implemented `BreakpointList` supporting EXEC, READ_WATCH, and WRITE_WATCH breakpoints.
@@ -25,17 +34,14 @@ All notable changes to this project will be documented in this file.
     - Implemented `DebugContext` for managing debug sessions, breakpoints, and system-wide snapshots.
     - Added support for diffing memory states between snapshots.
     - Created `tests/test_debug.cpp` to verify breakpoint logic, tracing, and snapshot integrity.
+- **CLI Target Implementation (Phase 5):**
+    - Implemented interactive REPL with command history and parsing.
+    - Added support for dynamic machine creation and selection.
+    - Implemented core debugging commands: `step`, `regs`, `m` (memory dump), `f` (memory fill), `disasm`.
+    - Added direct CPU instruction execution using the `.` prefix (e.g., `.lda #$42`).
 - **Utility & Performance:**
     - Implemented a generic `CircularBuffer<T>` template for high-performance fixed-capacity logging.
     - Refactored `FlatMemoryBus` write-log and `TraceBuffer` execution log to use `CircularBuffer`, eliminating $O(N)$ removal overhead.
-- **libtoolchain — Disassembler and Assembler (Phase 3):**
-    - Implemented `IDisassembler` interface and `DisasmEntry` for detailed instruction metadata.
-    - Implemented `Disassembler6502` with support for symbol resolution and control-flow detection.
-    - Implemented `IAssembler` interface with support for configurable backend metadata.
-    - Implemented `KickAssemblerBackend` for integration with external Java-based tools.
-    - Implemented `SymbolTable` and `SourceMap` for mapping between machine code and source labels/locations.
-    - Added `BaseDisassembler` for default delegation to CPU core disassembly.
-    - Created `tests/test_disasm6502.cpp` to verify disassembly and symbol resolution.
 - **Project Infrastructure:**
     - Unified the test suite into a single `mmemu-tests` binary using `tests/test_main.cpp`.
     - Added `tests/test_harness.h` for simple, lightweight unit testing.
