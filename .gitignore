@@ -1,0 +1,9 @@
+bin/*
+*.o
+*.a
+*.swp
+
+CLAUDE.md
+GEMINI.md
+ref/
+.plan/
