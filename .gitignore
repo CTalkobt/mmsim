@@ -3,6 +3,9 @@ bin/*
 *.a
 *.swp
 
+lib/*.a
+lib/*.so
+
 CLAUDE.md
 GEMINI.md
 ref/

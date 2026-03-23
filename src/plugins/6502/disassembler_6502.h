@@ -1,8 +1,8 @@
 #pragma once
 
-#include "idisasm.h"
-#include "libcore/cpu6502.h"
-#include "symbol_table.h"
+#include "libtoolchain/idisasm.h"
+#include "cpu6502.h"
+#include "libtoolchain/symbol_table.h"
 
 class Disassembler6502 : public IDisassembler {
 public:

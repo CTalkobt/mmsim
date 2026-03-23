@@ -7,10 +7,10 @@
 
 #include "libcore/machine_desc.h"
 #include "libcore/machines/machine_registry.h"
-#include "libcore/cpu6502.h"
+#include "libcore/core_registry.h"
+#include "libtoolchain/toolchain_registry.h"
+#include "plugin_loader/plugin_loader.h"
 #include "libmem/memory_bus.h"
-#include "libtoolchain/disassembler_6502.h"
-#include "libtoolchain/assembler_6502.h"
 #include "libdebug/debug_context.h"
 
 // Simple CLI for mmemu
@@ -75,26 +75,14 @@ int main(int argc, char *argv[]) {
 
     std::cout << "mmemu - Multi Machine Emulator (CLI)\n";
     std::cout << "Version 0.1.0-dev\n";
+    
+    // Initialize plugins
+    PluginLoader::instance().loadFromDir("./lib");
+
     std::cout << "Type 'help' for a list of commands.\n";
 
     CliContext ctx;
     
-    // Register a default "raw6502" machine for testing
-    MachineRegistry::instance().registerMachine("raw6502", []() {
-        MachineDescriptor* desc = new MachineDescriptor();
-        desc->machineId = "raw6502";
-        desc->displayName = "Raw 6502 System";
-        
-        FlatMemoryBus* bus = new FlatMemoryBus("system", 16);
-        MOS6502* cpu = new MOS6502();
-        cpu->setDataBus(bus);
-        
-        desc->cpus.push_back({"main", cpu, bus, bus, nullptr, true, 1});
-        desc->buses.push_back({"system", bus});
-        
-        return desc;
-    });
-
     std::string line;
     while (!ctx.quit) {
         std::cout << "> ";
@@ -103,7 +91,7 @@ int main(int argc, char *argv[]) {
 
         if (line[0] == '.') {
             if (!ctx.cpu || !ctx.asm6502) { 
-                std::cout << "No machine created.\n"; 
+                std::cout << "No machine created or no assembler for this ISA.\n"; 
                 continue; 
             }
             std::string instr = line.substr(1);
@@ -142,8 +130,11 @@ int main(int argc, char *argv[]) {
                 if (ctx.machine) {
                     ctx.cpu = ctx.machine->cpus[0].cpu;
                     ctx.bus = ctx.machine->buses[0].bus;
-                    ctx.disasm = new Disassembler6502();
-                    ctx.asm6502 = new Assembler6502();
+                    
+                    // Request toolchain from registry
+                    ctx.disasm = ToolchainRegistry::instance().createDisassembler(ctx.cpu->isaName());
+                    ctx.asm6502 = ToolchainRegistry::instance().createAssembler(ctx.cpu->isaName());
+                    
                     ctx.dbg = new DebugContext(ctx.cpu, ctx.bus);
                     ctx.cpu->observer = ctx.dbg;
                     ctx.bus->observer = ctx.dbg;
@@ -204,5 +195,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    PluginLoader::instance().unloadAll();
     return 0;
 }

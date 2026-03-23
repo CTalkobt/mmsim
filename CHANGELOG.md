@@ -34,6 +34,12 @@ All notable changes to this project will be documented in this file.
     - Implemented `DebugContext` for managing debug sessions, breakpoints, and system-wide snapshots.
     - Added support for diffing memory states between snapshots.
     - Created `tests/test_debug.cpp` to verify breakpoint logic, tracing, and snapshot integrity.
+- **Plugin Architecture & Refactor (Phase 6):**
+    - Finalized the `mmemu_plugin_api.h` C-ABI contract for runtime plugins.
+    - Implemented `PluginLoader` using `dlopen`/`dlsym` for dynamic loading of `.so` modules.
+    - Implemented `CoreRegistry` and `ToolchainRegistry` for centralized management of CPU cores and machine-specific tools.
+    - Decoupled the 6502 implementation from the host libraries, moving it into a dedicated `mmemu-plugin-6502.so`.
+    - Updated the CLI to automatically discover and load plugins from the `lib/` directory.
 - **CLI Target Implementation (Phase 5):**
     - Implemented interactive REPL with command history and parsing.
     - Added support for dynamic machine creation and selection.

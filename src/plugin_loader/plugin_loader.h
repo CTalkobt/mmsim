@@ -1,12 +1,28 @@
 #pragma once
 
-// mmemu plugin_loader — Runtime .so / .dll plugin management
-//
-// Planned contents (see .plan/arch.md §6.2):
-//   plugin_loader.h/cpp  PluginLoader: load(), isLoaded(), createCore(),
-//                        createMachine(), enumerate(), unloadAll()
-//
-// Plugin search order:
-//   1. Directory alongside the binary
-//   2. ~/.config/mmemu/plugins/  (Linux/macOS)  |  %APPDATA%\mmemu\plugins\ (Windows)
-//   3. Paths from MMEMU_PLUGIN_PATH environment variable.
+#include <string>
+#include <vector>
+#include "include/mmemu_plugin_api.h"
+
+class PluginLoader {
+public:
+    static PluginLoader& instance();
+
+    bool load(const std::string& path);
+    void loadFromDir(const std::string& dir);
+    
+    void unloadAll();
+
+private:
+    PluginLoader() = default;
+    
+    struct LoadedPlugin {
+        std::string path;
+        void* handle;
+        SimPluginManifest* manifest;
+    };
+
+    std::vector<LoadedPlugin> m_plugins;
+
+    void registerPluginItems(SimPluginManifest* manifest);
+};
