@@ -1,4 +1,5 @@
 #include "cpu6502.h"
+#include "libtoolchain/idisasm.h"
 #include <cstdio>
 #include <cstring>
 
@@ -122,13 +123,97 @@ void MOS6502::updateNZ(uint8_t val) {
 }
 
 int MOS6502::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
-    (void)bus; (void)addr; (void)buf; (void)bufsz;
-    return 0; // Placeholder
+    uint8_t op = bus->peek8(addr);
+    const Opcode& info = s_opcodes[op];
+    
+    int bytes = 1;
+    char operands[32] = "";
+
+    switch (info.mode) {
+        case Mode::IMP:    std::snprintf(operands, sizeof(operands), ""); break;
+        case Mode::ACC:    std::snprintf(operands, sizeof(operands), "A"); break;
+        case Mode::IMM:    std::snprintf(operands, sizeof(operands), "#$%02X", bus->peek8(addr+1)); bytes=2; break;
+        case Mode::BP:     std::snprintf(operands, sizeof(operands), "$%02X", bus->peek8(addr+1)); bytes=2; break;
+        case Mode::BPX:    std::snprintf(operands, sizeof(operands), "$%02X,X", bus->peek8(addr+1)); bytes=2; break;
+        case Mode::BPY:    std::snprintf(operands, sizeof(operands), "$%02X,Y", bus->peek8(addr+1)); bytes=2; break;
+        case Mode::REL: {
+            int8_t rel = (int8_t)bus->peek8(addr+1);
+            std::snprintf(operands, sizeof(operands), "$%04X", (uint16_t)(addr + 2 + rel));
+            bytes=2;
+            break;
+        }
+        case Mode::ABS: {
+            uint16_t target = bus->peek8(addr+1) | (bus->peek8(addr+2) << 8);
+            std::snprintf(operands, sizeof(operands), "$%04X", target);
+            bytes=3;
+            break;
+        }
+        case Mode::ABSX: {
+            uint16_t target = bus->peek8(addr+1) | (bus->peek8(addr+2) << 8);
+            std::snprintf(operands, sizeof(operands), "$%04X,X", target);
+            bytes=3;
+            break;
+        }
+        case Mode::ABSY: {
+            uint16_t target = bus->peek8(addr+1) | (bus->peek8(addr+2) << 8);
+            std::snprintf(operands, sizeof(operands), "$%04X,Y", target);
+            bytes=3;
+            break;
+        }
+        case Mode::IND: {
+            uint16_t target = bus->peek8(addr+1) | (bus->peek8(addr+2) << 8);
+            std::snprintf(operands, sizeof(operands), "($%04X)", target);
+            bytes=3;
+            break;
+        }
+        case Mode::BPXIND: std::snprintf(operands, sizeof(operands), "($%02X,X)", bus->peek8(addr+1)); bytes=2; break;
+        case Mode::INDBPY: std::snprintf(operands, sizeof(operands), "($%02X),Y", bus->peek8(addr+1)); bytes=2; break;
+    }
+
+    std::snprintf(buf, bufsz, "%-4s %s", info.mnemonic, operands);
+    return bytes;
 }
 
 int MOS6502::disassembleEntry(IBus* bus, uint32_t addr, void* entryOut) {
-    (void)bus; (void)addr; (void)entryOut;
-    return 0; // Placeholder
+    DisasmEntry* entry = (DisasmEntry*)entryOut;
+    uint8_t op = bus->peek8(addr);
+    const Opcode& info = s_opcodes[op];
+
+    entry->addr = addr;
+    entry->mnemonic = info.mnemonic;
+    
+    char buf[64];
+    entry->bytes = disassembleOne(bus, addr, buf, sizeof(buf));
+    
+    // Split buf into mnemonic and operands for entry
+    char mnem[16];
+    char ops[48];
+    if (std::sscanf(buf, "%s %[^\n]", mnem, ops) == 2) {
+        entry->operands = ops;
+    } else {
+        entry->operands = "";
+    }
+    entry->complete = buf;
+
+    entry->isCall = (op == 0x20); // JSR
+    entry->isReturn = (op == 0x60 || op == 0x40); // RTS or RTI
+    entry->isBranch = (info.mode == Mode::REL);
+    
+    if (entry->isCall || entry->isBranch || op == 0x4C || op == 0x6C) {
+        // Calculate targetAddr
+        if (info.mode == Mode::REL) {
+            int8_t rel = (int8_t)bus->peek8(addr + 1);
+            entry->targetAddr = (uint16_t)(addr + 2 + rel);
+        } else if (info.mode == Mode::ABS || info.mode == Mode::IND) {
+            entry->targetAddr = bus->peek8(addr+1) | (bus->peek8(addr+2) << 8);
+        } else {
+            entry->targetAddr = 0;
+        }
+    } else {
+        entry->targetAddr = 0;
+    }
+
+    return entry->bytes;
 }
 
 int MOS6502::isCallAt(IBus* bus, uint32_t addr) {

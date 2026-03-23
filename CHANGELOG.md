@@ -18,6 +18,14 @@ All notable changes to this project will be documented in this file.
     - Added `MachineDescriptor`, `CpuSlot`, and `BusSlot` structures for data-driven machine composition.
     - Implemented `MachineRegistry` for dynamic registration and creation of machine presets.
     - Created `tests/test_cpu6502.cpp` to verify instruction accuracy, status flags, and state snapshots.
+- **libtoolchain — Disassembler and Assembler (Phase 3):**
+    - Implemented `IDisassembler` interface and `DisasmEntry` for detailed instruction metadata.
+    - Implemented `Disassembler6502` with support for symbol resolution and control-flow detection.
+    - Implemented `IAssembler` interface with support for configurable backend metadata.
+    - Implemented `KickAssemblerBackend` for integration with external Java-based tools.
+    - Implemented `SymbolTable` and `SourceMap` for mapping between machine code and source labels/locations.
+    - Added `BaseDisassembler` for default delegation to CPU core disassembly.
+    - Created `tests/test_disasm6502.cpp` to verify disassembly and symbol resolution.
 - **Project Infrastructure:**
     - Unified the test suite into a single `mmemu-tests` binary using `tests/test_main.cpp`.
     - Added `tests/test_harness.h` for simple, lightweight unit testing.
