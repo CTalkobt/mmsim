@@ -52,7 +52,7 @@ bool PluginLoader::load(const std::string& path) {
     m_plugins.push_back({path, handle, manifest});
     registerPluginItems(manifest);
 
-    std::cout << "Loaded plugin: " << manifest->pluginId << " v" << manifest->version << std::endl;
+    std::cerr << "Loaded plugin: " << manifest->pluginId << " v" << manifest->version << std::endl;
     return true;
 }
 
