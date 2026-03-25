@@ -2,6 +2,8 @@ bin/*
 *.o
 *.a
 *.swp
+*.gcda
+*.gcno
 
 lib/*.a
 lib/*.so

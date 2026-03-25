@@ -1,0 +1,26 @@
+#include "mmemu_plugin_api.h"
+#include "via6522.h"
+
+static IOHandler* createVIA6522() {
+    // Default values, should be configured by the machine
+    return new VIA6522("6522", 0);
+}
+
+static DevicePluginInfo s_devices[] = {
+    {"6522", createVIA6522}
+};
+
+static SimPluginManifest s_manifest = {
+    MMEMU_PLUGIN_API_VERSION,
+    "mmemu-plugin-via6522",
+    "1.0.0",
+    0, nullptr,
+    0, nullptr,
+    1, s_devices,
+    0, nullptr
+};
+
+extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host) {
+    (void)host;
+    return &s_manifest;
+}

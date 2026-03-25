@@ -6,7 +6,8 @@ CXXFLAGS ?= -std=c++17 -Wall -Wextra -Wpedantic -O2 -fPIC
 INCLUDES  = -Isrc -Isrc/include \
             -Isrc/cli/main -Isrc/gui/main -Isrc/libcore/main -Isrc/libdebug/main \
             -Isrc/libdevices/main -Isrc/libmem/main -Isrc/libtoolchain/main \
-            -Isrc/mcp/main -Isrc/plugin_loader/main -Isrc/plugins/6502/main
+            -Isrc/mcp/main -Isrc/plugin_loader/main -Isrc/plugins/6502/main \
+            -Isrc/plugins/devices/via6522/main -Isrc/plugins/devices/vic6560/main
 AR        = ar
 ARFLAGS   = rcs
 
@@ -19,9 +20,11 @@ LIBDIR = lib
 
 # Libraries
 LIBS = $(LIBDIR)/libmem.a $(LIBDIR)/libcore.a $(LIBDIR)/libdevices.a \
-       $(LIBDIR)/libtoolchain.a $(LIBDIR)/libdebug.a $(LIBDIR)/libplugins.a
+       $(LIBDIR)/libtoolchain.a $(LIBDIR)/libdebug.a $(LIBDIR)/libplugins.a \
+       $(LIBDIR)/libdeviceVIA6522.a $(LIBDIR)/libdeviceVIC6560.a
 
-PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so
+PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so $(LIBDIR)/mmemu-plugin-via6522.so \
+          $(LIBDIR)/mmemu-plugin-vic6560.so
 
 # Binaries
 CLI_BIN = $(BINDIR)/mmemu-cli
@@ -40,23 +43,36 @@ TEST_SRCS = tests/test_main.cpp src/libcore/test/test_libcore.cpp \
             src/libmem/test/test_flatmembus.cpp src/libdebug/test/test_debug.cpp \
             src/plugins/6502/test/test_cpu6502.cpp src/plugins/6502/test/test_disasm6502.cpp \
             src/plugins/6502/test/test_assembler6502.cpp src/libtoolchain/test/test_toolchain.cpp \
-            src/libcore/test/test_registry.cpp src/libdevices/test/test_devices.cpp
+            src/libcore/test/test_registry.cpp src/libdevices/test/test_devices.cpp \
+            src/plugins/devices/via6522/test/test_via6522.cpp
 
 # Library Sources
 LIBMEM_SRCS       = src/libmem/main/ibus.cpp src/libmem/main/memory_bus.cpp src/libmem/main/libmem.cpp
 LIBCORE_SRCS      = src/libcore/main/icore.cpp src/libcore/main/rom_loader.cpp src/libcore/main/core_registry.cpp \
-                    src/libcore/main/machines/machine_registry.cpp src/libcore/main/libcore.cpp
-LIBDEVICES_SRCS   = src/libdevices/main/libdevices.cpp src/libdevices/main/io_registry.cpp
+                    src/libcore/main/machines/machine_registry.cpp src/libcore/main/libcore.cpp \
+                    src/libcore/main/machines/machine_vic20.cpp
+LIBDEVICES_SRCS   = src/libdevices/main/libdevices.cpp src/libdevices/main/io_registry.cpp \
+                    src/libdevices/main/device_registry.cpp
 LIBTOOLCHAIN_SRCS = src/libtoolchain/main/symbol_table.cpp src/libtoolchain/main/source_map.cpp \
                     src/libtoolchain/main/toolchain_registry.cpp src/libtoolchain/main/libtoolchain.cpp
 LIBDEBUG_SRCS     = src/libdebug/main/breakpoint_list.cpp src/libdebug/main/debug_context.cpp \
                     src/libdebug/main/trace_buffer.cpp src/libdebug/main/libdebug.cpp
 LIBPLUGINS_SRCS   = src/plugin_loader/main/plugin_loader.cpp
 
+# Device Implementations (as static libs for plugins to link)
+LIBVIA6522_SRCS   = src/plugins/devices/via6522/main/via6522.cpp
+LIBVIC6560_SRCS   = src/plugins/devices/vic6560/main/vic6560.cpp
+
 # Plugin 6502 Sources
 PLUGIN_6502_SRCS  = src/plugins/6502/main/cpu6502.cpp src/plugins/6502/main/disassembler_6502.cpp \
                     src/plugins/6502/main/assembler_6502.cpp src/plugins/6502/main/kickassembler.cpp \
                     src/plugins/6502/main/plugin_init.cpp
+
+# Plugin VIA6522 Sources
+PLUGIN_VIA6522_SRCS = src/plugins/devices/via6522/main/plugin_init.cpp
+
+# Plugin VIC6560 Sources
+PLUGIN_VIC6560_SRCS = src/plugins/devices/vic6560/main/plugin_init.cpp
 
 # Objects
 LIBMEM_OBJS       = $(LIBMEM_SRCS:.cpp=.o)
@@ -65,10 +81,16 @@ LIBDEVICES_OBJS   = $(LIBDEVICES_SRCS:.cpp=.o)
 LIBTOOLCHAIN_OBJS = $(LIBTOOLCHAIN_SRCS:.cpp=.o)
 LIBDEBUG_OBJS     = $(LIBDEBUG_SRCS:.cpp=.o)
 LIBPLUGINS_OBJS   = $(LIBPLUGINS_SRCS:.cpp=.o)
+LIBVIA6522_OBJS   = $(LIBVIA6522_SRCS:.cpp=.o)
+LIBVIC6560_OBJS   = $(LIBVIC6560_SRCS:.cpp=.o)
 PLUGIN_6502_OBJS  = $(PLUGIN_6502_SRCS:.cpp=.o)
+PLUGIN_VIA6522_OBJS = $(PLUGIN_VIA6522_SRCS:.cpp=.o)
+PLUGIN_VIC6560_OBJS = $(PLUGIN_VIC6560_SRCS:.cpp=.o)
 
 ALL_LIB_OBJS = $(LIBMEM_OBJS) $(LIBCORE_OBJS) $(LIBDEVICES_OBJS) \
-               $(LIBTOOLCHAIN_OBJS) $(LIBDEBUG_OBJS) $(LIBPLUGINS_OBJS)
+               $(LIBTOOLCHAIN_OBJS) $(LIBDEBUG_OBJS) $(LIBPLUGINS_OBJS) \
+               $(LIBVIA6522_OBJS) $(LIBVIC6560_OBJS) $(PLUGIN_VIA6522_OBJS) \
+               $(PLUGIN_VIC6560_OBJS)
 
 # ---------------------------------------------------------------------------
 # Ensure clean and build targets run sequentially even with -j
@@ -124,6 +146,12 @@ $(LIBDIR)/libdebug.a: $(LIBDEBUG_OBJS) | $(LIBDIR)
 $(LIBDIR)/libplugins.a: $(LIBPLUGINS_OBJS) | $(LIBDIR)
 	$(AR) $(ARFLAGS) $@ $^
 
+$(LIBDIR)/libdeviceVIA6522.a: $(LIBVIA6522_OBJS) | $(LIBDIR)
+	$(AR) $(ARFLAGS) $@ $^
+
+$(LIBDIR)/libdeviceVIC6560.a: $(LIBVIC6560_OBJS) | $(LIBDIR)
+	$(AR) $(ARFLAGS) $@ $^
+
 # ---------------------------------------------------------------------------
 # Plugin rules
 # ---------------------------------------------------------------------------
@@ -131,12 +159,18 @@ $(LIBDIR)/libplugins.a: $(LIBPLUGINS_OBJS) | $(LIBDIR)
 $(LIBDIR)/mmemu-plugin-6502.so: $(PLUGIN_6502_OBJS) $(LIBDIR)/libmem.a $(LIBDIR)/libcore.a $(LIBDIR)/libtoolchain.a | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_6502_OBJS) -L$(LIBDIR) -lmem -lcore -ltoolchain
 
+$(LIBDIR)/mmemu-plugin-via6522.so: $(PLUGIN_VIA6522_OBJS) $(LIBDIR)/libdeviceVIA6522.a | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIA6522_OBJS) -L$(LIBDIR) -ldeviceVIA6522
+
+$(LIBDIR)/mmemu-plugin-vic6560.so: $(PLUGIN_VIC6560_OBJS) $(LIBDIR)/libdeviceVIC6560.a | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIC6560_OBJS) -L$(LIBDIR) -ldeviceVIC6560
+
 # ---------------------------------------------------------------------------
 # Binary rules
 # ---------------------------------------------------------------------------
 
 # Helper to link against all libs
-BASE_LIBS = -L$(LIBDIR) -lplugins -ldebug -ltoolchain -ldevices -lcore -lmem -ldl
+BASE_LIBS = -L$(LIBDIR) -lplugins -ldebug -ltoolchain -ldevices -lcore -lmem -ldeviceVIA6522 -ldeviceVIC6560 -ldl
 
 $(CLI_BIN): $(CLI_SRCS) $(LIBS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $(CLI_SRCS) $(BASE_LIBS)

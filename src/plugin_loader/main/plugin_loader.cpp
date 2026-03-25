@@ -6,6 +6,7 @@
 #include "libcore/main/core_registry.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
+#include "libdevices/main/device_registry.h"
 
 namespace fs = std::filesystem;
 
@@ -89,5 +90,11 @@ void PluginLoader::registerPluginItems(SimPluginManifest* manifest) {
     for (int i = 0; i < manifest->machineCount; ++i) {
         auto& m = manifest->machines[i];
         MachineRegistry::instance().registerMachine(m.machineId, m.create);
+    }
+
+    // Devices
+    for (int i = 0; i < manifest->deviceCount; ++i) {
+        auto& d = manifest->devices[i];
+        DeviceRegistry::instance().registerDevice(d.name, d.create);
     }
 }
