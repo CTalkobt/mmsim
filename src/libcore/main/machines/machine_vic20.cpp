@@ -7,6 +7,7 @@
 #include "via6522.h"
 #include "vic6560.h"
 #include <iostream>
+#include <cstring>
 
 /**
  * VIC-20 Machine Descriptor Factory.
@@ -35,6 +36,10 @@ static MachineDescriptor* createMachineVic20() {
 
     auto* vic = (VIC6560*)DeviceRegistry::instance().createDevice("6560");
     
+    // 3.5 Color RAM (1K x 4 bits, mapped at $9400 or $9600 depending on RAM expansion)
+    uint8_t* colorRam = new uint8_t[1024];
+    std::memset(colorRam, 0, 1024);
+
     // Create VIA devices from registry (if available)
     auto* via1 = (VIA6522*)DeviceRegistry::instance().createDevice("6522");
     auto* via2 = (VIA6522*)DeviceRegistry::instance().createDevice("6522");
@@ -44,6 +49,7 @@ static MachineDescriptor* createMachineVic20() {
         vic->setName("VIC-I");
         vic->setBaseAddr(0x9000);
     }
+    vic->setColorRam(colorRam);
 
     if (!via1 || !via2) {
         // Fallback to direct creation if plugin not loaded or internal
@@ -60,8 +66,29 @@ static MachineDescriptor* createMachineVic20() {
     io->registerHandler(via1);
     io->registerHandler(via2);
 
+    // Register Color RAM as a simple IOHandler so it's accessible via bus
+    class ColorRamHandler : public IOHandler {
+    public:
+        ColorRamHandler(uint8_t* ram) : m_ram(ram) {}
+        std::string name() const override { return "ColorRAM"; }
+        uint32_t baseAddr() const override { return 0x9400; }
+        uint32_t addrMask() const override { return 0x03FF; }
+        bool ioRead(IBus*, uint32_t addr, uint8_t* val) override {
+            *val = m_ram[addr & 0x03FF] | 0xF0; // Only low 4 bits
+            return true;
+        }
+        bool ioWrite(IBus*, uint32_t addr, uint8_t val) override {
+            m_ram[addr & 0x03FF] = val & 0x0F;
+            return true;
+        }
+        void reset() override {}
+        void tick(uint64_t) override {}
+    private:
+        uint8_t* m_ram;
+    };
+    io->registerHandler(new ColorRamHandler(colorRam));
+
     // TODO: Wire interrupts (VIA -> CPU IRQ)
-    // TODO: Connect Colour RAM at $9400 and $9600
 
     // 4. ROM Overlays (Placeholders)
     // desc->overlays.push_back({"roms/vic20/char.bin", 0x8000, true, true});

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [0.1.0-dev] - 2026-03-23
 
 ### Added
+- **VIC-I Video Chip & Standard Video Interface (Phase 10.2):**
+    - Defined `IVideoOutput` standard interface for all video-generating plugins.
+    - Implemented MOS 6560 (VIC-I) rendering logic, including character fetch, multi-color support, and palette.
+    - Integrated VIC-I as a modular device plugin (`lib/mmemu-plugin-vic6560.so`).
+    - Wired VIC-I and Color RAM into the VIC-20 machine descriptor.
 - **Project Structure Refactoring:**
     - Reorganized all sub-modules into `main` and `test` subdirectories (e.g., `src/libdebug/main` and `src/libdebug/test`).
     - Moved module-specific unit tests from `tests/` to their respective module `test` directories.
