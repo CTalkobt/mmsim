@@ -1,8 +1,14 @@
 #include "core_registry.h"
 
+static CoreRegistry* s_instance = nullptr;
+
 CoreRegistry& CoreRegistry::instance() {
-    static CoreRegistry s_instance;
-    return s_instance;
+    if (!s_instance) s_instance = new CoreRegistry();
+    return *s_instance;
+}
+
+void CoreRegistry::setInstance(CoreRegistry* inst) {
+    s_instance = inst;
 }
 
 void CoreRegistry::registerCore(const std::string& name, const std::string& variant, const std::string& license, FactoryFn factory) {

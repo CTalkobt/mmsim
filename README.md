@@ -107,6 +107,7 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 - [6502 Processor Implementation](README-6502.md)
 - [6522 VIA Implementation](README-6522.md)
 - [6560 VIC-I Implementation](README-6560.md)
+- [VIC-20 Keyboard Implementation](README-KBD-VIC20.md)
 - [VIC-20 Machine Implementation](README-VIC20.md)
 
 ---

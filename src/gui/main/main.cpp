@@ -13,6 +13,7 @@
 #include "libcore/main/machine_desc.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
+#include "libdevices/main/ikeyboard_device.h"
 
 // mmemu - Multi Machine Emulator
 
@@ -25,6 +26,7 @@ enum {
     ID_FILL_MEM,
     ID_COPY_MEM,
     ID_ASSEMBLE,
+    ID_KBD_FOCUS,
     ID_GUI_TIMER
 };
 
@@ -42,7 +44,10 @@ private:
     void OnFillMem(wxCommandEvent& event);
     void OnCopyMem(wxCommandEvent& event);
     void OnAssemble(wxCommandEvent& event);
+    void OnKbdFocus(wxCommandEvent& event);
     void OnTimer(wxTimerEvent& event);
+    void OnKeyDown(wxKeyEvent& event);
+    void OnKeyUp(wxKeyEvent& event);
 
     MachineDescriptor* m_machine = nullptr;
     ICore* m_cpu = nullptr;
@@ -56,6 +61,7 @@ private:
     
     wxTimer m_timer;
     bool m_running = false;
+    bool m_kbdFocus = false;
 };
 
 class MmemuApp : public wxApp {
@@ -107,6 +113,8 @@ MmemuFrame::MmemuFrame()
     toolBar->AddTool(ID_STEP, "Step", wxArtProvider::GetBitmap(wxART_GO_FORWARD));
     toolBar->AddTool(ID_RUN, "Run", wxArtProvider::GetBitmap(wxART_GO_FORWARD));
     toolBar->AddTool(ID_PAUSE, "Pause", wxArtProvider::GetBitmap(wxART_QUIT));
+    toolBar->AddSeparator();
+    toolBar->AddCheckTool(ID_KBD_FOCUS, "Keyboard Focus (Ctrl-Shift-K)", wxArtProvider::GetBitmap(wxART_LIST_VIEW));
     toolBar->Realize();
     
     // Status Bar
@@ -145,8 +153,13 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_MENU, &MmemuFrame::OnFillMem, this, ID_FILL_MEM);
     Bind(wxEVT_MENU, &MmemuFrame::OnCopyMem, this, ID_COPY_MEM);
     Bind(wxEVT_MENU, &MmemuFrame::OnAssemble, this, ID_ASSEMBLE);
+    Bind(wxEVT_MENU, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
+    Bind(wxEVT_TOOL, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
     Bind(wxEVT_TIMER, &MmemuFrame::OnTimer, this, ID_GUI_TIMER);
     
+    Bind(wxEVT_CHAR_HOOK, &MmemuFrame::OnKeyDown, this);
+    Bind(wxEVT_KEY_UP, &MmemuFrame::OnKeyUp, this);
+
     m_timer.Start(33); // ~30 FPS
 }
 
@@ -255,6 +268,15 @@ void MmemuFrame::OnAssemble(wxCommandEvent& event) {
     }
 }
 
+void MmemuFrame::OnKbdFocus(wxCommandEvent& event) {
+    m_kbdFocus = event.IsChecked();
+    if (m_kbdFocus) {
+        SetStatusText("Keyboard focus active. Press Ctrl-Shift-K to exit.");
+    } else {
+        SetStatusText("Keyboard focus released.");
+    }
+}
+
 void MmemuFrame::OnTimer(wxTimerEvent& event) {
     (void)event;
     if (m_running && m_cpu) {
@@ -265,5 +287,60 @@ void MmemuFrame::OnTimer(wxTimerEvent& event) {
         m_regPane->RefreshValues();
         m_disasmPane->RefreshValues(m_cpu->pc());
         m_memPane->RefreshValues();
+    }
+}
+
+void MmemuFrame::OnKeyDown(wxKeyEvent& event) {
+    if (event.GetKeyCode() == 'K' && event.ControlDown() && event.ShiftDown()) {
+        m_kbdFocus = !m_kbdFocus;
+        GetToolBar()->ToggleTool(ID_KBD_FOCUS, m_kbdFocus);
+        if (m_kbdFocus) SetStatusText("Keyboard focus active. Press Ctrl-Shift-K to exit.");
+        else SetStatusText("Keyboard focus released.");
+        return;
+    }
+
+    if (m_kbdFocus && m_machine && m_machine->keyboard) {
+        // Map common keys to CBM matrix names
+        int code = event.GetKeyCode();
+        std::string name;
+        if (code >= 'A' && code <= 'Z') name = (char)std::tolower(code);
+        else if (code >= '0' && code <= '9') name = (char)code;
+        else if (code == WXK_SPACE) name = "space";
+        else if (code == WXK_RETURN) name = "return";
+        else if (code == WXK_CONTROL) name = "control";
+        else if (code == WXK_SHIFT) name = "left_shift";
+        else if (code == WXK_UP) name = "up";
+        else if (code == WXK_DOWN) name = "down";
+        else if (code == WXK_LEFT) name = "left";
+        else if (code == WXK_RIGHT) name = "right";
+
+        if (!name.empty()) {
+            m_machine->keyboard->pressKeyByName(name, true);
+        }
+    } else {
+        event.Skip();
+    }
+}
+
+void MmemuFrame::OnKeyUp(wxKeyEvent& event) {
+    if (m_kbdFocus && m_machine && m_machine->keyboard) {
+        int code = event.GetKeyCode();
+        std::string name;
+        if (code >= 'A' && code <= 'Z') name = (char)std::tolower(code);
+        else if (code >= '0' && code <= '9') name = (char)code;
+        else if (code == WXK_SPACE) name = "space";
+        else if (code == WXK_RETURN) name = "return";
+        else if (code == WXK_CONTROL) name = "control";
+        else if (code == WXK_SHIFT) name = "left_shift";
+        else if (code == WXK_UP) name = "up";
+        else if (code == WXK_DOWN) name = "down";
+        else if (code == WXK_LEFT) name = "left";
+        else if (code == WXK_RIGHT) name = "right";
+
+        if (!name.empty()) {
+            m_machine->keyboard->pressKeyByName(name, false);
+        }
+    } else {
+        event.Skip();
     }
 }

@@ -1,6 +1,7 @@
 #include "cli_interpreter.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
+#include "libdevices/main/ikeyboard_device.h"
 #include <iostream>
 
 void CliInterpreter::processLine(const std::string& line) {
@@ -50,16 +51,24 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
     } else if (cmd == "create") {
         std::string id;
         if (ss >> id) {
-            m_ctx.machine = MachineRegistry::instance().createMachine(id);
-            if (m_ctx.machine) {
-                m_ctx.cpu = m_ctx.machine->cpus[0].cpu;
-                m_ctx.bus = m_ctx.machine->buses[0].bus;
+            MachineDescriptor* md = MachineRegistry::instance().createMachine(id);
+            if (md) {
+                if (md->cpus.empty() || md->buses.empty()) {
+                    m_output("Error: Machine '" + id + "' is incomplete (missing CPU or Bus).\n");
+                    delete md;
+                    return;
+                }
+                m_ctx.machine = md;
+                m_ctx.cpu = md->cpus[0].cpu;
+                m_ctx.bus = md->buses[0].bus;
                 m_ctx.disasm = ToolchainRegistry::instance().createDisassembler(m_ctx.cpu->isaName());
                 m_ctx.assem = ToolchainRegistry::instance().createAssembler(m_ctx.cpu->isaName());
+                
+                if (m_ctx.dbg) delete m_ctx.dbg;
                 m_ctx.dbg = new DebugContext(m_ctx.cpu, m_ctx.bus);
                 m_ctx.cpu->observer = m_ctx.dbg;
                 m_ctx.bus->observer = m_ctx.dbg;
-                m_output("Created machine: " + m_ctx.machine->displayName + "\n");
+                m_output("Created machine: " + md->displayName + "\n");
             } else {
                 m_output("Unknown machine type: " + id + "\n");
             }
@@ -130,6 +139,17 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         } else {
             m_output("Syntax: asm <address>\n");
         }
+    } else if (cmd == "key") {
+        if (!m_ctx.machine || !m_ctx.machine->keyboard) { m_output("No machine with keyboard created.\n"); return; }
+        std::string keyName, state;
+        if (ss >> keyName >> state) {
+            bool down = (state == "down" || state == "1");
+            if (!m_ctx.machine->keyboard->pressKeyByName(keyName, down)) {
+                m_output("Unknown key: " + keyName + "\n");
+            }
+        } else {
+            m_output("Syntax: key <name> <down|up|1|0>\n");
+        }
     } else if (cmd == "quit" || cmd == "q") {
         m_ctx.quit = true;
     } else {
@@ -174,6 +194,7 @@ void CliInterpreter::printHelp() {
              "  copy <src> <dst> <len> - Copy memory range\n"
              "  disasm <addr> [n]- Disassemble N instructions\n"
              "  asm <addr>       - Interactive assembly mode (end with '.')\n"
+             "  key <name> <state>- Press/release a key (state: 1/0 or down/up)\n"
              "  load <path> <addr> - Load a binary file into memory\n"
              "  .<instr>         - Assemble and execute a single instruction\n"
              "  quit, q          - Exit the program\n");

@@ -16,7 +16,10 @@ struct MachineDescriptor;
  */
 struct SimPluginHostAPI {
     void (*log)(int level, const char* msg);
-    // Future: IBus factory helpers, memory allocation, etc.
+    class CoreRegistry*      coreRegistry;
+    class MachineRegistry*   machineRegistry;
+    class DeviceRegistry*    deviceRegistry;
+    class ToolchainRegistry* toolchainRegistry;
 };
 
 /**

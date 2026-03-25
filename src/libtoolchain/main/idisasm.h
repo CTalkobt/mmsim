@@ -25,7 +25,7 @@ struct DisasmEntry {
  */
 class IDisassembler {
 public:
-    virtual ~IDisassembler() {}
+    virtual ~IDisassembler();
 
     virtual const char* isaName() const = 0;
 

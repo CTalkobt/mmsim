@@ -4,10 +4,32 @@
 #include "libmem/main/memory_bus.h"
 #include "libdevices/main/io_registry.h"
 #include "libdevices/main/device_registry.h"
+#include "libdevices/main/ikeyboard_device.h"
 #include "via6522.h"
 #include "vic6560.h"
 #include <iostream>
 #include <cstring>
+
+// Register Color RAM as a simple IOHandler so it's accessible via bus
+class ColorRamHandler : public IOHandler {
+public:
+    ColorRamHandler(uint8_t* ram) : m_ram(ram) {}
+    std::string name() const override { return "ColorRAM"; }
+    uint32_t baseAddr() const override { return 0x9400; }
+    uint32_t addrMask() const override { return 0x03FF; }
+    bool ioRead(IBus*, uint32_t addr, uint8_t* val) override {
+        *val = m_ram[addr & 0x03FF] | 0xF0; // Only low 4 bits
+        return true;
+    }
+    bool ioWrite(IBus*, uint32_t addr, uint8_t val) override {
+        m_ram[addr & 0x03FF] = val & 0x0F;
+        return true;
+    }
+    void reset() override {}
+    void tick(uint64_t) override {}
+private:
+    uint8_t* m_ram;
+};
 
 /**
  * VIC-20 Machine Descriptor Factory.
@@ -28,6 +50,8 @@ MachineDescriptor* createMachineVic20() {
         cpu->setDataBus(bus);
         cpu->setCodeBus(bus);
         desc->cpus.push_back({"main", cpu, bus, bus, nullptr, true, 1});
+    } else {
+        std::cerr << "Error: VIC-20 could not find '6502' core." << std::endl;
     }
 
     // 3. I/O Devices
@@ -44,15 +68,17 @@ MachineDescriptor* createMachineVic20() {
     auto* via1 = (VIA6522*)DeviceRegistry::instance().createDevice("6522");
     auto* via2 = (VIA6522*)DeviceRegistry::instance().createDevice("6522");
 
-    if (!vic) vic = new VIC6560("VIC-I", 0x9000);
-    else {
+    if (!vic) {
+        std::cerr << "VIC-20: VIC-I plugin not found, creating internal." << std::endl;
+        vic = new VIC6560("VIC-I", 0x9000);
+    } else {
         vic->setName("VIC-I");
         vic->setBaseAddr(0x9000);
     }
     vic->setColorRam(colorRam);
 
     if (!via1 || !via2) {
-        // Fallback to direct creation if plugin not loaded or internal
+        std::cerr << "VIC-20: VIA plugin not found, creating internal." << std::endl;
         if (!via1) via1 = new VIA6522("VIA1", 0x9110);
         if (!via2) via2 = new VIA6522("VIA2", 0x9120);
     } else {
@@ -66,29 +92,23 @@ MachineDescriptor* createMachineVic20() {
     io->registerHandler(via1);
     io->registerHandler(via2);
 
-    // Register Color RAM as a simple IOHandler so it's accessible via bus
-    class ColorRamHandler : public IOHandler {
-    public:
-        ColorRamHandler(uint8_t* ram) : m_ram(ram) {}
-        std::string name() const override { return "ColorRAM"; }
-        uint32_t baseAddr() const override { return 0x9400; }
-        uint32_t addrMask() const override { return 0x03FF; }
-        bool ioRead(IBus*, uint32_t addr, uint8_t* val) override {
-            *val = m_ram[addr & 0x03FF] | 0xF0; // Only low 4 bits
-            return true;
+    // 3.6 Keyboard Matrix (Retrieve via registry)
+    IOHandler* kbdHandler = DeviceRegistry::instance().createDevice("kbd_vic20");
+    if (kbdHandler) {
+        // Cast to the interface, not the implementation
+        IKeyboardDevice* kbd = dynamic_cast<IKeyboardDevice*>(kbdHandler);
+        if (kbd) {
+            desc->keyboard = kbd;
+            via1->setPortADevice(kbd->getPort(0)); // ColumnPort
+            via2->setPortBDevice(kbd->getPort(1)); // RowPort
+            // Note: The machine descriptor doesn't own kbdHandler directly, 
+            // but we should probably track it if we wanted to delete it later.
         }
-        bool ioWrite(IBus*, uint32_t addr, uint8_t val) override {
-            m_ram[addr & 0x03FF] = val & 0x0F;
-            return true;
-        }
-        void reset() override {}
-        void tick(uint64_t) override {}
-    private:
-        uint8_t* m_ram;
-    };
-    io->registerHandler(new ColorRamHandler(colorRam));
+    } else {
+        std::cerr << "Error: VIC-20 could not find 'kbd_vic20' device." << std::endl;
+    }
 
-    // TODO: Wire interrupts (VIA -> CPU IRQ)
+    io->registerHandler(new ColorRamHandler(colorRam));
 
     // 4. ROM Overlays (Placeholders)
     // desc->overlays.push_back({"roms/vic20/char.bin", 0x8000, true, true});
@@ -97,6 +117,7 @@ MachineDescriptor* createMachineVic20() {
 
     desc->onReset = [](MachineDescriptor& d) {
         if (d.ioRegistry) d.ioRegistry->resetAll();
+        if (d.keyboard) d.keyboard->clearKeys();
         for (auto& slot : d.cpus) {
             if (slot.cpu) slot.cpu->reset();
         }

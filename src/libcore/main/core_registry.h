@@ -18,6 +18,7 @@ public:
     };
 
     static CoreRegistry& instance();
+    static void setInstance(CoreRegistry* inst);
 
     void registerCore(const std::string& name, const std::string& variant, const std::string& license, FactoryFn factory);
     ICore* createCore(const std::string& name);

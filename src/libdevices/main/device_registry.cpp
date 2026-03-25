@@ -1,8 +1,14 @@
 #include "device_registry.h"
 
+static DeviceRegistry* s_instance = nullptr;
+
 DeviceRegistry& DeviceRegistry::instance() {
-    static DeviceRegistry s_instance;
-    return s_instance;
+    if (!s_instance) s_instance = new DeviceRegistry();
+    return *s_instance;
+}
+
+void DeviceRegistry::setInstance(DeviceRegistry* inst) {
+    s_instance = inst;
 }
 
 void DeviceRegistry::registerDevice(const std::string& name, FactoryFn factory) {

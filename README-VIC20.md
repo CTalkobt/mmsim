@@ -43,6 +43,7 @@ This plugin is a **compositional node** and has heavy dependencies on other plug
     - [mmemu-plugin-6502](README-6502.md): Provides the execution core.
     - [mmemu-plugin-6522](README-6522.md): Provides the I/O and timers.
     - [mmemu-plugin-6560](README-6560.md): Provides the video generation.
+    - [mmemu-plugin-kbd-vic20](README-KBD-VIC20.md): Provides the keyboard matrix.
 
 ---
 

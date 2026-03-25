@@ -50,7 +50,7 @@ class ExecutionObserver;
  */
 class ICore {
 public:
-    virtual ~ICore() {}
+    virtual ~ICore();
 
     // ISA identification
     virtual const char* isaName()     const = 0;

@@ -10,7 +10,7 @@ class IBus;
  */
 class IOHandler {
 public:
-    virtual ~IOHandler() {}
+    virtual ~IOHandler();
 
     /**
      * Unique name of the device (e.g. "VIC-II").

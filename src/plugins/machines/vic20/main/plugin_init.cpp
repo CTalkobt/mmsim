@@ -18,7 +18,15 @@ static SimPluginManifest s_manifest = {
     1, s_machines
 };
 
+#include "libcore/main/core_registry.h"
+#include "libcore/main/machines/machine_registry.h"
+#include "libdevices/main/device_registry.h"
+#include "libtoolchain/main/toolchain_registry.h"
+
 extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host) {
-    (void)host;
+    if (host->coreRegistry) CoreRegistry::setInstance(host->coreRegistry);
+    if (host->machineRegistry) MachineRegistry::setInstance(host->machineRegistry);
+    if (host->deviceRegistry) DeviceRegistry::setInstance(host->deviceRegistry);
+    if (host->toolchainRegistry) ToolchainRegistry::setInstance(host->toolchainRegistry);
     return &s_manifest;
 }

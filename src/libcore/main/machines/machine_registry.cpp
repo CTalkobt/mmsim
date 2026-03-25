@@ -1,8 +1,14 @@
 #include "machine_registry.h"
 
+static MachineRegistry* s_instance = nullptr;
+
 MachineRegistry& MachineRegistry::instance() {
-    static MachineRegistry s_instance;
-    return s_instance;
+    if (!s_instance) s_instance = new MachineRegistry();
+    return *s_instance;
+}
+
+void MachineRegistry::setInstance(MachineRegistry* inst) {
+    s_instance = inst;
 }
 
 void MachineRegistry::registerMachine(const std::string& id, FactoryFn factory) {

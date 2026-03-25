@@ -33,7 +33,7 @@ struct AssemblerConfig {
  */
 class IAssembler {
 public:
-    virtual ~IAssembler() {}
+    virtual ~IAssembler();
 
     virtual const char* name() const = 0;
     virtual bool isaSupported(const std::string& isa) const = 0;

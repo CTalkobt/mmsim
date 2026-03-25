@@ -41,6 +41,7 @@ struct MemOverlay {
  * Forward declaration of IORegistry.
  */
 class IORegistry;
+class IKeyboardDevice;
 
 /**
  * Machine Descriptor.
@@ -54,6 +55,7 @@ struct MachineDescriptor {
     std::vector<BusSlot> buses;
 
     IORegistry* ioRegistry = nullptr;
+    IKeyboardDevice* keyboard = nullptr;
 
     // Lifecycle hooks
     std::function<void(MachineDescriptor&)> onReset;

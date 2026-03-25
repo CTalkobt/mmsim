@@ -8,7 +8,7 @@ INCLUDES  = -Isrc -Isrc/include \
             -Isrc/libdevices/main -Isrc/libmem/main -Isrc/libtoolchain/main \
             -Isrc/mcp/main -Isrc/plugin_loader/main -Isrc/plugins/6502/main \
             -Isrc/plugins/devices/via6522/main -Isrc/plugins/devices/vic6560/main \
-            -Isrc/plugins/machines/vic20/main
+            -Isrc/plugins/machines/vic20/main -Isrc/plugins/devices/kbd_vic20/main
 AR        = ar
 ARFLAGS   = rcs
 
@@ -25,12 +25,14 @@ ILIBDIR = lib/internal
 PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-via6522.so \
           $(LIBDIR)/mmemu-plugin-vic6560.so \
-          $(LIBDIR)/mmemu-plugin-vic20.so
+          $(LIBDIR)/mmemu-plugin-vic20.so \
+          $(LIBDIR)/mmemu-plugin-kbd-vic20.so
 
 # Static libraries used for linking and testing
 LIBS = $(ILIBDIR)/libmem.a $(ILIBDIR)/libcore.a $(ILIBDIR)/libdevices.a \
        $(ILIBDIR)/libtoolchain.a $(ILIBDIR)/libdebug.a $(ILIBDIR)/libplugins.a \
-       $(ILIBDIR)/libdeviceVIA6522.a $(ILIBDIR)/libdeviceVIC6560.a
+       $(ILIBDIR)/libdeviceVIA6522.a $(ILIBDIR)/libdeviceVIC6560.a \
+       $(ILIBDIR)/libdeviceKbdVic20.a
 
 # Binaries
 CLI_BIN = $(BINDIR)/mmemu-cli
@@ -67,6 +69,7 @@ LIBPLUGINS_SRCS   = src/plugin_loader/main/plugin_loader.cpp
 # Device Implementations (as static libs for plugins to link)
 LIBVIA6522_SRCS   = src/plugins/devices/via6522/main/via6522.cpp
 LIBVIC6560_SRCS   = src/plugins/devices/vic6560/main/vic6560.cpp
+LIBKBDVIC20_SRCS  = src/plugins/devices/kbd_vic20/main/kbd_vic20.cpp
 
 # Plugin 6502 Sources
 PLUGIN_6502_SRCS  = src/plugins/6502/main/cpu6502.cpp src/plugins/6502/main/disassembler_6502.cpp \
@@ -78,6 +81,9 @@ PLUGIN_VIA6522_SRCS = src/plugins/devices/via6522/main/plugin_init.cpp
 
 # Plugin VIC6560 Sources
 PLUGIN_VIC6560_SRCS = src/plugins/devices/vic6560/main/plugin_init.cpp
+
+# Plugin Keyboard Sources
+PLUGIN_KBDVIC20_SRCS = src/plugins/devices/kbd_vic20/main/plugin_init.cpp
 
 # Plugin VIC-20 Machine Sources
 PLUGIN_VIC20_SRCS = src/plugins/machines/vic20/main/machine_vic20.cpp src/plugins/machines/vic20/main/plugin_init.cpp
@@ -91,14 +97,18 @@ LIBDEBUG_OBJS     = $(LIBDEBUG_SRCS:.cpp=.o)
 LIBPLUGINS_OBJS   = $(LIBPLUGINS_SRCS:.cpp=.o)
 LIBVIA6522_OBJS   = $(LIBVIA6522_SRCS:.cpp=.o)
 LIBVIC6560_OBJS   = $(LIBVIC6560_SRCS:.cpp=.o)
+LIBKBDVIC20_OBJS  = $(LIBKBDVIC20_SRCS:.cpp=.o)
 PLUGIN_6502_OBJS  = $(PLUGIN_6502_SRCS:.cpp=.o)
 PLUGIN_VIA6522_OBJS = $(PLUGIN_VIA6522_SRCS:.cpp=.o)
 PLUGIN_VIC6560_OBJS = $(PLUGIN_VIC6560_SRCS:.cpp=.o)
+PLUGIN_KBDVIC20_OBJS = $(PLUGIN_KBDVIC20_SRCS:.cpp=.o)
 PLUGIN_VIC20_OBJS = $(PLUGIN_VIC20_SRCS:.cpp=.o)
 
 ALL_LIB_OBJS = $(LIBMEM_OBJS) $(LIBCORE_OBJS) $(LIBDEVICES_OBJS) \
                $(LIBTOOLCHAIN_OBJS) $(LIBDEBUG_OBJS) $(LIBPLUGINS_OBJS) \
-               $(LIBVIA6522_OBJS) $(LIBVIC6560_OBJS) $(PLUGIN_VIC20_OBJS)
+               $(LIBVIA6522_OBJS) $(LIBVIC6560_OBJS) $(LIBKBDVIC20_OBJS) \
+               $(PLUGIN_VIC20_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) \
+               $(PLUGIN_KBDVIC20_OBJS)
 
 # ---------------------------------------------------------------------------
 # Ensure clean and build targets run sequentially even with -j
@@ -160,40 +170,46 @@ $(ILIBDIR)/libdeviceVIA6522.a: $(LIBVIA6522_OBJS) | $(ILIBDIR)
 $(ILIBDIR)/libdeviceVIC6560.a: $(LIBVIC6560_OBJS) | $(ILIBDIR)
 	$(AR) $(ARFLAGS) $@ $^
 
+$(ILIBDIR)/libdeviceKbdVic20.a: $(LIBKBDVIC20_OBJS) | $(ILIBDIR)
+	$(AR) $(ARFLAGS) $@ $^
+
 # ---------------------------------------------------------------------------
 # Plugin rules
 # ---------------------------------------------------------------------------
 
-$(LIBDIR)/mmemu-plugin-6502.so: $(PLUGIN_6502_OBJS) $(ILIBDIR)/libmem.a $(ILIBDIR)/libcore.a $(ILIBDIR)/libtoolchain.a | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_6502_OBJS) -L$(ILIBDIR) -lmem -lcore -ltoolchain
+$(LIBDIR)/mmemu-plugin-6502.so: $(PLUGIN_6502_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_6502_OBJS)
 
-$(LIBDIR)/mmemu-plugin-via6522.so: $(PLUGIN_VIA6522_OBJS) $(ILIBDIR)/libdeviceVIA6522.a | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIA6522_OBJS) -L$(ILIBDIR) -ldeviceVIA6522
+$(LIBDIR)/mmemu-plugin-via6522.so: $(PLUGIN_VIA6522_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIA6522_OBJS)
 
-$(LIBDIR)/mmemu-plugin-vic6560.so: $(PLUGIN_VIC6560_OBJS) $(ILIBDIR)/libdeviceVIC6560.a | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIC6560_OBJS) -L$(ILIBDIR) -ldeviceVIC6560
+$(LIBDIR)/mmemu-plugin-vic6560.so: $(PLUGIN_VIC6560_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIC6560_OBJS)
 
-$(LIBDIR)/mmemu-plugin-vic20.so: $(PLUGIN_VIC20_OBJS) $(ILIBDIR)/libdeviceVIA6522.a $(ILIBDIR)/libdeviceVIC6560.a | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIC20_OBJS) -L$(ILIBDIR) -ldeviceVIA6522 -ldeviceVIC6560
+$(LIBDIR)/mmemu-plugin-kbd-vic20.so: $(PLUGIN_KBDVIC20_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_KBDVIC20_OBJS)
+
+$(LIBDIR)/mmemu-plugin-vic20.so: $(PLUGIN_VIC20_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIC20_OBJS)
 
 # ---------------------------------------------------------------------------
 # Binary rules
 # ---------------------------------------------------------------------------
 
 # Helper to link against all libs
-BASE_LIBS = -L$(ILIBDIR) -lplugins -ldebug -ltoolchain -ldevices -lcore -lmem -ldeviceVIA6522 -ldeviceVIC6560 -ldl
+BASE_LIBS = -Wl,--whole-archive -L$(ILIBDIR) -lplugins -ldebug -ltoolchain -ldevices -lcore -lmem -ldeviceVIA6522 -ldeviceVIC6560 -ldeviceKbdVic20 -Wl,--no-whole-archive -ldl
 
 $(CLI_BIN): $(CLI_SRCS) $(LIBS) | $(BINDIR)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $(CLI_SRCS) $(BASE_LIBS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -rdynamic -o $@ $(CLI_SRCS) $(BASE_LIBS)
 
 $(GUI_BIN): $(GUI_SRCS) $(LIBS) | $(BINDIR)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -o $@ $(GUI_SRCS) $(BASE_LIBS) $(WXLIBS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -rdynamic -o $@ $(GUI_SRCS) $(BASE_LIBS) $(WXLIBS)
 
 $(MCP_BIN): $(MCP_SRCS) $(LIBS) | $(BINDIR)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $(MCP_SRCS) $(BASE_LIBS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -rdynamic -o $@ $(MCP_SRCS) $(BASE_LIBS)
 
 $(TEST_BIN): $(TEST_SRCS) $(LIBS) $(PLUGIN_6502_OBJS) | $(BINDIR)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -Itests -o $@ $(TEST_SRCS) $(PLUGIN_6502_OBJS) $(BASE_LIBS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -Itests -rdynamic -o $@ $(TEST_SRCS) $(PLUGIN_6502_OBJS) $(BASE_LIBS)
 
 # ---------------------------------------------------------------------------
 # Generic object rule
@@ -212,4 +228,4 @@ test: $(TEST_BIN) plugins
 # ---------------------------------------------------------------------------
 
 clean:
-	rm -rf $(BINDIR) $(LIBDIR) $(ALL_LIB_OBJS) $(PLUGIN_6502_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS)
+	rm -rf $(BINDIR) $(LIBDIR) $(ALL_LIB_OBJS) $(PLUGIN_6502_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) $(PLUGIN_KBDVIC20_OBJS)

@@ -20,6 +20,7 @@ Plugins that implement the `IOHandler` interface for memory-mapped hardware.
 |-------------|-------------|---------------|
 | `lib/mmemu-plugin-via6522.so` | MOS 6522 Versatile Interface Adapter (VIA). | [README-6522.md](README-6522.md) |
 | `lib/mmemu-plugin-vic6560.so` | MOS 6560 VIC-I Video/Sound generator. | [README-6560.md](README-6560.md) |
+| `lib/mmemu-plugin-kbd-vic20.so` | Standard VIC-20 8x8 Keyboard Matrix. | [README-KBD-VIC20.md](README-KBD-VIC20.md) |
 
 ---
 

@@ -1,3 +1,6 @@
-#include "libtoolchain/main/libtoolchain.h"
+#include "libtoolchain.h"
+#include "idisasm.h"
+#include "iassembler.h"
 
-// Placeholder for libtoolchain implementation
+IDisassembler::~IDisassembler() {}
+IAssembler::~IAssembler() {}

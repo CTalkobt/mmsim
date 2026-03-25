@@ -20,7 +20,11 @@ static void hostLog(int level, const char* msg) {
 }
 
 static SimPluginHostAPI s_hostAPI = {
-    hostLog
+    hostLog,
+    &CoreRegistry::instance(),
+    &MachineRegistry::instance(),
+    &DeviceRegistry::instance(),
+    &ToolchainRegistry::instance()
 };
 
 bool PluginLoader::load(const std::string& path) {

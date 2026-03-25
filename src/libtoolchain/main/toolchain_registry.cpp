@@ -1,8 +1,14 @@
 #include "toolchain_registry.h"
 
+static ToolchainRegistry* s_instance = nullptr;
+
 ToolchainRegistry& ToolchainRegistry::instance() {
-    static ToolchainRegistry s_instance;
-    return s_instance;
+    if (!s_instance) s_instance = new ToolchainRegistry();
+    return *s_instance;
+}
+
+void ToolchainRegistry::setInstance(ToolchainRegistry* inst) {
+    s_instance = inst;
 }
 
 void ToolchainRegistry::registerToolchain(const std::string& isa, DisasmFactoryFn df, AsmFactoryFn af) {

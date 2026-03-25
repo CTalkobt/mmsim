@@ -19,6 +19,7 @@ public:
     };
 
     static DeviceRegistry& instance();
+    static void setInstance(DeviceRegistry* inst);
 
     /**
      * Register a device factory.

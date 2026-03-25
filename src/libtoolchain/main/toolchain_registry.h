@@ -19,6 +19,7 @@ public:
     };
 
     static ToolchainRegistry& instance();
+    static void setInstance(ToolchainRegistry* inst);
 
     void registerToolchain(const std::string& isa, DisasmFactoryFn df, AsmFactoryFn af);
     IDisassembler* createDisassembler(const std::string& isa);

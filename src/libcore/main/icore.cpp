@@ -1,10 +1,11 @@
 #include "icore.h"
 #include <cstring>
 
+ICore::~ICore() {}
+
 uint32_t ICore::regReadByName(const char* name) const {
     int idx = regIndexByName(name);
-    if (idx >= 0) return regRead(idx);
-    return 0;
+    return (idx >= 0) ? regRead(idx) : 0;
 }
 
 void ICore::regWriteByName(const char* name, uint32_t val) {
@@ -15,9 +16,9 @@ void ICore::regWriteByName(const char* name, uint32_t val) {
 int ICore::regIndexByName(const char* name) const {
     int count = regCount();
     for (int i = 0; i < count; ++i) {
-        const RegDescriptor* d = regDescriptor(i);
-        if (std::strcmp(d->name, name) == 0) return i;
-        if (d->alias && std::strcmp(d->alias, name) == 0) return i;
+        const auto* desc = regDescriptor(i);
+        if (desc && desc->name && std::strcmp(desc->name, name) == 0) return i;
+        if (desc && desc->alias && std::strcmp(desc->alias, name) == 0) return i;
     }
     return -1;
 }

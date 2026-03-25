@@ -11,6 +11,7 @@
 #include "plugin_loader/main/plugin_loader.h"
 #include "libmem/main/memory_bus.h"
 #include "libcore/main/icore.h"
+#include "libdevices/main/ikeyboard_device.h"
 
 struct MachineState {
     MachineDescriptor* machine = nullptr;
@@ -133,6 +134,20 @@ Json handleToolsList() {
 
     addTool("read_registers", "Get full CPU state", rrSchema);
 
+    Json kSchema(Json::OBJ);
+    kSchema.oVal["type"] = Json("object");
+    Json kProps(Json::OBJ);
+    kProps.oVal["machine_id"] = midProp;
+    Json knProp(Json::OBJ); knProp.oVal["type"] = Json("string");
+    Json ksProp(Json::OBJ); ksProp.oVal["type"] = Json("boolean");
+    kProps.oVal["key"] = knProp;
+    kProps.oVal["down"] = ksProp;
+    kSchema.oVal["properties"] = kProps;
+    Json kReq(Json::ARR); kReq.push_back(Json("machine_id")); kReq.push_back(Json("key")); kReq.push_back(Json("down"));
+    kSchema.oVal["required"] = kReq;
+
+    addTool("press_key", "Inject a keystroke", kSchema);
+
     res.oVal["tools"] = tools;
     return res;
 }
@@ -204,7 +219,7 @@ Json handleToolsCall(const Json& params) {
             for (uint32_t i = 0; i < size; i += 16) {
                 ss << std::hex << std::setw(4) << std::setfill('0') << (addr + i) << ": ";
                 for (uint32_t j = 0; j < 16 && (i + j) < size; ++j) {
-                    ss << std::setw(2) << (int)ms->bus->read8(addr + i + j) << " ";
+                    ss << std::setw(2) << (int)ms->bus->peek8(addr + i + j) << " ";
                 }
                 ss << "\n";
             }
@@ -244,6 +259,25 @@ Json handleToolsCall(const Json& params) {
             }
             ss << std::dec << "\nCycles: " << ms->cpu->cycles();
             textItem.oVal["text"] = Json(ss.str());
+        }
+    } else if (name == "press_key") {
+        std::string mid = args["machine_id"].sVal;
+        std::string key = args["key"].sVal;
+        bool down = args["down"].bVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else if (!ms->machine->keyboard) {
+            textItem.oVal["text"] = Json("Error: Machine has no keyboard");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            if (ms->machine->keyboard->pressKeyByName(key, down)) {
+                textItem.oVal["text"] = Json("Key " + key + (down ? " pressed" : " released"));
+            } else {
+                textItem.oVal["text"] = Json("Error: Unknown key " + key);
+                textItem.oVal["isError"] = Json(true);
+            }
         }
     } else {
         textItem.oVal["text"] = Json("Error: Unknown tool");

@@ -14,6 +14,7 @@ public:
     using FactoryFn = std::function<MachineDescriptor*()>;
 
     static MachineRegistry& instance();
+    static void setInstance(MachineRegistry* inst);
 
     void registerMachine(const std::string& id, FactoryFn factory);
     MachineDescriptor* createMachine(const std::string& id);
