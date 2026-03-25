@@ -1,5 +1,5 @@
 #include "test_harness.h"
-#include "libtoolchain/disassembler_6502.h"
+#include "plugins/6502/disassembler_6502.h"
 #include "libmem/memory_bus.h"
 #include <cstring>
 

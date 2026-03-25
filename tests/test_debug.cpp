@@ -1,6 +1,6 @@
 #include "test_harness.h"
 #include "libdebug/debug_context.h"
-#include "libcore/cpu6502.h"
+#include "plugins/6502/cpu6502.h"
 #include "libmem/memory_bus.h"
 
 TEST_CASE(debug_breakpoints) {

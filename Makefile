@@ -30,7 +30,7 @@ TEST_BIN = $(BINDIR)/mmemu-tests
 CLI_SRCS = src/cli/main.cpp
 GUI_SRCS = src/gui/main.cpp
 MCP_SRCS = src/mcp/main.cpp
-TEST_SRCS = tests/test_main.cpp tests/test_smoke.cpp tests/test_flatmembus.cpp tests/test_debug.cpp
+TEST_SRCS = tests/test_main.cpp tests/test_smoke.cpp tests/test_flatmembus.cpp tests/test_debug.cpp tests/test_cpu6502.cpp tests/test_disasm6502.cpp
 
 # Library Sources
 LIBMEM_SRCS       = src/libmem/ibus.cpp src/libmem/memory_bus.cpp src/libmem/libmem.cpp
@@ -56,6 +56,13 @@ PLUGIN_6502_OBJS  = $(PLUGIN_6502_SRCS:.cpp=.o)
 
 ALL_LIB_OBJS = $(LIBMEM_OBJS) $(LIBCORE_OBJS) $(LIBDEVICES_OBJS) \
                $(LIBTOOLCHAIN_OBJS) $(LIBDEBUG_OBJS) $(LIBPLUGINS_OBJS)
+
+# ---------------------------------------------------------------------------
+# Ensure clean and build targets run sequentially even with -j
+# ---------------------------------------------------------------------------
+ifneq ($(filter clean,$(MAKECMDGOALS)),)
+  all cli gui mcp libs plugins test: clean
+endif
 
 # ---------------------------------------------------------------------------
 # Phony targets

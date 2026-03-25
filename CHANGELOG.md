@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 ## [0.1.0-dev] - 2026-03-23
 
 ### Added
+- **MCP Target Implementation (Phase 7):**
+    - Implemented MCP (Model Context Protocol) server over JSON-RPC 2.0 (`src/mcp/main.cpp`).
+    - Created a lightweight, dependency-free JSON library (`src/mcp/minijson.h`).
+    - Registered essential tools for AI interaction: `step_cpu`, `read_memory`, `write_memory`, and `read_registers`.
+    - Exposed `machine_state` as an MCP resource.
+    - Added a Python-based validation harness (`tests/mcp_test.py`) for automated MCP interface testing.
+    - Updated `PluginLoader` to use `std::cerr` for logging to keep `stdout` clean for JSON-RPC.
+    - Fixed a race condition in the `Makefile` when running `make -j clean all`.
 - **libmem — Address Bus Abstraction (Phase 1):**
     - Implemented `IBus` abstract interface for memory and I/O access.
     - Implemented `FlatMemoryBus` with support for heap-allocated storage, configurable address masking, and ROM overlays.
