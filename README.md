@@ -13,11 +13,36 @@ The system is built on a strictly decoupled library system to ensure flexibility
 - **libdebug**: Advanced debugging features including breakpoints, trace history, and system snapshots.
 
 ### Plugin System
-All processor-specific logic and specialized devices are decoupled from the host and loaded dynamically as `.so` (or `.dll`) modules via the `PluginLoader`. This allows for a "drop-in" ecosystem where new architectures can be added without recompiling the main application.
+All processor-specific logic and specialized devices are decoupled from the host and loaded dynamically as `.so` (or `.dll`) modules via the `PluginLoader`. At startup, the system scans the `./lib` directory for modules and registers their capabilities with the core registries.
 
 ---
 
-## 2. CLI Target (Implemented)
+## 2. Plugin Architecture
+
+The **mmsim** ecosystem relies on a modular system where specialized logic is provided by dynamically loadable plugins.
+
+### 2.1 Startup Discovery
+At startup, all binaries (`mmemu-cli`, `mmemu-gui`, `mmemu-mcp`) use the `PluginLoader` to scan for resources:
+- **Search Path**: `./lib/` relative to the current working directory.
+- **Resource Types**: The loader looks for `.so` files (on Linux) that export the required ABI.
+
+### 2.2 The Plugin ABI
+Every plugin must export a C-compatible entry point that returns a manifest of its capabilities:
+```cpp
+extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host);
+```
+
+### 2.3 Supported Resource Types
+A single plugin module can provide multiple resources, which are automatically registered upon loading:
+
+- **CPU Cores (`ICore`)**: Implementations of processor logic and register sets (e.g., 6502).
+- **Toolchains**: Integrated **Assemblers** and **Disassemblers** for specific ISAs.
+- **Machine Presets**: Descriptor factories that define how to compose a CPU, memory bus, and devices into a specific system (e.g., C64, VIC-20).
+- **I/O Devices (`IOHandler`)**: Individual memory-mapped hardware components.
+
+---
+
+## 3. CLI Target (Implemented)
 
 The `mmemu-cli` binary provides an interactive REPL for low-level machine control and debugging.
 
@@ -38,7 +63,7 @@ The `mmemu-cli` binary provides an interactive REPL for low-level machine contro
 
 ---
 
-## 3. MCP Target (Implemented)
+## 4. MCP Target (Implemented)
 
 The `mmemu-mcp` binary implements the **Model Context Protocol**, allowing AI agents (like Claude) to interact directly with the simulator.
 
@@ -50,7 +75,7 @@ The `mmemu-mcp` binary implements the **Model Context Protocol**, allowing AI ag
 
 ---
 
-## 4. GUI Target (Implemented)
+## 5. GUI Target (Implemented)
 
 The `mmemu-gui` binary provides a professional, multi-pane graphical debugging environment.
 
@@ -67,14 +92,14 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 
 ---
 
-## 5. Implementation Roadmap
+## 6. Implementation Roadmap
 
 - **Phase 9+: libdevices & Machines**: Implementation of classic hardware components (VIC-II, SID, CIA) and machine presets (C64, VIC-20).
 - **Phase 12: Performance Profiling**: Advanced cycle-accurate profiling and execution heatmaps.
 
 ---
 
-## 6. Plugin Ecosystem
+## 7. Plugin Ecosystem
 
 ### Processors
 - [6502 (Implemented)](README-6502.md)
@@ -85,7 +110,7 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 
 ---
 
-## 5. Getting Started
+## 8. Getting Started
 
 ### Prerequisites
 - C++17 compatible compiler (e.g., GCC 9+)
@@ -106,6 +131,6 @@ make test     # Build and run the unified test suite
 
 ---
 
-## 6. Development Standards
+## 9. Development Standards
 - Adhere to the conventions in [STYLEGUIDE.md](STYLEGUIDE.md).
 - Track all significant updates in [CHANGELOG.md](CHANGELOG.md).

@@ -3,7 +3,10 @@
 
 CXX      ?= g++
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -Wpedantic -O2 -fPIC
-INCLUDES  = -Isrc -Isrc/include
+INCLUDES  = -Isrc -Isrc/include \
+            -Isrc/cli/main -Isrc/gui/main -Isrc/libcore/main -Isrc/libdebug/main \
+            -Isrc/libdevices/main -Isrc/libmem/main -Isrc/libtoolchain/main \
+            -Isrc/mcp/main -Isrc/plugin_loader/main -Isrc/plugins/6502/main
 AR        = ar
 ARFLAGS   = rcs
 
@@ -27,26 +30,33 @@ MCP_BIN = $(BINDIR)/mmemu-mcp
 TEST_BIN = $(BINDIR)/mmemu-tests
 
 # Sources
-CLI_SRCS = src/cli/main.cpp src/cli/cli_interpreter.cpp
-GUI_SRCS = src/gui/main.cpp src/gui/machine_selector.cpp src/gui/register_pane.cpp \
-           src/gui/memory_pane.cpp src/gui/disasm_pane.cpp src/gui/console_pane.cpp \
-           src/gui/dialogs/memory_dialogs.cpp src/gui/dialogs/assemble_dialog.cpp \
-           src/cli/cli_interpreter.cpp
-MCP_SRCS = src/mcp/main.cpp
-TEST_SRCS = tests/test_main.cpp tests/test_smoke.cpp tests/test_flatmembus.cpp tests/test_debug.cpp tests/test_cpu6502.cpp tests/test_disasm6502.cpp tests/test_devices.cpp
+CLI_SRCS = src/cli/main/main.cpp src/cli/main/cli_interpreter.cpp
+GUI_SRCS = src/gui/main/main.cpp src/gui/main/machine_selector.cpp src/gui/main/register_pane.cpp \
+           src/gui/main/memory_pane.cpp src/gui/main/disasm_pane.cpp src/gui/main/console_pane.cpp \
+           src/gui/main/dialogs/memory_dialogs.cpp src/gui/main/dialogs/assemble_dialog.cpp \
+           src/cli/main/cli_interpreter.cpp
+MCP_SRCS = src/mcp/main/main.cpp
+TEST_SRCS = tests/test_main.cpp src/libcore/test/test_libcore.cpp \
+            src/libmem/test/test_flatmembus.cpp src/libdebug/test/test_debug.cpp \
+            src/plugins/6502/test/test_cpu6502.cpp src/plugins/6502/test/test_disasm6502.cpp \
+            src/plugins/6502/test/test_assembler6502.cpp src/libtoolchain/test/test_toolchain.cpp \
+            src/libcore/test/test_registry.cpp src/libdevices/test/test_devices.cpp
 
 # Library Sources
-LIBMEM_SRCS       = src/libmem/ibus.cpp src/libmem/memory_bus.cpp src/libmem/libmem.cpp
-LIBCORE_SRCS      = src/libcore/icore.cpp src/libcore/rom_loader.cpp src/libcore/core_registry.cpp src/libcore/machines/machine_registry.cpp src/libcore/libcore.cpp
-LIBDEVICES_SRCS   = src/libdevices/libdevices.cpp src/libdevices/io_registry.cpp
-LIBTOOLCHAIN_SRCS = src/libtoolchain/symbol_table.cpp src/libtoolchain/source_map.cpp src/libtoolchain/toolchain_registry.cpp src/libtoolchain/libtoolchain.cpp
-LIBDEBUG_SRCS     = src/libdebug/breakpoint_list.cpp src/libdebug/debug_context.cpp src/libdebug/trace_buffer.cpp src/libdebug/libdebug.cpp
-LIBPLUGINS_SRCS   = src/plugin_loader/plugin_loader.cpp
+LIBMEM_SRCS       = src/libmem/main/ibus.cpp src/libmem/main/memory_bus.cpp src/libmem/main/libmem.cpp
+LIBCORE_SRCS      = src/libcore/main/icore.cpp src/libcore/main/rom_loader.cpp src/libcore/main/core_registry.cpp \
+                    src/libcore/main/machines/machine_registry.cpp src/libcore/main/libcore.cpp
+LIBDEVICES_SRCS   = src/libdevices/main/libdevices.cpp src/libdevices/main/io_registry.cpp
+LIBTOOLCHAIN_SRCS = src/libtoolchain/main/symbol_table.cpp src/libtoolchain/main/source_map.cpp \
+                    src/libtoolchain/main/toolchain_registry.cpp src/libtoolchain/main/libtoolchain.cpp
+LIBDEBUG_SRCS     = src/libdebug/main/breakpoint_list.cpp src/libdebug/main/debug_context.cpp \
+                    src/libdebug/main/trace_buffer.cpp src/libdebug/main/libdebug.cpp
+LIBPLUGINS_SRCS   = src/plugin_loader/main/plugin_loader.cpp
 
 # Plugin 6502 Sources
-PLUGIN_6502_SRCS  = src/plugins/6502/cpu6502.cpp src/plugins/6502/disassembler_6502.cpp \
-                    src/plugins/6502/assembler_6502.cpp src/plugins/6502/kickassembler.cpp \
-                    src/plugins/6502/plugin_init.cpp
+PLUGIN_6502_SRCS  = src/plugins/6502/main/cpu6502.cpp src/plugins/6502/main/disassembler_6502.cpp \
+                    src/plugins/6502/main/assembler_6502.cpp src/plugins/6502/main/kickassembler.cpp \
+                    src/plugins/6502/main/plugin_init.cpp
 
 # Objects
 LIBMEM_OBJS       = $(LIBMEM_SRCS:.cpp=.o)

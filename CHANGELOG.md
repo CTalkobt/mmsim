@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [0.1.0-dev] - 2026-03-23
 
 ### Added
+- **Project Structure Refactoring:**
+    - Reorganized all sub-modules into `main` and `test` subdirectories (e.g., `src/libdebug/main` and `src/libdebug/test`).
+    - Moved module-specific unit tests from `tests/` to their respective module `test` directories.
+    - Updated `Makefile` and all C++ include directives to reflect the new structure.
+    - Reserved the top-level `tests/` directory for cross-cutting integration scenarios.
 - **Device Infrastructure (Phase 9):**
     - Implemented `IOHandler` abstract base class for memory-mapped devices.
     - Implemented `IORegistry` for centralized device management and I/O dispatching.
