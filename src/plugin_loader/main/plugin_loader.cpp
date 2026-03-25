@@ -28,7 +28,7 @@ static SimPluginHostAPI s_hostAPI = {
 };
 
 bool PluginLoader::load(const std::string& path) {
-    void* handle = dlopen(path.c_str(), RTLD_NOW);
+    void* handle = dlopen(path.c_str(), RTLD_NOW | RTLD_GLOBAL);
     if (!handle) {
         std::cerr << "Failed to load plugin: " << dlerror() << std::endl;
         return false;
@@ -48,8 +48,10 @@ bool PluginLoader::load(const std::string& path) {
         return false;
     }
 
-    if (manifest->apiVersion != MMEMU_PLUGIN_API_VERSION) {
-        std::cerr << "Plugin API version mismatch: " << manifest->apiVersion << " (host uses " << MMEMU_PLUGIN_API_VERSION << ")" << std::endl;
+    if (MMEMU_PLUGIN_API_MAJOR(manifest->apiVersion) != MMEMU_PLUGIN_API_MAJOR(MMEMU_PLUGIN_API_VERSION)) {
+        std::cerr << "Plugin API major version mismatch: plugin="
+                  << MMEMU_PLUGIN_API_MAJOR(manifest->apiVersion)
+                  << " host=" << MMEMU_PLUGIN_API_MAJOR(MMEMU_PLUGIN_API_VERSION) << std::endl;
         dlclose(handle);
         return false;
     }
@@ -63,10 +65,16 @@ bool PluginLoader::load(const std::string& path) {
 
 void PluginLoader::loadFromDir(const std::string& dir) {
     if (!fs::exists(dir)) return;
+    std::vector<std::string> deferred;
     for (const auto& entry : fs::directory_iterator(dir)) {
         if (entry.is_regular_file() && entry.path().extension() == ".so") {
-            load(entry.path().string());
+            if (!load(entry.path().string()))
+                deferred.push_back(entry.path().string());
         }
+    }
+    // Retry plugins that failed on first pass — their dependencies may now be loaded.
+    for (const auto& path : deferred) {
+        load(path);
     }
 }
 

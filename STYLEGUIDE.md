@@ -41,4 +41,4 @@ The project prefers **camelCase** for local variables, function parameters, and 
 ## 5. Plugin ABI
 
 - Functions exported by plugins MUST follow the C calling convention and be declared `extern "C"`.
-- Naming for the public ABI (e.g., `mmemu_plugin_init`) may use `snake_case` to maintain compatibility with standard loader expectations.
+- The plugin entry point is `mmemuPluginInit` — camelCase, consistent with the rest of the codebase.

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 
 class IBus;
 
@@ -15,7 +14,7 @@ public:
     /**
      * Unique name of the device (e.g. "VIC-II").
      */
-    virtual std::string name() const = 0;
+    virtual const char* name() const = 0;
 
     /**
      * Base address where this device is mapped.

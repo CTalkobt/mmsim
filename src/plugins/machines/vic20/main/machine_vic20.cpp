@@ -4,7 +4,7 @@
 #include "libmem/main/memory_bus.h"
 #include "libdevices/main/io_registry.h"
 #include "libdevices/main/device_registry.h"
-#include "libdevices/main/ikeyboard_device.h"
+#include "libdevices/main/ikeyboard_matrix.h"
 #include "via6522.h"
 #include "vic6560.h"
 #include <iostream>
@@ -14,7 +14,7 @@
 class ColorRamHandler : public IOHandler {
 public:
     ColorRamHandler(uint8_t* ram) : m_ram(ram) {}
-    std::string name() const override { return "ColorRAM"; }
+    const char* name() const override { return "ColorRAM"; }
     uint32_t baseAddr() const override { return 0x9400; }
     uint32_t addrMask() const override { return 0x03FF; }
     bool ioRead(IBus*, uint32_t addr, uint8_t* val) override {
@@ -92,17 +92,18 @@ MachineDescriptor* createMachineVic20() {
     io->registerHandler(via1);
     io->registerHandler(via2);
 
-    // 3.6 Keyboard Matrix (Retrieve via registry)
+    // 3.6 Keyboard Matrix — wired as two IPortDevices into the VIAs.
+    // Registered in the IORegistry so resetAll() and tickAll() reach it.
     IOHandler* kbdHandler = DeviceRegistry::instance().createDevice("kbd_vic20");
     if (kbdHandler) {
-        // Cast to the interface, not the implementation
-        IKeyboardDevice* kbd = dynamic_cast<IKeyboardDevice*>(kbdHandler);
+        IKeyboardMatrix* kbd = dynamic_cast<IKeyboardMatrix*>(kbdHandler);
         if (kbd) {
-            desc->keyboard = kbd;
-            via1->setPortADevice(kbd->getPort(0)); // ColumnPort
-            via2->setPortBDevice(kbd->getPort(1)); // RowPort
-            // Note: The machine descriptor doesn't own kbdHandler directly, 
-            // but we should probably track it if we wanted to delete it later.
+            via1->setPortADevice(kbd->getPort(0)); // ColumnPort → VIA1 Port A
+            via2->setPortBDevice(kbd->getPort(1)); // RowPort   → VIA2 Port B
+            io->registerHandler(kbdHandler);
+            desc->onKey = [kbd](const std::string& keyName, bool down) {
+                return kbd->pressKeyByName(keyName, down);
+            };
         }
     } else {
         std::cerr << "Error: VIC-20 could not find 'kbd_vic20' device." << std::endl;
@@ -116,8 +117,7 @@ MachineDescriptor* createMachineVic20() {
     // desc->overlays.push_back({"roms/vic20/kernal.bin", 0xE000, true, true});
 
     desc->onReset = [](MachineDescriptor& d) {
-        if (d.ioRegistry) d.ioRegistry->resetAll();
-        if (d.keyboard) d.keyboard->clearKeys();
+        if (d.ioRegistry) d.ioRegistry->resetAll(); // resets all devices incl. keyboard
         for (auto& slot : d.cpus) {
             if (slot.cpu) slot.cpu->reset();
         }

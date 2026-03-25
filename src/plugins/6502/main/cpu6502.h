@@ -61,7 +61,7 @@ public:
     void triggerNmi()   override;
     void triggerReset() override { reset(); }
 
-    // Disassembly (Stubs for now, will be implemented if needed for Phase 2 tests)
+    // Disassembly
     int disassembleOne  (IBus* bus, uint32_t addr, char* buf, int bufsz) override;
     int disassembleEntry(IBus* bus, uint32_t addr, void* entryOut)      override;
 

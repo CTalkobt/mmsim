@@ -2,8 +2,11 @@
 
 #include <cstdint>
 
-// mmemu public plugin ABI — version 1
-#define MMEMU_PLUGIN_API_VERSION 1
+// mmemu public plugin ABI version — upper 16 bits: major, lower 16 bits: minor.
+// Major version changes are breaking; minor version changes are additive.
+#define MMEMU_PLUGIN_API_VERSION  0x00010000u
+#define MMEMU_PLUGIN_API_MAJOR(v) ((v) >> 16)
+#define MMEMU_PLUGIN_API_MINOR(v) ((v) & 0xFFFFu)
 
 class ICore;
 class IDisassembler;
@@ -61,7 +64,7 @@ struct MachinePluginInfo {
  * Top-level manifest returned by the plugin entry point.
  */
 struct SimPluginManifest {
-    int apiVersion;
+    uint32_t apiVersion;
     const char* pluginId;
     const char* version;
 

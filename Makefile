@@ -2,7 +2,7 @@
 # Top-level Makefile
 
 CXX      ?= g++
-CXXFLAGS ?= -std=c++17 -Wall -Wextra -Wpedantic -O2 -fPIC
+CXXFLAGS ?= -std=c++17 -Wall -Wextra -Wpedantic -Wno-unused-parameter -O2 -fPIC
 INCLUDES  = -Isrc -Isrc/include \
             -Isrc/cli/main -Isrc/gui/main -Isrc/libcore/main -Isrc/libdebug/main \
             -Isrc/libdevices/main -Isrc/libmem/main -Isrc/libtoolchain/main \
@@ -21,6 +21,10 @@ LIBDIR = lib
 # Internal library directory for static archives (.a) not intended for distribution
 ILIBDIR = lib/internal
 
+# Eagerly create output directories when the Makefile is parsed so that
+# parallel builds never race against the order-only prerequisite rule.
+$(shell mkdir -p $(BINDIR) $(LIBDIR) $(ILIBDIR))
+
 # Public dynamic plugins intended for distribution
 PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-via6522.so \
@@ -30,9 +34,7 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
 
 # Static libraries used for linking and testing
 LIBS = $(ILIBDIR)/libmem.a $(ILIBDIR)/libcore.a $(ILIBDIR)/libdevices.a \
-       $(ILIBDIR)/libtoolchain.a $(ILIBDIR)/libdebug.a $(ILIBDIR)/libplugins.a \
-       $(ILIBDIR)/libdeviceVIA6522.a $(ILIBDIR)/libdeviceVIC6560.a \
-       $(ILIBDIR)/libdeviceKbdVic20.a
+       $(ILIBDIR)/libtoolchain.a $(ILIBDIR)/libdebug.a $(ILIBDIR)/libplugins.a
 
 # Binaries
 CLI_BIN = $(BINDIR)/mmemu-cli
@@ -66,24 +68,22 @@ LIBDEBUG_SRCS     = src/libdebug/main/breakpoint_list.cpp src/libdebug/main/debu
                     src/libdebug/main/trace_buffer.cpp src/libdebug/main/libdebug.cpp
 LIBPLUGINS_SRCS   = src/plugin_loader/main/plugin_loader.cpp
 
-# Device Implementations (as static libs for plugins to link)
-LIBVIA6522_SRCS   = src/plugins/devices/via6522/main/via6522.cpp
-LIBVIC6560_SRCS   = src/plugins/devices/vic6560/main/vic6560.cpp
-LIBKBDVIC20_SRCS  = src/plugins/devices/kbd_vic20/main/kbd_vic20.cpp
-
 # Plugin 6502 Sources
 PLUGIN_6502_SRCS  = src/plugins/6502/main/cpu6502.cpp src/plugins/6502/main/disassembler_6502.cpp \
                     src/plugins/6502/main/assembler_6502.cpp src/plugins/6502/main/kickassembler.cpp \
                     src/plugins/6502/main/plugin_init.cpp
 
-# Plugin VIA6522 Sources
-PLUGIN_VIA6522_SRCS = src/plugins/devices/via6522/main/plugin_init.cpp
+# Plugin VIA6522 Sources — device implementation compiled into the .so
+PLUGIN_VIA6522_SRCS = src/plugins/devices/via6522/main/via6522.cpp \
+                      src/plugins/devices/via6522/main/plugin_init.cpp
 
-# Plugin VIC6560 Sources
-PLUGIN_VIC6560_SRCS = src/plugins/devices/vic6560/main/plugin_init.cpp
+# Plugin VIC6560 Sources — device implementation compiled into the .so
+PLUGIN_VIC6560_SRCS = src/plugins/devices/vic6560/main/vic6560.cpp \
+                      src/plugins/devices/vic6560/main/plugin_init.cpp
 
-# Plugin Keyboard Sources
-PLUGIN_KBDVIC20_SRCS = src/plugins/devices/kbd_vic20/main/plugin_init.cpp
+# Plugin Keyboard Sources — device implementation compiled into the .so
+PLUGIN_KBDVIC20_SRCS = src/plugins/devices/kbd_vic20/main/kbd_vic20.cpp \
+                       src/plugins/devices/kbd_vic20/main/plugin_init.cpp
 
 # Plugin VIC-20 Machine Sources
 PLUGIN_VIC20_SRCS = src/plugins/machines/vic20/main/machine_vic20.cpp src/plugins/machines/vic20/main/plugin_init.cpp
@@ -95,9 +95,6 @@ LIBDEVICES_OBJS   = $(LIBDEVICES_SRCS:.cpp=.o)
 LIBTOOLCHAIN_OBJS = $(LIBTOOLCHAIN_SRCS:.cpp=.o)
 LIBDEBUG_OBJS     = $(LIBDEBUG_SRCS:.cpp=.o)
 LIBPLUGINS_OBJS   = $(LIBPLUGINS_SRCS:.cpp=.o)
-LIBVIA6522_OBJS   = $(LIBVIA6522_SRCS:.cpp=.o)
-LIBVIC6560_OBJS   = $(LIBVIC6560_SRCS:.cpp=.o)
-LIBKBDVIC20_OBJS  = $(LIBKBDVIC20_SRCS:.cpp=.o)
 PLUGIN_6502_OBJS  = $(PLUGIN_6502_SRCS:.cpp=.o)
 PLUGIN_VIA6522_OBJS = $(PLUGIN_VIA6522_SRCS:.cpp=.o)
 PLUGIN_VIC6560_OBJS = $(PLUGIN_VIC6560_SRCS:.cpp=.o)
@@ -106,9 +103,8 @@ PLUGIN_VIC20_OBJS = $(PLUGIN_VIC20_SRCS:.cpp=.o)
 
 ALL_LIB_OBJS = $(LIBMEM_OBJS) $(LIBCORE_OBJS) $(LIBDEVICES_OBJS) \
                $(LIBTOOLCHAIN_OBJS) $(LIBDEBUG_OBJS) $(LIBPLUGINS_OBJS) \
-               $(LIBVIA6522_OBJS) $(LIBVIC6560_OBJS) $(LIBKBDVIC20_OBJS) \
-               $(PLUGIN_VIC20_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) \
-               $(PLUGIN_KBDVIC20_OBJS)
+               $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) $(PLUGIN_KBDVIC20_OBJS) \
+               $(PLUGIN_VIC20_OBJS)
 
 # ---------------------------------------------------------------------------
 # Ensure clean and build targets run sequentially even with -j
@@ -164,15 +160,6 @@ $(ILIBDIR)/libdebug.a: $(LIBDEBUG_OBJS) | $(ILIBDIR)
 $(ILIBDIR)/libplugins.a: $(LIBPLUGINS_OBJS) | $(ILIBDIR)
 	$(AR) $(ARFLAGS) $@ $^
 
-$(ILIBDIR)/libdeviceVIA6522.a: $(LIBVIA6522_OBJS) | $(ILIBDIR)
-	$(AR) $(ARFLAGS) $@ $^
-
-$(ILIBDIR)/libdeviceVIC6560.a: $(LIBVIC6560_OBJS) | $(ILIBDIR)
-	$(AR) $(ARFLAGS) $@ $^
-
-$(ILIBDIR)/libdeviceKbdVic20.a: $(LIBKBDVIC20_OBJS) | $(ILIBDIR)
-	$(AR) $(ARFLAGS) $@ $^
-
 # ---------------------------------------------------------------------------
 # Plugin rules
 # ---------------------------------------------------------------------------
@@ -196,8 +183,8 @@ $(LIBDIR)/mmemu-plugin-vic20.so: $(PLUGIN_VIC20_OBJS) | $(LIBDIR)
 # Binary rules
 # ---------------------------------------------------------------------------
 
-# Helper to link against all libs
-BASE_LIBS = -Wl,--whole-archive -L$(ILIBDIR) -lplugins -ldebug -ltoolchain -ldevices -lcore -lmem -ldeviceVIA6522 -ldeviceVIC6560 -ldeviceKbdVic20 -Wl,--no-whole-archive -ldl
+# Helper to link against all host libs (device implementations live in plugins, not the host)
+BASE_LIBS = -Wl,--whole-archive -L$(ILIBDIR) -lplugins -ldebug -ltoolchain -ldevices -lcore -lmem -Wl,--no-whole-archive -ldl
 
 $(CLI_BIN): $(CLI_SRCS) $(LIBS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -rdynamic -o $@ $(CLI_SRCS) $(BASE_LIBS)
@@ -208,8 +195,23 @@ $(GUI_BIN): $(GUI_SRCS) $(LIBS) | $(BINDIR)
 $(MCP_BIN): $(MCP_SRCS) $(LIBS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -rdynamic -o $@ $(MCP_SRCS) $(BASE_LIBS)
 
-$(TEST_BIN): $(TEST_SRCS) $(LIBS) $(PLUGIN_6502_OBJS) | $(BINDIR)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -Itests -rdynamic -o $@ $(TEST_SRCS) $(PLUGIN_6502_OBJS) $(BASE_LIBS)
+# Device implementation objects linked directly into the test binary (tests don't use dlopen)
+DEVICE_TEST_OBJS = src/plugins/devices/via6522/main/via6522.o
+
+$(TEST_BIN): $(TEST_SRCS) $(LIBS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) | $(BINDIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -Itests -rdynamic -o $@ $(TEST_SRCS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) $(BASE_LIBS)
+
+# Plugin ABI surface enforcement: plugin sources see only the public include surface.
+# This prevents accidental use of internal host headers from plugin code.
+PLUGIN_INCLUDES = -Isrc -Isrc/include \
+                  -Isrc/plugins/6502/main \
+                  -Isrc/plugins/devices/via6522/main \
+                  -Isrc/plugins/devices/vic6560/main \
+                  -Isrc/plugins/devices/kbd_vic20/main \
+                  -Isrc/plugins/machines/vic20/main
+
+$(PLUGIN_6502_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) \
+$(PLUGIN_KBDVIC20_OBJS) $(PLUGIN_VIC20_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
 
 # ---------------------------------------------------------------------------
 # Generic object rule
@@ -228,4 +230,4 @@ test: $(TEST_BIN) plugins
 # ---------------------------------------------------------------------------
 
 clean:
-	rm -rf $(BINDIR) $(LIBDIR) $(ALL_LIB_OBJS) $(PLUGIN_6502_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) $(PLUGIN_KBDVIC20_OBJS)
+	rm -rf $(BINDIR) $(LIBDIR) $(ALL_LIB_OBJS) $(PLUGIN_6502_OBJS)

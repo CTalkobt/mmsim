@@ -7,7 +7,7 @@ public:
     MockDevice(std::string name, uint32_t base, uint32_t mask) 
         : m_name(name), m_base(base), m_mask(mask) {}
 
-    std::string name() const override { return m_name; }
+    const char* name() const override { return m_name.c_str(); }
     uint32_t baseAddr() const override { return m_base; }
     uint32_t addrMask() const override { return m_mask; }
 

@@ -1,7 +1,6 @@
 #include "cli_interpreter.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
-#include "libdevices/main/ikeyboard_device.h"
 #include <iostream>
 
 void CliInterpreter::processLine(const std::string& line) {
@@ -140,11 +139,11 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
             m_output("Syntax: asm <address>\n");
         }
     } else if (cmd == "key") {
-        if (!m_ctx.machine || !m_ctx.machine->keyboard) { m_output("No machine with keyboard created.\n"); return; }
+        if (!m_ctx.machine || !m_ctx.machine->onKey) { m_output("No machine with keyboard created.\n"); return; }
         std::string keyName, state;
         if (ss >> keyName >> state) {
             bool down = (state == "down" || state == "1");
-            if (!m_ctx.machine->keyboard->pressKeyByName(keyName, down)) {
+            if (!m_ctx.machine->onKey(keyName, down)) {
                 m_output("Unknown key: " + keyName + "\n");
             }
         } else {

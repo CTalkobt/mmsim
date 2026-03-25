@@ -1,19 +1,19 @@
 #include "mmemu_plugin_api.h"
 #include "libdevices/main/io_handler.h"
-#include "libdevices/main/ikeyboard_device.h"
+#include "libdevices/main/ikeyboard_matrix.h"
 #include "kbd_vic20.h"
 
 /**
  * Wrapper that allows a keyboard device to be registered as an IOHandler
  * while also exposing the IKeyboardDevice interface.
  */
-class KeyboardDeviceWrapper : public IOHandler, public IKeyboardDevice {
+class KeyboardDeviceWrapper : public IOHandler, public IKeyboardMatrix {
 public:
     KeyboardDeviceWrapper() { m_kbd = new KbdVic20(); }
     ~KeyboardDeviceWrapper() { delete m_kbd; }
 
     // IOHandler interface
-    std::string name() const override { return "kbd_vic20"; }
+    const char* name() const override { return "kbd_vic20"; }
     uint32_t baseAddr() const override { return 0; }
     uint32_t addrMask() const override { return 0; }
     bool ioRead(IBus*, uint32_t, uint8_t*) override { return false; }

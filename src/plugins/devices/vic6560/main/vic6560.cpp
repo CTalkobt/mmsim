@@ -52,21 +52,11 @@ void VIC6560::tick(uint64_t cycles) {
         currRaster = 0;
     }
 
-    if (currRaster != prevRaster) {
-        // Check for raster IRQ (very simplified)
-        // In real VIC, there is no raster IRQ on 6560? 
-        // Wait, 6560/6561 doesn't have raster IRQ! 
-        // Only 6522 VIAs handle interrupts in VIC-20.
-        // My mistake, 10.2 says "raster counter triggers IRQ". 
-        // Actually, 6560 does NOT have a raster IRQ register like 6567 (VIC-II).
-        // It only has a raster counter you can poll.
-        // Let's re-read 10.2: "raster counter: increments each line; comparison register triggers IRQ."
-        // Maybe the plan wants me to implement one if it were there, or maybe I'm misremembering.
-        // Actually, some sources say there IS a light pen interrupt?
-        // Let's stick to the plan's requirement even if it diverges from 6560 slightly, 
-        // or assume it's for a "VIC-I enhanced".
-        // Actually, 6560 does NOT have an IRQ pin.
-    }
+    // The 6560/6561 has no IRQ pin and no raster-compare interrupt (unlike the 6567 VIC-II).
+    // The raster counter is read-only via registers $03/$04 and is polled by software.
+    // Interrupt generation in the VIC-20 is handled entirely by the 6522 VIAs.
+    (void)currRaster;
+    (void)prevRaster;
 }
 
 IVideoOutput::VideoDimensions VIC6560::getDimensions() const {

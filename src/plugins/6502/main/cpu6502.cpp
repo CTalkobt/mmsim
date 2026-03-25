@@ -11,7 +11,8 @@ static const RegDescriptor s_regDescriptors[] = {
     { "SP",     RegWidth::R8,  REGFLAG_SP,          nullptr },
     { "PC",     RegWidth::R16, REGFLAG_PC,          nullptr },
     { "P",      RegWidth::R8,  REGFLAG_STATUS,      "F"     },
-    { "cycles", RegWidth::R32, REGFLAG_INTERNAL,    nullptr }
+    { "cycles_lo", RegWidth::R32, REGFLAG_INTERNAL,  nullptr },
+    { "cycles_hi", RegWidth::R32, REGFLAG_INTERNAL,  nullptr }
 };
 
 MOS6502::MOS6502() {
@@ -35,7 +36,8 @@ uint32_t MOS6502::regRead(int idx) const {
         case 3: return m_state.sp;
         case 4: return m_state.pc;
         case 5: return m_state.p;
-        case 6: return (uint32_t)m_state.cycles;
+        case 6: return (uint32_t)(m_state.cycles & 0xFFFFFFFFu);
+        case 7: return (uint32_t)(m_state.cycles >> 32);
         default: return 0;
     }
 }
@@ -48,7 +50,8 @@ void MOS6502::regWrite(int idx, uint32_t val) {
         case 3: m_state.sp = (uint8_t)val; break;
         case 4: m_state.pc = (uint16_t)val; break;
         case 5: m_state.p = (uint8_t)val; break;
-        case 6: m_state.cycles = val; break;
+        case 6: m_state.cycles = (m_state.cycles & 0xFFFFFFFF00000000ull) | val; break;
+        case 7: m_state.cycles = ((uint64_t)val << 32) | (m_state.cycles & 0xFFFFFFFFu); break;
     }
 }
 

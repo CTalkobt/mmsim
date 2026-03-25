@@ -18,11 +18,12 @@ public:
     // Configuration
     void setName(const std::string& name) { m_name = name; }
     void setBaseAddr(uint32_t addr) { m_baseAddr = addr; }
+    void setBus(IBus* bus) { m_bus = bus; }
     void setIrqLine(ISignalLine* line) { m_irqLine = line; }
     void setColorRam(const uint8_t* colorRam) { m_colorRam = colorRam; }
 
     // IOHandler interface
-    std::string name() const override { return m_name; }
+    const char* name() const override { return m_name.c_str(); }
     uint32_t baseAddr() const override { return m_baseAddr; }
     uint32_t addrMask() const override { return 0x000F; } // 16 registers
 

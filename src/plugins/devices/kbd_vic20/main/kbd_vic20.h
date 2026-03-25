@@ -1,7 +1,7 @@
 #pragma once
 
 #include "libdevices/main/iport_device.h"
-#include "libdevices/main/ikeyboard_device.h"
+#include "libdevices/main/ikeyboard_matrix.h"
 #include <vector>
 #include <map>
 
@@ -9,7 +9,7 @@
  * Standard Commodore 8x8 Keyboard Matrix.
  * Wired to two I/O ports.
  */
-class KbdVic20 : public IKeyboardDevice {
+class KbdVic20 : public IKeyboardMatrix {
 public:
     KbdVic20();
     virtual ~KbdVic20() = default;

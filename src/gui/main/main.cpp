@@ -13,7 +13,6 @@
 #include "libcore/main/machine_desc.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
-#include "libdevices/main/ikeyboard_device.h"
 
 // mmemu - Multi Machine Emulator
 
@@ -299,7 +298,7 @@ void MmemuFrame::OnKeyDown(wxKeyEvent& event) {
         return;
     }
 
-    if (m_kbdFocus && m_machine && m_machine->keyboard) {
+    if (m_kbdFocus && m_machine && m_machine->onKey) {
         // Map common keys to CBM matrix names
         int code = event.GetKeyCode();
         std::string name;
@@ -315,7 +314,7 @@ void MmemuFrame::OnKeyDown(wxKeyEvent& event) {
         else if (code == WXK_RIGHT) name = "right";
 
         if (!name.empty()) {
-            m_machine->keyboard->pressKeyByName(name, true);
+            m_machine->onKey(name, true);
         }
     } else {
         event.Skip();
@@ -323,7 +322,7 @@ void MmemuFrame::OnKeyDown(wxKeyEvent& event) {
 }
 
 void MmemuFrame::OnKeyUp(wxKeyEvent& event) {
-    if (m_kbdFocus && m_machine && m_machine->keyboard) {
+    if (m_kbdFocus && m_machine && m_machine->onKey) {
         int code = event.GetKeyCode();
         std::string name;
         if (code >= 'A' && code <= 'Z') name = (char)std::tolower(code);
@@ -338,7 +337,7 @@ void MmemuFrame::OnKeyUp(wxKeyEvent& event) {
         else if (code == WXK_RIGHT) name = "right";
 
         if (!name.empty()) {
-            m_machine->keyboard->pressKeyByName(name, false);
+            m_machine->onKey(name, false);
         }
     } else {
         event.Skip();

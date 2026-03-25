@@ -41,7 +41,6 @@ struct MemOverlay {
  * Forward declaration of IORegistry.
  */
 class IORegistry;
-class IKeyboardDevice;
 
 /**
  * Machine Descriptor.
@@ -55,11 +54,17 @@ struct MachineDescriptor {
     std::vector<BusSlot> buses;
 
     IORegistry* ioRegistry = nullptr;
-    IKeyboardDevice* keyboard = nullptr;
 
     // Lifecycle hooks
     std::function<void(MachineDescriptor&)> onReset;
     std::function<void(MachineDescriptor&)> onInit;
+
+    /** Key injection hook — set by machines that have a keyboard matrix.
+     *  @param keyName  Symbolic key name (e.g. "a", "return", "f1").
+     *  @param down     true = press, false = release.
+     *  @return true if the key name was recognised.
+     */
+    std::function<bool(const std::string& keyName, bool down)> onKey;
 
     // Scheduler
     std::function<int(MachineDescriptor&)> schedulerStep;

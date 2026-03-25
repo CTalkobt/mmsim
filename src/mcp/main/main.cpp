@@ -11,7 +11,6 @@
 #include "plugin_loader/main/plugin_loader.h"
 #include "libmem/main/memory_bus.h"
 #include "libcore/main/icore.h"
-#include "libdevices/main/ikeyboard_device.h"
 
 struct MachineState {
     MachineDescriptor* machine = nullptr;
@@ -268,11 +267,11 @@ Json handleToolsCall(const Json& params) {
         if (!ms) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID");
             textItem.oVal["isError"] = Json(true);
-        } else if (!ms->machine->keyboard) {
+        } else if (!ms->machine->onKey) {
             textItem.oVal["text"] = Json("Error: Machine has no keyboard");
             textItem.oVal["isError"] = Json(true);
         } else {
-            if (ms->machine->keyboard->pressKeyByName(key, down)) {
+            if (ms->machine->onKey(key, down)) {
                 textItem.oVal["text"] = Json("Key " + key + (down ? " pressed" : " released"));
             } else {
                 textItem.oVal["text"] = Json("Error: Unknown key " + key);
