@@ -12,7 +12,7 @@
 /**
  * VIC-20 Machine Descriptor Factory.
  */
-static MachineDescriptor* createMachineVic20() {
+MachineDescriptor* createMachineVic20() {
     auto* desc = new MachineDescriptor();
     desc->machineId = "vic20";
     desc->displayName = "Commodore VIC-20";
@@ -116,11 +116,3 @@ static MachineDescriptor* createMachineVic20() {
 
     return desc;
 }
-
-/**
- * Register the VIC-20 machine at startup.
- */
-static bool s_vic20Registered = []() {
-    MachineRegistry::instance().registerMachine("vic20", createMachineVic20);
-    return true;
-}();

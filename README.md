@@ -101,12 +101,13 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 
 ## 7. Plugin Ecosystem
 
-### Processors
-- [6502 (Implemented)](README-6502.md)
-- *Z80, 68000, ARM, etc. (Planned)*
+**mmsim** utilizes a modular plugin architecture. For a complete list of available processors, devices, and machine presets, see the **[Plugin Index (README-PLUGINS.md)](README-PLUGINS.md)**.
 
-### Devices & Machines
-- *Documentation for specialized devices and machine presets will be added as they are implemented.*
+### Quick Links:
+- [6502 Processor Implementation](README-6502.md)
+- [6522 VIA Implementation](README-6522.md)
+- [6560 VIC-I Implementation](README-6560.md)
+- [VIC-20 Machine Implementation](README-VIC20.md)
 
 ---
 

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [0.1.0-dev] - 2026-03-23
 
 ### Added
+- **Machine Plugin Refactor & Build Cleanup:**
+    - Moved the VIC-20 machine descriptor into a dedicated dynamic plugin (`lib/mmemu-plugin-vic20.so`).
+    - Standardized the `lib/` directory to contain only dynamic plugins intended for distribution.
+    - Relocated internal static archives (`.a` files) to `lib/internal/` to keep them hidden from end-users.
+    - Updated the `Makefile` to handle complex cross-plugin dependencies while maintaining test suite stability.
 - **VIC-I Video Chip & Standard Video Interface (Phase 10.2):**
     - Defined `IVideoOutput` standard interface for all video-generating plugins.
     - Implemented MOS 6560 (VIC-I) rendering logic, including character fetch, multi-color support, and palette.
