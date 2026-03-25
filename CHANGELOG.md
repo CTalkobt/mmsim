@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 ## [0.1.0-dev] - 2026-03-23
 
 ### Added
+- **Device Infrastructure (Phase 9):**
+    - Implemented `IOHandler` abstract base class for memory-mapped devices.
+    - Implemented `IORegistry` for centralized device management and I/O dispatching.
+    - Added `IPortDevice` interface for parallel I/O peripherals (VIA/CIA support).
+    - Added `ISignalLine` interface for hardware signals (IRQ/NMI/Reset).
+    - Integrated `IORegistry` into the build system and added unit tests in `tests/test_devices.cpp`.
 - **GUI Advanced Debugger Features (Phase 8.5):**
     - Implemented `ConsolePane` providing an integrated CLI environment within the GUI.
     - Added `FillMemoryDialog` and `CopyMemoryDialog` for easier memory manipulation.

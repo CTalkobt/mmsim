@@ -33,12 +33,12 @@ GUI_SRCS = src/gui/main.cpp src/gui/machine_selector.cpp src/gui/register_pane.c
            src/gui/dialogs/memory_dialogs.cpp src/gui/dialogs/assemble_dialog.cpp \
            src/cli/cli_interpreter.cpp
 MCP_SRCS = src/mcp/main.cpp
-TEST_SRCS = tests/test_main.cpp tests/test_smoke.cpp tests/test_flatmembus.cpp tests/test_debug.cpp tests/test_cpu6502.cpp tests/test_disasm6502.cpp
+TEST_SRCS = tests/test_main.cpp tests/test_smoke.cpp tests/test_flatmembus.cpp tests/test_debug.cpp tests/test_cpu6502.cpp tests/test_disasm6502.cpp tests/test_devices.cpp
 
 # Library Sources
 LIBMEM_SRCS       = src/libmem/ibus.cpp src/libmem/memory_bus.cpp src/libmem/libmem.cpp
 LIBCORE_SRCS      = src/libcore/icore.cpp src/libcore/rom_loader.cpp src/libcore/core_registry.cpp src/libcore/machines/machine_registry.cpp src/libcore/libcore.cpp
-LIBDEVICES_SRCS   = src/libdevices/libdevices.cpp
+LIBDEVICES_SRCS   = src/libdevices/libdevices.cpp src/libdevices/io_registry.cpp
 LIBTOOLCHAIN_SRCS = src/libtoolchain/symbol_table.cpp src/libtoolchain/source_map.cpp src/libtoolchain/toolchain_registry.cpp src/libtoolchain/libtoolchain.cpp
 LIBDEBUG_SRCS     = src/libdebug/breakpoint_list.cpp src/libdebug/debug_context.cpp src/libdebug/trace_buffer.cpp src/libdebug/libdebug.cpp
 LIBPLUGINS_SRCS   = src/plugin_loader/plugin_loader.cpp

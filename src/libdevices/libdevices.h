@@ -1,5 +1,10 @@
 #pragma once
 
+#include "io_handler.h"
+#include "io_registry.h"
+#include "iport_device.h"
+#include "isignal_line.h"
+
 // mmemu libdevices — Device / IO handler implementations
 //
 // Planned contents:
