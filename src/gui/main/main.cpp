@@ -10,6 +10,7 @@
 #include "dialogs/memory_dialogs.h"
 #include "dialogs/assemble_dialog.h"
 #include "plugin_loader/main/plugin_loader.h"
+#include "plugin_pane_manager.h"
 #include "libcore/main/machine_desc.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
@@ -61,6 +62,7 @@ private:
     MemoryPane* m_memPane;
     DisasmPane* m_disasmPane;
     ConsolePane* m_consolePane;
+    wxAuiNotebook* m_notebook = nullptr;
     
     wxTimer m_timer;
     bool m_running = false;
@@ -70,6 +72,9 @@ private:
 class MmemuApp : public wxApp {
 public:
     bool OnInit() override {
+        PluginLoader::instance().setPaneRegisterFn([](const PluginPaneInfo* info) {
+            PluginPaneManager::instance().registerPane(info);
+        });
         PluginLoader::instance().loadFromDir("./lib");
         auto *frame = new MmemuFrame();
         frame->Show(true);
@@ -135,9 +140,14 @@ MmemuFrame::MmemuFrame()
     auto* leftSplitter = new wxSplitterWindow(mainSplitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
     
     auto* centerSplitter = new wxSplitterWindow(leftSplitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
-    m_disasmPane = new DisasmPane(centerSplitter);
-    m_memPane = new MemoryPane(centerSplitter);
-    centerSplitter->SplitHorizontally(m_disasmPane, m_memPane, 300);
+    
+    auto* notebookSplitter = new wxSplitterWindow(centerSplitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
+    m_disasmPane = new DisasmPane(notebookSplitter);
+    m_memPane = new MemoryPane(notebookSplitter);
+    notebookSplitter->SplitHorizontally(m_disasmPane, m_memPane, 300);
+    
+    m_notebook = new wxAuiNotebook(centerSplitter, wxID_ANY);
+    centerSplitter->SplitVertically(notebookSplitter, m_notebook, 600);
     
     m_consolePane = new ConsolePane(leftSplitter);
     leftSplitter->SplitHorizontally(centerSplitter, m_consolePane, 550);
@@ -190,6 +200,8 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             m_disasmPane->SetBus(m_bus);
             m_disasmPane->SetDisassembler(m_disasm);
             m_consolePane->SetContext(m_cpu, m_bus);
+            
+            PluginPaneManager::instance().onMachineSwitch(id, this, m_notebook);
             
             SetTitle("mmemu - " + m_machine->displayName);
             SetStatusText("Loaded machine: " + id);
@@ -363,6 +375,7 @@ void MmemuFrame::OnTimer(wxTimerEvent& event) {
         m_regPane->RefreshValues();
         m_disasmPane->RefreshValues(m_cpu->pc());
         m_memPane->RefreshValues();
+        PluginPaneManager::instance().tickAll(m_cpu->cycles());
     }
 }
 

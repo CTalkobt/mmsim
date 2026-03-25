@@ -19,13 +19,32 @@ static void hostLog(int level, const char* msg) {
     std::cerr << "[Plugin Log " << level << "] " << msg << std::endl;
 }
 
+static void stubRegisterPane(const PluginPaneInfo*) {}
+static void stubRegisterCommand(const PluginCommandInfo*) {}
+static void stubRegisterMcpTool(const PluginMcpToolInfo*) {}
+
 static SimPluginHostAPI s_hostAPI = {
     hostLog,
     &CoreRegistry::instance(),
     &MachineRegistry::instance(),
     &DeviceRegistry::instance(),
-    &ToolchainRegistry::instance()
+    &ToolchainRegistry::instance(),
+    stubRegisterPane,
+    stubRegisterCommand,
+    stubRegisterMcpTool
 };
+
+void PluginLoader::setPaneRegisterFn(void (*fn)(const PluginPaneInfo*)) {
+    s_hostAPI.registerPane = fn ? fn : stubRegisterPane;
+}
+
+void PluginLoader::setCommandRegisterFn(void (*fn)(const PluginCommandInfo*)) {
+    s_hostAPI.registerCommand = fn ? fn : stubRegisterCommand;
+}
+
+void PluginLoader::setMcpToolRegisterFn(void (*fn)(const PluginMcpToolInfo*)) {
+    s_hostAPI.registerMcpTool = fn ? fn : stubRegisterMcpTool;
+}
 
 bool PluginLoader::load(const std::string& path) {
     void* handle = dlopen(path.c_str(), RTLD_NOW | RTLD_GLOBAL);

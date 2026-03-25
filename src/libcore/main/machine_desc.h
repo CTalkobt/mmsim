@@ -66,8 +66,15 @@ struct MachineDescriptor {
      */
     std::function<bool(const std::string& keyName, bool down)> onKey;
 
+    /** Joystick injection hook.
+     *  @param port     Joystick port index (0 or 1).
+     *  @param bits     5-bit active-low state (0=pressed, 1=idle).
+     */
+    std::function<void(int port, uint8_t bits)> onJoystick;
+
     // Scheduler
     std::function<int(MachineDescriptor&)> schedulerStep;
 
     std::vector<MemOverlay> overlays;
+    std::vector<uint8_t*>   roms; // Buffers owned by the machine
 };

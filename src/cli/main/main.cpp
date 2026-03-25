@@ -2,12 +2,23 @@
 #include <string>
 #include "cli_interpreter.h"
 #include "plugin_loader/main/plugin_loader.h"
+#include "plugin_command_registry.h"
 
 int main(int argc, char *argv[]) {
     (void)argc; (void)argv;
 
     std::cout << "mmemu - Multi Machine Emulator (CLI)\n";
     std::cout << "Version 0.1.0-dev\n";
+    
+    PluginLoader::instance().setCommandRegisterFn([](const PluginCommandInfo* info) {
+        PluginCommandRegistry::instance().registerCommand(info);
+    });
+    
+    // Register built-ins to prevent collisions
+    const char* builtIns[] = {"help", "?", "list", "create", "step", "setpc", "regs", "m", "f", "copy", "search", "searcha", "disasm", "asm", "key", "load", "quit", "q", nullptr};
+    for (int i = 0; builtIns[i]; ++i) {
+        PluginCommandRegistry::instance().registerBuiltIn(builtIns[i]);
+    }
     
     PluginLoader::instance().loadFromDir("./lib");
 

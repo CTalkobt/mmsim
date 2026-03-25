@@ -14,7 +14,7 @@ ARFLAGS   = rcs
 
 WXCONFIG  ?= wx-config
 WXCXXFLAGS := $(shell $(WXCONFIG) --cxxflags 2>/dev/null)
-WXLIBS     := $(shell $(WXCONFIG) --libs    2>/dev/null)
+WXLIBS     := $(shell $(WXCONFIG) --libs std,aui 2>/dev/null)
 
 BINDIR = bin
 LIBDIR = lib
@@ -32,9 +32,17 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-vic20.so \
           $(LIBDIR)/mmemu-plugin-kbd-vic20.so
 
+CC       ?= gcc
+CFLAGS   ?= -std=c11 -Wall -Wextra -Wpedantic -O2 -fPIC
+
+# ... (rest of variables)
+
 # Static libraries used for linking and testing
 LIBS = $(ILIBDIR)/libmem.a $(ILIBDIR)/libcore.a $(ILIBDIR)/libdevices.a \
        $(ILIBDIR)/libtoolchain.a $(ILIBDIR)/libdebug.a $(ILIBDIR)/libplugins.a
+
+# C compatibility check object
+C_CHECK_OBJ = tests/test_c_compatibility.o
 
 # Binaries
 CLI_BIN = $(BINDIR)/mmemu-cli
@@ -43,25 +51,31 @@ MCP_BIN = $(BINDIR)/mmemu-mcp
 TEST_BIN = $(BINDIR)/mmemu-tests
 
 # Sources
-CLI_SRCS = src/cli/main/main.cpp src/cli/main/cli_interpreter.cpp
+CLI_SRCS = src/cli/main/main.cpp src/cli/main/cli_interpreter.cpp src/cli/main/plugin_command_registry.cpp
 GUI_SRCS = src/gui/main/main.cpp src/gui/main/machine_selector.cpp src/gui/main/register_pane.cpp \
            src/gui/main/memory_pane.cpp src/gui/main/disasm_pane.cpp src/gui/main/console_pane.cpp \
            src/gui/main/dialogs/memory_dialogs.cpp src/gui/main/dialogs/assemble_dialog.cpp \
-           src/cli/main/cli_interpreter.cpp
-MCP_SRCS = src/mcp/main/main.cpp
+           src/cli/main/cli_interpreter.cpp src/gui/main/plugin_pane_manager.cpp \
+           src/cli/main/plugin_command_registry.cpp
+MCP_SRCS = src/mcp/main/main.cpp src/mcp/main/plugin_tool_registry.cpp
 TEST_SRCS = tests/test_main.cpp src/libcore/test/test_libcore.cpp \
             src/libmem/test/test_flatmembus.cpp src/libdebug/test/test_debug.cpp \
             src/plugins/6502/test/test_cpu6502.cpp src/plugins/6502/test/test_disasm6502.cpp \
             src/plugins/6502/test/test_assembler6502.cpp src/libtoolchain/test/test_toolchain.cpp \
             src/libcore/test/test_registry.cpp src/libdevices/test/test_devices.cpp \
-            src/plugins/devices/via6522/test/test_via6522.cpp
+            src/libdevices/test/test_joystick.cpp \
+            src/plugins/devices/via6522/test/test_via6522.cpp \
+            src/cli/main/plugin_command_registry.cpp \
+            src/mcp/main/plugin_tool_registry.cpp \
+            src/gui/main/plugin_pane_manager.cpp \
+            tests/test_plugin_extension.cpp
 
 # Library Sources
 LIBMEM_SRCS       = src/libmem/main/ibus.cpp src/libmem/main/memory_bus.cpp src/libmem/main/libmem.cpp
 LIBCORE_SRCS      = src/libcore/main/icore.cpp src/libcore/main/rom_loader.cpp src/libcore/main/core_registry.cpp \
                     src/libcore/main/machines/machine_registry.cpp src/libcore/main/libcore.cpp
 LIBDEVICES_SRCS   = src/libdevices/main/libdevices.cpp src/libdevices/main/io_registry.cpp \
-                    src/libdevices/main/device_registry.cpp
+                    src/libdevices/main/device_registry.cpp src/libdevices/main/joystick.cpp
 LIBTOOLCHAIN_SRCS = src/libtoolchain/main/symbol_table.cpp src/libtoolchain/main/source_map.cpp \
                     src/libtoolchain/main/toolchain_registry.cpp src/libtoolchain/main/libtoolchain.cpp
 LIBDEBUG_SRCS     = src/libdebug/main/breakpoint_list.cpp src/libdebug/main/debug_context.cpp \
@@ -199,7 +213,7 @@ $(MCP_BIN): $(MCP_SRCS) $(LIBS) | $(BINDIR)
 DEVICE_TEST_OBJS = src/plugins/devices/via6522/main/via6522.o
 
 $(TEST_BIN): $(TEST_SRCS) $(LIBS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) | $(BINDIR)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -Itests -rdynamic -o $@ $(TEST_SRCS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) $(BASE_LIBS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -Itests -rdynamic -o $@ $(TEST_SRCS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) $(BASE_LIBS) $(WXLIBS)
 
 # Plugin ABI surface enforcement: plugin sources see only the public include surface.
 # This prevents accidental use of internal host headers from plugin code.
@@ -220,11 +234,14 @@ $(PLUGIN_KBDVIC20_OBJS) $(PLUGIN_VIC20_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c -o $@ $<
 
+%.o: %.c
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
+
 # ---------------------------------------------------------------------------
 # Test target
 # ---------------------------------------------------------------------------
 
-test: $(TEST_BIN) plugins
+test: $(TEST_BIN) $(C_CHECK_OBJ) plugins
 	./$(TEST_BIN)
 
 # ---------------------------------------------------------------------------

@@ -5,6 +5,8 @@
 #include "libdevices/main/io_registry.h"
 #include "libdevices/main/device_registry.h"
 #include "libdevices/main/ikeyboard_matrix.h"
+#include "libdevices/main/joystick.h"
+#include "libcore/main/rom_loader.h"
 #include "via6522.h"
 #include "vic6560.h"
 #include <iostream>
@@ -63,6 +65,7 @@ MachineDescriptor* createMachineVic20() {
     // 3.5 Color RAM (1K x 4 bits, mapped at $9400 or $9600 depending on RAM expansion)
     uint8_t* colorRam = new uint8_t[1024];
     std::memset(colorRam, 0, 1024);
+    desc->roms.push_back(colorRam);
 
     // Create VIA devices from registry (if available)
     auto* via1 = (VIA6522*)DeviceRegistry::instance().createDevice("6522");
@@ -111,10 +114,39 @@ MachineDescriptor* createMachineVic20() {
 
     io->registerHandler(new ColorRamHandler(colorRam));
 
-    // 4. ROM Overlays (Placeholders)
-    // desc->overlays.push_back({"roms/vic20/char.bin", 0x8000, true, true});
-    // desc->overlays.push_back({"roms/vic20/basic.bin", 0xC000, true, true});
-    // desc->overlays.push_back({"roms/vic20/kernal.bin", 0xE000, true, true});
+    // 3.7 Joystick
+    auto* joy = new Joystick();
+    via1->setPortBDevice(joy);
+    desc->onJoystick = [joy](int port, uint8_t bits) {
+        if (port == 0) joy->setState(bits);
+    };
+
+    // 4. ROM Overlays
+    uint8_t* charRom = new uint8_t[4096];
+    uint8_t* basicRom = new uint8_t[8192];
+    uint8_t* kernalRom = new uint8_t[8192];
+
+    desc->roms.push_back(charRom);
+    desc->roms.push_back(basicRom);
+    desc->roms.push_back(kernalRom);
+
+    if (romLoad("roms/vic20/char.bin", charRom, 4096)) {
+        bus->addOverlay(0x8000, 4096, charRom, false);
+    } else {
+        std::cerr << "VIC-20: Warning: char.bin not found." << std::endl;
+    }
+
+    if (romLoad("roms/vic20/basic.bin", basicRom, 8192)) {
+        bus->addOverlay(0xC000, 8192, basicRom, false);
+    } else {
+        std::cerr << "VIC-20: Warning: basic.bin not found." << std::endl;
+    }
+
+    if (romLoad("roms/vic20/kernal.bin", kernalRom, 8192)) {
+        bus->addOverlay(0xE000, 8192, kernalRom, false);
+    } else {
+        std::cerr << "VIC-20: Warning: kernal.bin not found." << std::endl;
+    }
 
     desc->onReset = [](MachineDescriptor& d) {
         if (d.ioRegistry) d.ioRegistry->resetAll(); // resets all devices incl. keyboard

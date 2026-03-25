@@ -1,6 +1,7 @@
 #include "cli_interpreter.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
+#include "plugin_command_registry.h"
 #include <iostream>
 
 void CliInterpreter::processLine(const std::string& line) {
@@ -212,7 +213,14 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
     } else if (cmd == "quit" || cmd == "q") {
         m_ctx.quit = true;
     } else {
-        m_output("Unknown command: " + cmd + ". Type 'help' for info.\n");
+        std::vector<std::string> tokens;
+        std::stringstream ss2(line);
+        std::string t;
+        while (ss2 >> t) tokens.push_back(t);
+        
+        if (!PluginCommandRegistry::instance().dispatch(tokens)) {
+            m_output("Unknown command: " + cmd + ". Type 'help' for info.\n");
+        }
     }
 }
 
@@ -260,6 +268,13 @@ void CliInterpreter::printHelp() {
              "  load <path> <addr> - Load a binary file into memory\n"
              "  .<instr>         - Assemble and execute a single instruction\n"
              "  quit, q          - Exit the program\n");
+
+    std::vector<std::string> pluginCmds;
+    PluginCommandRegistry::instance().listCommands(pluginCmds);
+    if (!pluginCmds.empty()) {
+        m_output("\nPlugin commands:\n");
+        for (const auto& s : pluginCmds) m_output(s + "\n");
+    }
 }
 
 void CliInterpreter::dumpMemory(uint32_t addr, uint32_t len) {

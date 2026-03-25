@@ -26,6 +26,20 @@ All notable changes to this project will be documented in this file.
     - Added `IPortDevice` interface for parallel I/O peripherals (VIA/CIA support).
     - Added `ISignalLine` interface for hardware signals (IRQ/NMI/Reset).
     - Integrated `IORegistry` into the build system and added unit tests in `tests/test_devices.cpp`.
+- **Plugin Extension Host API (Phase 10.5):**
+    - Extended `SimPluginHostAPI` with dynamic registration for GUI panes, CLI commands, and MCP tools.
+    - Implemented `PluginPaneManager` (GUI) with `wxAuiNotebook` integration for plugin-provided tabs.
+    - Implemented `PluginCommandRegistry` (CLI) for dynamically adding commands to the REPL.
+    - Implemented `PluginToolRegistry` (MCP) for exposing plugin methods as JSON-RPC tools.
+    - Updated `PluginLoader` to automatically wire host registration stubs during plugin initialization.
+    - Verified cross-module callback logic with comprehensive unit tests.
+- **VIC-20 Machine Integration (Phase 10.3 & 10.4):**
+    - Implemented full VIC-20 memory map with support for Character, BASIC, and KERNAL ROM overlays.
+    - Integrated `romLoad` utility for validated ROM loading into machine memory.
+    - Implemented a standard 5-bit active-low joystick device as an `IPortDevice`.
+    - Wired the Joystick to VIA #1 Port B in the VIC-20 machine descriptor.
+    - Added `onJoystick` hook to `MachineDescriptor` for external input injection.
+    - Updated `MachineDescriptor` to manage ROM memory lifetimes.
 - **GUI Advanced Debugger Features (Phase 8.5):**
     - Implemented `ConsolePane` providing an integrated CLI environment within the GUI.
     - Added `FillMemoryDialog` and `CopyMemoryDialog` for easier memory manipulation.

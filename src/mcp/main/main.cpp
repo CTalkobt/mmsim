@@ -11,6 +11,7 @@
 #include "plugin_loader/main/plugin_loader.h"
 #include "libmem/main/memory_bus.h"
 #include "libcore/main/icore.h"
+#include "plugin_tool_registry.h"
 
 struct MachineState {
     MachineDescriptor* machine = nullptr;
@@ -174,6 +175,14 @@ Json handleToolsList() {
     kSchema.oVal["required"] = kReq;
 
     addTool("press_key", "Inject a keystroke", kSchema);
+
+    std::vector<std::string> pluginTools;
+    PluginToolRegistry::instance().listTools(pluginTools);
+    for (const auto& name : pluginTools) {
+        std::string schema = PluginToolRegistry::instance().getSchema(name);
+        Json s = Json::parse(schema);
+        addTool(name, "Plugin-provided tool", s);
+    }
 
     res.oVal["tools"] = tools;
     return res;
@@ -362,17 +371,28 @@ Json handleToolsCall(const Json& params) {
             }
         }
     } else {
-        textItem.oVal["text"] = Json("Error: Unknown tool");
-        textItem.oVal["isError"] = Json(true);
+        std::string resultJson;
+        if (PluginToolRegistry::instance().dispatch(name, args.stringify(), resultJson)) {
+            content.aVal[0].oVal["text"] = Json(resultJson);
+        } else {
+            textItem.oVal["text"] = Json("Error: Unknown tool");
+            textItem.oVal["isError"] = Json(true);
+        }
     }
 
-    content.push_back(textItem);
+    if (content.aVal[0].oVal["text"].is_null()) {
+        content.push_back(textItem);
+    }
     res.oVal["content"] = content;
     return res;
 }
 
 int main(int argc, char *argv[]) {
     (void)argc; (void)argv;
+
+    PluginLoader::instance().setMcpToolRegisterFn([](const PluginMcpToolInfo* info) {
+        PluginToolRegistry::instance().registerTool(info);
+    });
 
     PluginLoader::instance().loadFromDir("./lib");
 

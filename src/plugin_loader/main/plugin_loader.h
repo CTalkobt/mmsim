@@ -13,6 +13,11 @@ public:
     
     void unloadAll();
 
+    // Host-provided extension registration stubs
+    void setPaneRegisterFn(void (*fn)(const PluginPaneInfo*));
+    void setCommandRegisterFn(void (*fn)(const PluginCommandInfo*));
+    void setMcpToolRegisterFn(void (*fn)(const PluginMcpToolInfo*));
+
 private:
     PluginLoader() = default;
     
