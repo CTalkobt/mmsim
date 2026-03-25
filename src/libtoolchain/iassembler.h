@@ -57,10 +57,11 @@ public:
      * @param line The source line (e.g., "LDA #$02").
      * @param buf The destination buffer for opcode bytes.
      * @param bufsz Size of the destination buffer.
+     * @param currentAddr The memory address where this instruction will be placed (for relative branches).
      * @return Number of bytes written to the buffer, or -1 on error.
      */
-    virtual int assembleLine(const std::string& line, uint8_t* buf, int bufsz) {
-        (void)line; (void)buf; (void)bufsz;
+    virtual int assembleLine(const std::string& line, uint8_t* buf, int bufsz, uint32_t currentAddr = 0) {
+        (void)line; (void)buf; (void)bufsz; (void)currentAddr;
         return -1; // Default: not supported by backend
     }
 

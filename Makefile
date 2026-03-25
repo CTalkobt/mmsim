@@ -27,8 +27,11 @@ MCP_BIN = $(BINDIR)/mmemu-mcp
 TEST_BIN = $(BINDIR)/mmemu-tests
 
 # Sources
-CLI_SRCS = src/cli/main.cpp
-GUI_SRCS = src/gui/main.cpp
+CLI_SRCS = src/cli/main.cpp src/cli/cli_interpreter.cpp
+GUI_SRCS = src/gui/main.cpp src/gui/machine_selector.cpp src/gui/register_pane.cpp \
+           src/gui/memory_pane.cpp src/gui/disasm_pane.cpp src/gui/console_pane.cpp \
+           src/gui/dialogs/memory_dialogs.cpp src/gui/dialogs/assemble_dialog.cpp \
+           src/cli/cli_interpreter.cpp
 MCP_SRCS = src/mcp/main.cpp
 TEST_SRCS = tests/test_main.cpp tests/test_smoke.cpp tests/test_flatmembus.cpp tests/test_debug.cpp tests/test_cpu6502.cpp tests/test_disasm6502.cpp
 

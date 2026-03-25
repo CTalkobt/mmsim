@@ -145,10 +145,13 @@ The faithfully reproduced bug: `JMP ($xxFF)` fetches the high byte of the target
 ## 4. Toolchain Support
 
 ### 4.1 Disassembler
-Decodes opcodes into standard assembly syntax and provides control-flow metadata for the debugger.
+Decodes all 256 opcode bytes (including all illegal/undocumented instructions) into standard assembly syntax. It provides control-flow metadata (calls, returns, branches) for the debugger.
 
 ### 4.2 Native Mini-Assembler
-Supports single-instruction assembly for the CLI `.` command. Currently supports most common mnemonics and addressing modes.
+Supports full standard 6502 assembly syntax for both the CLI `.` (direct execute) and `asm` (interactive mode) commands.
+- **Mnemonics**: All 56 standard opcodes plus common undocumented ones (`SLO`, `RLA`, `SRE`, `RRA`, `SAX`, `LAX`, `DCP`, `ISC`).
+- **Addressing Modes**: Complete support for Immediate, Zero Page, Absolute, Indexed (X and Y), Indirect, and Relative (including automatic branch offset calculation).
+- **Flexibility**: Handles both hex (`$`) and decimal values.
 
 ---
 

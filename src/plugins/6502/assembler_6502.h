@@ -14,7 +14,7 @@ public:
     bool isaSupported(const std::string& isa) const override { return isa == "6502"; }
 
     AssemblerResult assemble(const std::string& sourcePath, const std::string& outputPath) override;
-    int assembleLine(const std::string& line, uint8_t* buf, int bufsz) override;
+    int assembleLine(const std::string& line, uint8_t* buf, int bufsz, uint32_t currentAddr = 0) override;
 
 private:
     struct OpcodeInfo {

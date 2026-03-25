@@ -27,24 +27,54 @@ The `mmemu-cli` binary provides an interactive REPL for low-level machine contro
 - **CPU Control**: 
     - `step [n]`: Execute specific number of cycles.
     - `regs`: Detailed register inspection (automatically adapts to the current CPU).
+    - `asm <addr>`: **Interactive Assembly** - Enter a continuous assembly session at the specified address (exit with `.`).
     - `.<instr>`: **Direct Execution** - Use the native mini-assembler to instantly execute a single instruction (e.g., `.lda #$42`).
 - **Memory Tools**:
     - `m <addr> [len]`: Hex and ASCII memory dump.
-    - `f <addr> <val>`: Direct memory modification.
+    - `f <addr> <val> [len]`: Direct memory modification (supports ranges).
+    - `copy <src> <dst> <len>`: Copy memory blocks.
     - `load <path> <addr>`: Binary file injection into the simulation space.
 - **Disassembly**: Multi-ISA disassembly with integrated symbol resolution.
 
 ---
 
-## 3. Implementation Roadmap
+## 3. MCP Target (Implemented)
 
-- **Phase 7: MCP Target**: Implementing the Model Context Protocol for AI-agent interaction.
-- **Phase 8: GUI Target**: A rich, multi-pane graphical debugger using wxWidgets.
-- **Phase 9+: libdevices & Machines**: Implementation of classic hardware components (VIC-II, SID, CIA) and machine presets (C64, VIC-20).
+The `mmemu-mcp` binary implements the **Model Context Protocol**, allowing AI agents (like Claude) to interact directly with the simulator.
+
+### Available Tools:
+- `step_cpu(machine_id, count)`: Execute instructions.
+- `read_memory(machine_id, addr, size)`: Inspect memory states.
+- `write_memory(machine_id, addr, bytes)`: Inject code or data.
+- `read_registers(machine_id)`: Inspect CPU state.
 
 ---
 
-## 4. Plugin Ecosystem
+## 4. GUI Target (Implemented)
+
+The `mmemu-gui` binary provides a professional, multi-pane graphical debugging environment.
+
+### Integrated Panes:
+- **Register Pane**: Live view of all CPU registers with automatic change highlighting.
+- **Memory Pane**: High-performance scrollable hex/ASCII dump with side-effect-free reads.
+- **Disassembly Pane**: Real-time disassembly centered on the current program counter.
+- **Console Pane**: Integrated CLI environment with 100% parity with the standalone CLI target.
+
+### Advanced Features:
+- **Asynchronous Refresh**: UI updates at 30-60 Hz for a smooth experience.
+- **Interactive Dialogs**: Easy machine selection, memory filling, and instruction assembly.
+- **Shared Engine**: All core logic is shared between CLI and GUI targets for consistent behavior.
+
+---
+
+## 5. Implementation Roadmap
+
+- **Phase 9+: libdevices & Machines**: Implementation of classic hardware components (VIC-II, SID, CIA) and machine presets (C64, VIC-20).
+- **Phase 12: Performance Profiling**: Advanced cycle-accurate profiling and execution heatmaps.
+
+---
+
+## 6. Plugin Ecosystem
 
 ### Processors
 - [6502 (Implemented)](README-6502.md)

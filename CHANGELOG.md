@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 ## [0.1.0-dev] - 2026-03-23
 
 ### Added
+- **GUI Advanced Debugger Features (Phase 8.5):**
+    - Implemented `ConsolePane` providing an integrated CLI environment within the GUI.
+    - Added `FillMemoryDialog` and `CopyMemoryDialog` for easier memory manipulation.
+    - Added `AssembleDialog` for on-the-fly instruction assembly and RAM injection.
+    - Refactored GUI layout to include a vertical split for the console and notebook support.
+- **GUI Target Implementation (Phase 8):**
+    - Implemented a modular graphical user interface using wxWidgets (`src/gui/main.cpp`).
+    - Added `MachineSelectorDialog` for dynamic machine preset selection.
+    - Implemented `RegisterPane` with automatic change highlighting and support for multiple CPU slots.
+    - Implemented `MemoryPane` providing a high-performance hex/ASCII dump with scroll support and side-effect-free reads.
+    - Implemented `DisasmPane` with scrollable disassembly view centered on the current program counter.
+    - Integrated all core libraries (mem, core, toolchain, debug, plugins) into the GUI frontend.
+    - Established GUI standards: fixed-width fonts, asynchronous refresh (30 Hz), and DPI-aware layout using splitters.
 - **MCP Target Implementation (Phase 7):**
     - Implemented MCP (Model Context Protocol) server over JSON-RPC 2.0 (`src/mcp/main.cpp`).
     - Created a lightweight, dependency-free JSON library (`src/mcp/minijson.h`).
