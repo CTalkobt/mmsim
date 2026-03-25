@@ -19,9 +19,9 @@ TEST_CASE(debug_breakpoints) {
     cpu.setPc(0x1000);
     cpu.regWrite(0, 0x42); // A = $42
 
-    int bpId = dbg.breakpoints().add(0x1001, BreakpointType::EXEC);
-    int wpId = dbg.breakpoints().add(0x0010, BreakpointType::WRITE_WATCH);
-    int rpId = dbg.breakpoints().add(0x0011, BreakpointType::READ_WATCH);
+    dbg.breakpoints().add(0x1001, BreakpointType::EXEC);
+    dbg.breakpoints().add(0x0010, BreakpointType::WRITE_WATCH);
+    dbg.breakpoints().add(0x0011, BreakpointType::READ_WATCH);
 
     cpu.step(); // Execute NOP
     ASSERT(dbg.breakpoints().breakpoints()[0].hitCount == 0);

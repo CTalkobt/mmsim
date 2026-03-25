@@ -35,3 +35,38 @@ private:
     wxTextCtrl* m_dstAddrCtrl;
     uint32_t m_srcAddr = 0, m_length = 0, m_dstAddr = 0;
 };
+
+class GotoAddressDialog : public wxDialog {
+public:
+    GotoAddressDialog(wxWindow* parent, uint32_t currentAddr = 0);
+    uint32_t GetAddress() const { return m_address; }
+    bool ShouldSetPC() const { return m_setPC; }
+
+private:
+    void OnOK(wxCommandEvent& event);
+    
+    wxTextCtrl* m_addrCtrl;
+    wxCheckBox* m_setPCCheck;
+    uint32_t m_address = 0;
+    bool m_setPC = false;
+};
+
+class SearchMemoryDialog : public wxDialog {
+public:
+    SearchMemoryDialog(wxWindow* parent);
+    std::string GetPattern() const { return m_pattern; }
+    bool IsHex() const { return m_isHex; }
+    uint32_t GetStartAddress() const { return m_startAddr; }
+
+private:
+    void OnOK(wxCommandEvent& event);
+    
+    wxTextCtrl* m_patternCtrl;
+    wxRadioButton* m_hexRadio;
+    wxRadioButton* m_asciiRadio;
+    wxTextCtrl* m_startAddrCtrl;
+    
+    std::string m_pattern;
+    bool m_isHex = true;
+    uint32_t m_startAddr = 0;
+};

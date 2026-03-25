@@ -78,6 +78,16 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         if (ss >> n) {} else { n = 1; }
         for (int i = 0; i < n; ++i) m_ctx.cpu->step();
         showRegisters();
+    } else if (cmd == "setpc") {
+        if (!m_ctx.cpu) { m_output("No machine created.\n"); return; }
+        std::string addrStr;
+        if (ss >> addrStr) {
+            uint32_t addr = std::stoul(addrStr, nullptr, 16);
+            m_ctx.cpu->setPc(addr);
+            showRegisters();
+        } else {
+            m_output("Syntax: setpc <address>\n");
+        }
     } else if (cmd == "regs") {
         if (!m_ctx.cpu) { m_output("No machine created.\n"); return; }
         showRegisters();
@@ -110,6 +120,56 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
             std::vector<uint8_t> tmp(len);
             for (uint32_t i = 0; i < len; ++i) tmp[i] = m_ctx.bus->read8(src + i);
             for (uint32_t i = 0; i < len; ++i) m_ctx.bus->write8(dst + i, tmp[i]);
+        }
+    } else if (cmd == "search") {
+        if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
+        std::string patternStr;
+        std::vector<uint8_t> pattern;
+        while (ss >> patternStr) {
+            try {
+                pattern.push_back((uint8_t)std::stoul(patternStr, nullptr, 16));
+            } catch (...) {}
+        }
+        if (pattern.empty()) {
+            m_output("Syntax: search <hex1> [hex2] ...\n");
+            return;
+        }
+        for (uint32_t i = 0; i < 0x10000 - pattern.size(); ++i) {
+            bool match = true;
+            for (size_t j = 0; j < pattern.size(); ++j) {
+                if (m_ctx.bus->peek8(i + j) != pattern[j]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%04X", i);
+                m_output("Found at $" + std::string(buf) + "\n");
+            }
+        }
+    } else if (cmd == "searcha") {
+        if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
+        std::string pattern;
+        std::getline(ss, pattern);
+        if (!pattern.empty() && pattern[0] == ' ') pattern = pattern.substr(1);
+        if (pattern.empty()) {
+            m_output("Syntax: searcha <ascii_string>\n");
+            return;
+        }
+        for (uint32_t i = 0; i < 0x10000 - pattern.size(); ++i) {
+            bool match = true;
+            for (size_t j = 0; j < pattern.size(); ++j) {
+                if (m_ctx.bus->peek8(i + j) != (uint8_t)pattern[j]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%04X", i);
+                m_output("Found at $" + std::string(buf) + "\n");
+            }
         }
     } else if (cmd == "disasm") {
         if (!m_ctx.cpu || !m_ctx.disasm) { m_output("No machine created.\n"); return; }
@@ -187,10 +247,13 @@ void CliInterpreter::printHelp() {
              "  create <id>      - Create a machine of the given type\n"
              "  step [n]         - Step the CPU N times (default 1)\n"
              "  run              - Run until a breakpoint or stop\n"
+             "  setpc <addr>     - Set the CPU program counter\n"
              "  regs             - Show CPU registers\n"
              "  m <addr> [len]   - Dump memory\n"
              "  f <addr> <val> [len] - Fill memory range\n"
              "  copy <src> <dst> <len> - Copy memory range\n"
+             "  search <hex1>... - Search for hex pattern in memory\n"
+             "  searcha <str>    - Search for ASCII string in memory\n"
              "  disasm <addr> [n]- Disassemble N instructions\n"
              "  asm <addr>       - Interactive assembly mode (end with '.')\n"
              "  key <name> <state>- Press/release a key (state: 1/0 or down/up)\n"

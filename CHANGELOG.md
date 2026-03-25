@@ -30,6 +30,10 @@ All notable changes to this project will be documented in this file.
     - Implemented `ConsolePane` providing an integrated CLI environment within the GUI.
     - Added `FillMemoryDialog` and `CopyMemoryDialog` for easier memory manipulation.
     - Added `AssembleDialog` for on-the-fly instruction assembly and RAM injection.
+    - Added `GotoAddressDialog` with optional PC update and "Go to" toolbar button.
+    - Added `SearchMemoryDialog` for Hex/ASCII pattern searching in memory.
+    - Added CLI `setpc`, `search`, and `searcha` commands for advanced debugging.
+    - Added MCP `set_pc` and `search_memory` tools for AI-driven debugging.
     - Refactored GUI layout to include a vertical split for the console and notebook support.
 - **GUI Target Implementation (Phase 8):**
     - Implemented a modular graphical user interface using wxWidgets (`src/gui/main.cpp`).

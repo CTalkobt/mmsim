@@ -25,6 +25,8 @@ enum {
     ID_FILL_MEM,
     ID_COPY_MEM,
     ID_ASSEMBLE,
+    ID_GOTO_ADDR,
+    ID_SEARCH_MEM,
     ID_KBD_FOCUS,
     ID_GUI_TIMER
 };
@@ -43,6 +45,8 @@ private:
     void OnFillMem(wxCommandEvent& event);
     void OnCopyMem(wxCommandEvent& event);
     void OnAssemble(wxCommandEvent& event);
+    void OnGotoAddr(wxCommandEvent& event);
+    void OnSearchMem(wxCommandEvent& event);
     void OnKbdFocus(wxCommandEvent& event);
     void OnTimer(wxTimerEvent& event);
     void OnKeyDown(wxKeyEvent& event);
@@ -96,6 +100,9 @@ MmemuFrame::MmemuFrame()
     auto* menuDebug = new wxMenu;
     menuDebug->Append(ID_ASSEMBLE, "Assemble...\tCtrl-A");
     menuDebug->AppendSeparator();
+    menuDebug->Append(ID_GOTO_ADDR, "Go to Address...\tCtrl-G");
+    menuDebug->Append(ID_SEARCH_MEM, "Search Memory...\tCtrl-F");
+    menuDebug->AppendSeparator();
     menuDebug->Append(ID_FILL_MEM, "Fill Memory...");
     menuDebug->Append(ID_COPY_MEM, "Copy Memory...");
     
@@ -112,6 +119,8 @@ MmemuFrame::MmemuFrame()
     toolBar->AddTool(ID_STEP, "Step", wxArtProvider::GetBitmap(wxART_GO_FORWARD));
     toolBar->AddTool(ID_RUN, "Run", wxArtProvider::GetBitmap(wxART_GO_FORWARD));
     toolBar->AddTool(ID_PAUSE, "Pause", wxArtProvider::GetBitmap(wxART_QUIT));
+    toolBar->AddSeparator();
+    toolBar->AddTool(ID_GOTO_ADDR, "Go to", wxArtProvider::GetBitmap(wxART_FIND));
     toolBar->AddSeparator();
     toolBar->AddCheckTool(ID_KBD_FOCUS, "Keyboard Focus (Ctrl-Shift-K)", wxArtProvider::GetBitmap(wxART_LIST_VIEW));
     toolBar->Realize();
@@ -152,6 +161,9 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_MENU, &MmemuFrame::OnFillMem, this, ID_FILL_MEM);
     Bind(wxEVT_MENU, &MmemuFrame::OnCopyMem, this, ID_COPY_MEM);
     Bind(wxEVT_MENU, &MmemuFrame::OnAssemble, this, ID_ASSEMBLE);
+    Bind(wxEVT_MENU, &MmemuFrame::OnGotoAddr, this, ID_GOTO_ADDR);
+    Bind(wxEVT_TOOL, &MmemuFrame::OnGotoAddr, this, ID_GOTO_ADDR);
+    Bind(wxEVT_MENU, &MmemuFrame::OnSearchMem, this, ID_SEARCH_MEM);
     Bind(wxEVT_MENU, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
     Bind(wxEVT_TOOL, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
     Bind(wxEVT_TIMER, &MmemuFrame::OnTimer, this, ID_GUI_TIMER);
@@ -263,6 +275,71 @@ void MmemuFrame::OnAssemble(wxCommandEvent& event) {
                 wxMessageBox("Assembly failed!", "Error", wxOK | wxICON_ERROR);
             }
             delete assem;
+        }
+    }
+}
+
+void MmemuFrame::OnGotoAddr(wxCommandEvent& event) {
+    (void)event;
+    if (!m_cpu) return;
+    GotoAddressDialog dialog(this, m_cpu->pc());
+    if (dialog.ShowModal() == wxID_OK) {
+        uint32_t addr = dialog.GetAddress();
+        if (dialog.ShouldSetPC()) {
+            m_cpu->setPc(addr);
+            m_disasmPane->RefreshValues(m_cpu->pc());
+        }
+        m_memPane->SetAddress(addr);
+        m_memPane->RefreshValues();
+    }
+}
+
+void MmemuFrame::OnSearchMem(wxCommandEvent& event) {
+    (void)event;
+    if (!m_bus) return;
+    SearchMemoryDialog dialog(this);
+    if (dialog.ShowModal() == wxID_OK) {
+        std::string pattern = dialog.GetPattern();
+        bool isHex = dialog.IsHex();
+        uint32_t startAddr = dialog.GetStartAddress();
+        
+        std::vector<uint8_t> bytes;
+        if (isHex) {
+            std::stringstream ss(pattern);
+            std::string byteStr;
+            while (ss >> byteStr) {
+                try {
+                    bytes.push_back((uint8_t)std::stoul(byteStr, nullptr, 16));
+                } catch (...) {}
+            }
+        } else {
+            for (char c : pattern) bytes.push_back((uint8_t)c);
+        }
+        
+        if (bytes.empty()) return;
+        
+        // Simple search (64KB max for now as per VIC-20/C64)
+        uint32_t foundAddr = 0xFFFFFFFF;
+        for (uint32_t i = startAddr; i < 0x10000 - bytes.size(); ++i) {
+            bool match = true;
+            for (size_t j = 0; j < bytes.size(); ++j) {
+                if (m_bus->peek8(i + j) != bytes[j]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                foundAddr = i;
+                break;
+            }
+        }
+        
+        if (foundAddr != 0xFFFFFFFF) {
+            m_memPane->SetAddress(foundAddr);
+            m_memPane->RefreshValues();
+            SetStatusText(wxString::Format("Pattern found at $%04X", foundAddr));
+        } else {
+            wxMessageBox("Pattern not found", "Search", wxOK | wxICON_INFORMATION);
         }
     }
 }
