@@ -1,4 +1,5 @@
 #include "register_pane.h"
+#include <wx/settings.h>
 #include <iomanip>
 #include <sstream>
 
@@ -33,9 +34,13 @@ void RegisterPane::SetCPU(ICore* cpu) {
         m_grid->AppendRows(count);
         m_prevValues.assign(count, 0);
         
+        wxColour fg = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+        wxColour bg = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
         for (int i = 0; i < count; ++i) {
             const auto* desc = m_cpu->regDescriptor(i);
             m_grid->SetCellValue(i, 0, desc->name);
+            m_grid->SetCellTextColour(i, 0, fg);
+            m_grid->SetCellBackgroundColour(i, 0, bg);
             m_prevValues[i] = m_cpu->regRead(i);
         }
     }
@@ -56,13 +61,23 @@ void RegisterPane::RefreshValues() {
         else ss << "$" << std::setw(2) << val;
         
         m_grid->SetCellValue(i, 1, ss.str());
-        
+
+        wxColour fg = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+        wxColour bg;
         if (val != m_prevValues[i]) {
-            m_grid->SetCellBackgroundColour(i, 1, wxColour(255, 200, 200));
+            // Blend a red tint into the window background so it stays legible
+            // in both light and dark themes.
+            wxColour winBg = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
+            bg = wxColour(
+                (winBg.Red()   * 2 + 255) / 3,
+                (winBg.Green() * 2 + 80)  / 3,
+                (winBg.Blue()  * 2 + 80)  / 3);
             m_prevValues[i] = val;
         } else {
-            m_grid->SetCellBackgroundColour(i, 1, *wxWHITE);
+            bg = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
         }
+        m_grid->SetCellTextColour(i, 1, fg);
+        m_grid->SetCellBackgroundColour(i, 1, bg);
     }
     m_grid->AutoSizeColumns();
     m_grid->ForceRefresh();

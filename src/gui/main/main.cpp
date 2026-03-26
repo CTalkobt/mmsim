@@ -202,8 +202,10 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             m_disasmPane->SetDisassembler(m_disasm);
             m_consolePane->SetContext(m_cpu, m_bus);
             
+            if (m_machine->onReset) m_machine->onReset(*m_machine);
+
             PluginPaneManager::instance().onMachineSwitch(id, this, m_notebook);
-            
+
             SetTitle("mmemu - " + m_machine->displayName);
             SetStatusText("Loaded machine: " + id);
         }
@@ -233,8 +235,8 @@ void MmemuFrame::OnPause(wxCommandEvent& event) {
 
 void MmemuFrame::OnReset(wxCommandEvent& event) {
     (void)event;
-    if (m_machine) {
-        m_cpu->reset();
+    if (m_machine && m_machine->onReset) {
+        m_machine->onReset(*m_machine);
         m_regPane->RefreshValues();
         m_disasmPane->RefreshValues(m_cpu->pc());
     }

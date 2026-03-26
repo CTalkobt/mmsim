@@ -33,7 +33,8 @@ std::vector<RomSource> discoverSourcesInPaths(const std::string& machineId,
         }
 
         if (allPresent) {
-            found.push_back({ "VICE at " + path, path });
+            std::string label = (path == "rom") ? "Bundled ROMs (rom/)" : "VICE at " + path;
+            found.push_back({ label, path });
         }
     }
 
@@ -42,6 +43,7 @@ std::vector<RomSource> discoverSourcesInPaths(const std::string& machineId,
 
 std::vector<RomSource> discoverSources(const std::string& machineId) {
     std::vector<std::string> candidates = {
+        "rom",
         "/usr/share/vice",
         "/usr/local/share/vice",
         "/usr/share/games/vice",
