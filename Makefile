@@ -73,7 +73,8 @@ TEST_SRCS = tests/test_main.cpp src/libcore/test/test_libcore.cpp \
             tests/test_plugin_extension.cpp \
             src/plugins/viceImporter/main/rom_discovery.cpp \
             src/plugins/viceImporter/main/rom_importer.cpp \
-            tests/test_vice_importer.cpp
+            tests/test_vice_importer.cpp \
+            src/plugins/machines/vic20/test/test_vic20_integration.cpp
 
 # Library Sources
 LIBMEM_SRCS       = src/libmem/main/ibus.cpp src/libmem/main/memory_bus.cpp src/libmem/main/libmem.cpp
@@ -226,7 +227,9 @@ $(MCP_BIN): $(MCP_SRCS) $(LIBS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -rdynamic -o $@ $(MCP_SRCS) $(BASE_LIBS)
 
 # Device implementation objects linked directly into the test binary (tests don't use dlopen)
-DEVICE_TEST_OBJS = src/plugins/devices/via6522/main/via6522.o
+DEVICE_TEST_OBJS = src/plugins/devices/via6522/main/via6522.o \
+                   src/plugins/devices/vic6560/main/vic6560.o \
+                   src/plugins/machines/vic20/main/machine_vic20.o
 
 $(TEST_BIN): $(TEST_SRCS) $(LIBS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -Itests -rdynamic -o $@ $(TEST_SRCS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) $(BASE_LIBS) $(WXLIBS)

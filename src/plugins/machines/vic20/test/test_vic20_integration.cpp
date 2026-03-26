@@ -1,0 +1,197 @@
+#include "test_harness.h"
+#include "libcore/main/core_registry.h"
+#include "libcore/main/machines/machine_registry.h"
+#include "libdevices/main/device_registry.h"
+#include "libdevices/main/io_registry.h"
+#include "libmem/main/memory_bus.h"
+#include "cpu6502.h"
+#include "via6522.h"
+#include "vic6560.h"
+#include "plugin_loader/main/plugin_loader.h"
+#include "cli/main/plugin_command_registry.h"
+#include <vector>
+#include <string>
+
+// Linked directly into the test binary — no dlopen for core machine components.
+MachineDescriptor* createMachineVic20();
+
+// ---------------------------------------------------------------------------
+// Registry setup — called once; singletons persist across all test cases.
+// ---------------------------------------------------------------------------
+
+static bool s_registriesReady = false;
+static void ensureRegistriesReady() {
+    if (s_registriesReady) return;
+    s_registriesReady = true;
+    CoreRegistry::instance().registerCore("6502", "NMOS", "open",
+        []() -> ICore* { return new MOS6502(); });
+    DeviceRegistry::instance().registerDevice("6560",
+        []() -> IOHandler* { return new VIC6560("VIC-I", 0x9000); });
+    DeviceRegistry::instance().registerDevice("6522",
+        []() -> IOHandler* { return new VIA6522("6522", 0); });
+    MachineRegistry::instance().registerMachine("vic20", createMachineVic20);
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+static FlatMemoryBus* getBus(MachineDescriptor* desc) {
+    return static_cast<FlatMemoryBus*>(desc->buses[0].bus);
+}
+
+// Clean up a MachineDescriptor produced by the VIC-20 factory.
+// The factory creates IOHandlers on the heap but the registry does not own them;
+// enumerate them here so they can be freed alongside the other owned objects.
+static void destroyDesc(MachineDescriptor* desc) {
+    if (!desc) return;
+    if (desc->ioRegistry) {
+        std::vector<IOHandler*> handlers;
+        desc->ioRegistry->enumerate(handlers);
+        delete desc->ioRegistry;
+        for (auto* h : handlers) delete h;
+    }
+    for (auto& slot : desc->cpus) delete slot.cpu;
+    for (auto& slot : desc->buses) delete slot.bus;
+    for (auto* rom : desc->roms) delete[] rom;
+    delete desc;
+}
+
+// ---------------------------------------------------------------------------
+// Test 1: Machine setup — verify the VIC-20 descriptor has the expected shape
+// ---------------------------------------------------------------------------
+
+TEST_CASE(vic20_setup) {
+    ensureRegistriesReady();
+    auto* desc = createMachineVic20();
+    ASSERT(desc != nullptr);
+    ASSERT(desc->machineId == "vic20");
+    ASSERT(!desc->cpus.empty());
+    ASSERT(desc->cpus[0].cpu != nullptr);
+    ASSERT(!desc->buses.empty());
+    ASSERT(desc->buses[0].bus != nullptr);
+    ASSERT(desc->ioRegistry != nullptr);
+    ASSERT(desc->schedulerStep != nullptr);
+    ASSERT(desc->onReset != nullptr);
+    destroyDesc(desc);
+}
+
+// ---------------------------------------------------------------------------
+// Test 2: Execute — write to screen RAM and halt
+// ---------------------------------------------------------------------------
+
+TEST_CASE(vic20_execute_screen_write) {
+    ensureRegistriesReady();
+    auto* desc = createMachineVic20();
+    ASSERT(desc != nullptr);
+    auto* bus = getBus(desc);
+    ICore* cpu = desc->cpus[0].cpu;
+
+    // Minimal test program:
+    //   $1000  A9 41        LDA #$41
+    //   $1002  8D 00 1E     STA $1E00
+    //   $1005  4C 05 10     JMP $1005   ; halt (JMP to self)
+    bus->write8(0x1000, 0xA9); bus->write8(0x1001, 0x41);
+    bus->write8(0x1002, 0x8D); bus->write8(0x1003, 0x00); bus->write8(0x1004, 0x1E);
+    bus->write8(0x1005, 0x4C); bus->write8(0x1006, 0x05); bus->write8(0x1007, 0x10);
+    // Reset vector → $1000
+    bus->write8(0xFFFC, 0x00); bus->write8(0xFFFD, 0x10);
+
+    desc->onReset(*desc);
+
+    // Run until JMP-to-self is detected; guard with iteration cap.
+    for (int i = 0; i < 100 && !cpu->isProgramEnd(bus); ++i) {
+        desc->schedulerStep(*desc);
+    }
+
+    ASSERT(cpu->isProgramEnd(bus));
+    ASSERT(bus->read8(0x1E00) == 0x41);
+
+    destroyDesc(desc);
+}
+
+// ---------------------------------------------------------------------------
+// Test 3: Raster frame — VIC-I raster counter advances with CPU cycles
+// ---------------------------------------------------------------------------
+
+TEST_CASE(vic20_raster_frame) {
+    ensureRegistriesReady();
+    auto* desc = createMachineVic20();
+    ASSERT(desc != nullptr);
+    auto* bus = getBus(desc);
+
+    // JMP $1000 (JMP to self) keeps the CPU spinning without halting.
+    bus->write8(0x1000, 0x4C); bus->write8(0x1001, 0x00); bus->write8(0x1002, 0x10);
+    bus->write8(0xFFFC, 0x00); bus->write8(0xFFFD, 0x10);
+    desc->onReset(*desc);
+
+    // 50 steps × 3 cycles/JMP = 150 cycles.  VIC raster line = 150 / 65 = 2.
+    for (int i = 0; i < 50; ++i) desc->schedulerStep(*desc);
+
+    uint8_t rasterLine = 0;
+    bool ok = desc->ioRegistry->dispatchRead(bus, 0x9004, &rasterLine);
+    ASSERT(ok);
+    ASSERT(rasterLine >= 2);
+
+    destroyDesc(desc);
+}
+
+// ---------------------------------------------------------------------------
+// Test 4: VIA1 T1 timer — IFR bit 6 set after underflow
+// ---------------------------------------------------------------------------
+
+TEST_CASE(vic20_via_timer) {
+    ensureRegistriesReady();
+    auto* desc = createMachineVic20();
+    ASSERT(desc != nullptr);
+    auto* bus = getBus(desc);
+    desc->onReset(*desc);
+
+    // Write T1CL latch first, then T1CH to load and start the timer.
+    desc->ioRegistry->dispatchWrite(bus, 0x9114, 0x05); // T1CL latch = 5
+    desc->ioRegistry->dispatchWrite(bus, 0x9115, 0x00); // T1CH = 0 → starts timer
+
+    desc->ioRegistry->tickAll(50); // 50 cycles — well past the 5-cycle underflow
+
+    uint8_t ifr = 0;
+    bool ok = desc->ioRegistry->dispatchRead(bus, 0x911D, &ifr); // VIA1 IFR
+    ASSERT(ok);
+    ASSERT(ifr & 0x40); // T1 interrupt flag (bit 6) must be set
+
+    destroyDesc(desc);
+}
+
+// ---------------------------------------------------------------------------
+// Test 5: Machine identity — machineId matches the string used by pane filters
+// ---------------------------------------------------------------------------
+
+TEST_CASE(vic20_machine_id_pane_match) {
+    ensureRegistriesReady();
+    auto* desc = createMachineVic20();
+    ASSERT(desc != nullptr);
+    ASSERT(desc->machineId == "vic20");
+    destroyDesc(desc);
+}
+
+// ---------------------------------------------------------------------------
+// Test 6: importroms command registered when vice-importer plugin is loaded
+// ---------------------------------------------------------------------------
+
+static bool s_importRomsRegistered = false;
+
+static void captureImportRomsCommand(const PluginCommandInfo* info) {
+    if (info && std::string(info->name) == "importroms") {
+        s_importRomsRegistered = true;
+    }
+}
+
+TEST_CASE(vic20_importroms_command) {
+    s_importRomsRegistered = false;
+    PluginLoader::instance().setCommandRegisterFn(captureImportRomsCommand);
+
+    bool loaded = PluginLoader::instance().load("lib/mmemu-plugin-vice-importer.so");
+    ASSERT(loaded);
+    ASSERT(s_importRomsRegistered);
+
+    PluginLoader::instance().setCommandRegisterFn(nullptr); // restore default stub
+}

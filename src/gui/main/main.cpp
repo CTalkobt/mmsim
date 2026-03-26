@@ -159,6 +159,7 @@ MmemuFrame::MmemuFrame()
     mainSplitter->SetMinimumPaneSize(200);
     
     // Bind events
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) { Close(true); }, wxID_EXIT);
     Bind(wxEVT_MENU, &MmemuFrame::OnLoadMachine, this, ID_LOAD_MACHINE);
     Bind(wxEVT_TOOL, &MmemuFrame::OnLoadMachine, this, ID_LOAD_MACHINE);
     Bind(wxEVT_MENU, &MmemuFrame::OnStep, this, ID_STEP);
