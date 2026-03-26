@@ -102,6 +102,7 @@ TEST_CASE(plugin_extension_gui_logic) {
     info.createPane = createFn;
     info.refreshPane = refreshFn;
     info.destroyPane = destroyFn;
+    info.onMachineLoad = nullptr;
     info.ctx = &ctx;
 
     PluginPaneManager::instance().registerPane(&info);

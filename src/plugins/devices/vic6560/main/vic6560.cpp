@@ -65,23 +65,24 @@ IVideoOutput::VideoDimensions VIC6560::getDimensions() const {
     return {256, 280, 22 * 8, 23 * 8};
 }
 
+// VIC-I colour palette in AARRGGBB order.
 static uint32_t s_palette[] = {
-    0xFF000000, // 0: Black
-    0xFFFFFFFF, // 1: White
-    0xFF000088, // 2: Red
-    0xFFFFFFAA, // 3: Cyan
-    0xFFCC44CC, // 4: Purple
-    0xFF00CC00, // 5: Green
-    0xFF0000CC, // 6: Blue
-    0xFFEEEE77, // 7: Yellow
-    0xFF0088DD, // 8: Orange
-    0xFF00AAFF, // 9: Light Orange
-    0xFF8888FF, // 10: Pink
-    0xFFEEFFFF, // 11: Light Cyan
-    0xFFFFAAFF, // 12: Light Purple
+    0xFF000000, //  0: Black
+    0xFFFFFFFF, //  1: White
+    0xFF882000, //  2: Red
+    0xFF88FFFF, //  3: Cyan
+    0xFFAA22CC, //  4: Purple
+    0xFF00CC55, //  5: Green
+    0xFF0000AA, //  6: Blue
+    0xFFEEEE77, //  7: Yellow
+    0xFFDD8855, //  8: Orange
+    0xFFFFAA77, //  9: Light Orange
+    0xFFFFBBBB, // 10: Pink
+    0xFF888888, // 11: Dark Gray
+    0xFFAAAAAA, // 12: Medium Gray
     0xFF88FF88, // 13: Light Green
-    0xFFFFFF88, // 14: Light Blue
-    0xFFFFFFCC  // 15: Light Yellow
+    0xFF88AAFF, // 14: Light Blue
+    0xFFDDDDDD, // 15: Light Gray
 };
 
 uint32_t VIC6560::getVicColor(uint8_t index) {
@@ -91,15 +92,23 @@ uint32_t VIC6560::getVicColor(uint8_t index) {
 void VIC6560::renderFrame(uint32_t* buffer) {
     if (!m_bus) return;
 
-    // VIC-I memory mapping is complex.
-    // $9005: bits 0-3 = char matrix (screen) address (bits 10-13)
-    //        bits 4-7 = char generator address (bits 10-13)
-    // bit 7 of $9002 is bit 9 of screen address.
-    
-    uint16_t screenBase = (m_regs[0x05] & 0x0F) << 10;
-    if (m_regs[0x02] & 0x80) screenBase |= 0x0200;
-    
-    uint16_t charBase = (m_regs[0x05] & 0xF0) << 6; // bits 4-7 * 1024
+    // VIC-I address space is inverted relative to the CPU: VA13 is complemented.
+    //   VIC $0000-$1FFF (VA13=0) → CPU $8000-$9FFF  (char ROM / I/O)
+    //   VIC $2000-$3FFF (VA13=1) → CPU $0000-$1FFF  (RAM)
+    //
+    // $9005 bits 7-4 = screen matrix base (VIC address bits 13-10)
+    //        bits 3-0 = char generator base (VIC address bits 13-10)
+    // bit 7 of $9002 = VIC address bit 9 of the screen base.
+    auto vicToCpu = [](uint16_t v) -> uint16_t {
+        return (v < 0x2000) ? (v + 0x8000) : (v - 0x2000);
+    };
+
+    uint16_t vicScreen = ((m_regs[0x05] >> 4) & 0x0F) * 0x400;
+    if (m_regs[0x02] & 0x80) vicScreen |= 0x200;
+    uint16_t screenBase = vicToCpu(vicScreen);
+
+    uint16_t vicChar = (m_regs[0x05] & 0x0F) * 0x400;
+    uint16_t charBase = vicToCpu(vicChar);
     
     int cols = m_regs[0x02] & 0x7F;
     int rows = (m_regs[0x03] & 0x7E) >> 1;

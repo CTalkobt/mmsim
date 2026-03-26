@@ -5,12 +5,28 @@
 #include "libdevices/main/io_registry.h"
 #include "libdevices/main/device_registry.h"
 #include "libdevices/main/ikeyboard_matrix.h"
+#include "libdevices/main/isignal_line.h"
 #include "libdevices/main/joystick.h"
 #include "libcore/main/rom_loader.h"
 #include "via6522.h"
 #include "vic6560.h"
 #include <iostream>
 #include <cstring>
+
+// Signal line that forwards level changes to the CPU IRQ pin.
+class CpuIrqLine : public ISignalLine {
+public:
+    explicit CpuIrqLine(ICore* cpu) : m_cpu(cpu) {}
+    bool get()  const override { return m_level; }
+    void pulse() override { if (m_cpu) m_cpu->triggerIrq(); }
+    void set(bool level) override {
+        m_level = level;
+        if (level && m_cpu) m_cpu->triggerIrq();
+    }
+private:
+    ICore* m_cpu;
+    bool   m_level = false;
+};
 
 // Register Color RAM as a simple IOHandler so it's accessible via bus
 class ColorRamHandler : public IOHandler {
@@ -20,10 +36,12 @@ public:
     uint32_t baseAddr() const override { return 0x9400; }
     uint32_t addrMask() const override { return 0x03FF; }
     bool ioRead(IBus*, uint32_t addr, uint8_t* val) override {
+        if ((addr & ~addrMask()) != baseAddr()) return false;
         *val = m_ram[addr & 0x03FF] | 0xF0; // Only low 4 bits
         return true;
     }
     bool ioWrite(IBus*, uint32_t addr, uint8_t val) override {
+        if ((addr & ~addrMask()) != baseAddr()) return false;
         m_ram[addr & 0x03FF] = val & 0x0F;
         return true;
     }
@@ -78,6 +96,7 @@ MachineDescriptor* createMachineVic20() {
         vic->setName("VIC-I");
         vic->setBaseAddr(0x9000);
     }
+    vic->setBus(bus);
     vic->setColorRam(colorRam);
 
     if (!via1 || !via2) {
@@ -94,6 +113,21 @@ MachineDescriptor* createMachineVic20() {
     io->registerHandler(vic);
     io->registerHandler(via1);
     io->registerHandler(via2);
+
+    // Wire CPU reads/writes through the IO registry so VIC/VIA registers are
+    // actually accessed instead of flat RAM.
+    bus->setIoHooks(
+        [io, bus](uint32_t addr, uint8_t* val) { return io->dispatchRead(bus, addr, val); },
+        [io, bus](uint32_t addr, uint8_t  val) { return io->dispatchWrite(bus, addr, val); }
+    );
+
+    // Wire VIA IRQ lines to the CPU so timer / peripheral interrupts are delivered.
+    // Both VIAs share one line (open-collector, wired-OR).
+    if (cpu) {
+        auto* irqLine = new CpuIrqLine(cpu);
+        via1->setIrqLine(irqLine);
+        via2->setIrqLine(irqLine);
+    }
 
     // 3.6 Keyboard Matrix — wired as two IPortDevices into the VIAs.
     // Registered in the IORegistry so resetAll() and tickAll() reach it.

@@ -19,7 +19,7 @@ static bool isRelevant(const PluginPaneInfo& info, const std::string& machineId)
     return false;
 }
 
-void PluginPaneManager::onMachineSwitch(const std::string& machineId, wxWindow* parent, wxAuiNotebook* notebook) {
+void PluginPaneManager::onMachineSwitch(const std::string& machineId, wxWindow* parent, wxAuiNotebook* notebook, MachineDescriptor* desc) {
     m_currentMachineId = machineId;
     m_notebook = notebook;
 
@@ -59,6 +59,9 @@ void PluginPaneManager::onMachineSwitch(const std::string& machineId, wxWindow* 
                     m_livePanes[info.paneId] = {info, win};
                     if (m_notebook) {
                         m_notebook->AddPage(win, info.displayName ? info.displayName : info.paneId);
+                    }
+                    if (info.onMachineLoad) {
+                        info.onMachineLoad(handle, desc, info.ctx);
                     }
                 }
             }

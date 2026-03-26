@@ -105,8 +105,11 @@ PLUGIN_VIC6560_SRCS = src/plugins/devices/vic6560/main/vic6560.cpp \
 PLUGIN_KBDVIC20_SRCS = src/plugins/devices/kbd_vic20/main/kbd_vic20.cpp \
                        src/plugins/devices/kbd_vic20/main/plugin_init.cpp
 
-# Plugin VIC-20 Machine Sources
-PLUGIN_VIC20_SRCS = src/plugins/machines/vic20/main/machine_vic20.cpp src/plugins/machines/vic20/main/plugin_init.cpp
+# Plugin VIC-20 Machine Sources — split so the wx pane gets wx compile flags
+PLUGIN_VIC20_CORE_SRCS = src/plugins/machines/vic20/main/machine_vic20.cpp
+PLUGIN_VIC20_GUI_SRCS  = src/plugins/machines/vic20/main/plugin_init.cpp \
+                          src/plugins/machines/vic20/main/vic_display_pane.cpp
+PLUGIN_VIC20_SRCS      = $(PLUGIN_VIC20_CORE_SRCS) $(PLUGIN_VIC20_GUI_SRCS)
 
 # Plugin VICE ROM Importer Sources
 PLUGIN_VICEIMPORTER_SRCS = src/plugins/viceImporter/main/plugin_main.cpp \
@@ -125,7 +128,9 @@ PLUGIN_6502_OBJS  = $(PLUGIN_6502_SRCS:.cpp=.o)
 PLUGIN_VIA6522_OBJS = $(PLUGIN_VIA6522_SRCS:.cpp=.o)
 PLUGIN_VIC6560_OBJS = $(PLUGIN_VIC6560_SRCS:.cpp=.o)
 PLUGIN_KBDVIC20_OBJS = $(PLUGIN_KBDVIC20_SRCS:.cpp=.o)
-PLUGIN_VIC20_OBJS = $(PLUGIN_VIC20_SRCS:.cpp=.o)
+PLUGIN_VIC20_CORE_OBJS = $(PLUGIN_VIC20_CORE_SRCS:.cpp=.o)
+PLUGIN_VIC20_GUI_OBJS  = $(PLUGIN_VIC20_GUI_SRCS:.cpp=.o)
+PLUGIN_VIC20_OBJS      = $(PLUGIN_VIC20_CORE_OBJS) $(PLUGIN_VIC20_GUI_OBJS)
 PLUGIN_VICEIMPORTER_OBJS = $(PLUGIN_VICEIMPORTER_SRCS:.cpp=.o)
 
 ALL_LIB_OBJS = $(LIBMEM_OBJS) $(LIBCORE_OBJS) $(LIBDEVICES_OBJS) \
@@ -248,7 +253,9 @@ PLUGIN_INCLUDES = -Isrc -Isrc/include \
 PLUGIN_VICEIMPORTER_INCLUDES = $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
 
 $(PLUGIN_6502_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) \
-$(PLUGIN_KBDVIC20_OBJS) $(PLUGIN_VIC20_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
+$(PLUGIN_KBDVIC20_OBJS) $(PLUGIN_VIC20_CORE_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
+
+$(PLUGIN_VIC20_GUI_OBJS): INCLUDES := $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
 
 $(PLUGIN_VICEIMPORTER_OBJS): INCLUDES := $(PLUGIN_VICEIMPORTER_INCLUDES)
 

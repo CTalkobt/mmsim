@@ -94,10 +94,11 @@ TEST_CASE(vic20_execute_screen_write) {
     bus->write8(0x1000, 0xA9); bus->write8(0x1001, 0x41);
     bus->write8(0x1002, 0x8D); bus->write8(0x1003, 0x00); bus->write8(0x1004, 0x1E);
     bus->write8(0x1005, 0x4C); bus->write8(0x1006, 0x05); bus->write8(0x1007, 0x10);
-    // Reset vector → $1000
-    bus->write8(0xFFFC, 0x00); bus->write8(0xFFFD, 0x10);
 
+    // onReset resets all IO and CPU; the KERNAL ROM at $FFFC sets PC to $FD22.
+    // Force PC to the test stub directly.
     desc->onReset(*desc);
+    cpu->setPc(0x1000);
 
     // Run until JMP-to-self is detected; guard with iteration cap.
     for (int i = 0; i < 100 && !cpu->isProgramEnd(bus); ++i) {
@@ -122,8 +123,8 @@ TEST_CASE(vic20_raster_frame) {
 
     // JMP $1000 (JMP to self) keeps the CPU spinning without halting.
     bus->write8(0x1000, 0x4C); bus->write8(0x1001, 0x00); bus->write8(0x1002, 0x10);
-    bus->write8(0xFFFC, 0x00); bus->write8(0xFFFD, 0x10);
     desc->onReset(*desc);
+    desc->cpus[0].cpu->setPc(0x1000);
 
     // 50 steps × 3 cycles/JMP = 150 cycles.  VIC raster line = 150 / 65 = 2.
     for (int i = 0; i < 50; ++i) desc->schedulerStep(*desc);

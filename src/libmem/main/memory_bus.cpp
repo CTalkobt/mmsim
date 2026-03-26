@@ -32,6 +32,13 @@ const RomOverlay* FlatMemoryBus::findOverlay(uint32_t addr) const {
 
 uint8_t FlatMemoryBus::read8(uint32_t addr) {
     addr &= m_config.addrMask;
+    if (m_ioRead) {
+        uint8_t ioVal;
+        if (m_ioRead(addr, &ioVal)) {
+            if (observer) observer->onMemoryRead(this, addr, ioVal);
+            return ioVal;
+        }
+    }
     uint8_t val;
     const RomOverlay* overlay = findOverlay(addr);
     if (overlay) {
@@ -45,8 +52,12 @@ uint8_t FlatMemoryBus::read8(uint32_t addr) {
 
 void FlatMemoryBus::write8(uint32_t addr, uint8_t val) {
     addr &= m_config.addrMask;
+    if (m_ioWrite && m_ioWrite(addr, val)) {
+        if (observer) observer->onMemoryWrite(this, addr, m_data[addr], val);
+        return;
+    }
     const RomOverlay* overlay = findOverlay(addr);
-    
+
     uint8_t before = peek8(addr);
     
     if (overlay) {
@@ -105,4 +116,10 @@ void FlatMemoryBus::getWrites(uint32_t *addrs, uint8_t *before,
 
 void FlatMemoryBus::addOverlay(uint32_t base, uint32_t size, const uint8_t* data, bool writable) {
     m_overlays.push_back({base, size, data, writable});
+}
+
+void FlatMemoryBus::setIoHooks(std::function<bool(uint32_t, uint8_t*)> readFn,
+                                std::function<bool(uint32_t, uint8_t)>  writeFn) {
+    m_ioRead  = std::move(readFn);
+    m_ioWrite = std::move(writeFn);
 }

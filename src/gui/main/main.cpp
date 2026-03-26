@@ -62,8 +62,8 @@ private:
     MemoryPane* m_memPane;
     DisasmPane* m_disasmPane;
     ConsolePane* m_consolePane;
-    wxAuiNotebook* m_notebook = nullptr;
-    
+    wxAuiNotebook*   m_notebook = nullptr;
+
     wxTimer m_timer;
     bool m_running = false;
     bool m_kbdFocus = false;
@@ -204,7 +204,7 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             
             if (m_machine->onReset) m_machine->onReset(*m_machine);
 
-            PluginPaneManager::instance().onMachineSwitch(id, this, m_notebook);
+            PluginPaneManager::instance().onMachineSwitch(id, this, m_notebook, m_machine);
 
             SetTitle("mmemu - " + m_machine->displayName);
             SetStatusText("Loaded machine: " + id);
@@ -370,8 +370,13 @@ void MmemuFrame::OnKbdFocus(wxCommandEvent& event) {
 
 void MmemuFrame::OnTimer(wxTimerEvent& event) {
     (void)event;
-    if (m_running && m_cpu) {
-        for (int i = 0; i < 1000; ++i) m_cpu->step(); // Run some cycles
+    if (m_running && m_machine && m_machine->schedulerStep) {
+        // ~1 MHz VIC-20 at 30 fps needs ~33 333 cycles per frame.
+        // Use schedulerStep so the IO registry (VIC, VIA) is ticked each instruction.
+        const int CYCLES_PER_FRAME = 33333;
+        int ran = 0;
+        while (ran < CYCLES_PER_FRAME)
+            ran += m_machine->schedulerStep(*m_machine);
     }
     
     if (m_cpu) {

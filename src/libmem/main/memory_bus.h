@@ -2,6 +2,7 @@
 
 #include "ibus.h"
 #include "util/circular_buffer.h"
+#include <functional>
 #include <vector>
 #include <string>
 
@@ -56,6 +57,14 @@ public:
      */
     void addOverlay(uint32_t base, uint32_t size, const uint8_t* data, bool writable = false);
 
+    /**
+     * Register IO dispatch hooks.  The read hook returns true and fills *val if
+     * it owns the address; the write hook returns true if it owns the address.
+     * Called before overlay / RAM on every read8 / write8.
+     */
+    void setIoHooks(std::function<bool(uint32_t, uint8_t*)> readFn,
+                    std::function<bool(uint32_t, uint8_t)>  writeFn);
+
 private:
     std::string m_name;
     BusConfig   m_config;
@@ -64,6 +73,9 @@ private:
 
     std::vector<RomOverlay> m_overlays;
     CircularBuffer<WriteLogEntry> m_writeLog;
+
+    std::function<bool(uint32_t, uint8_t*)> m_ioRead;
+    std::function<bool(uint32_t, uint8_t)>  m_ioWrite;
 
     const RomOverlay* findOverlay(uint32_t addr) const;
 };

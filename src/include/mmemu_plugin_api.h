@@ -39,6 +39,8 @@ struct PluginPaneInfo {
     void* (*createPane)(void* parentHandle, void* ctx);
     void  (*destroyPane)(void* paneHandle, void* ctx);
     void  (*refreshPane)(void* paneHandle, uint64_t cycles, void* ctx);
+    /** Called after createPane when a matching machine is loaded. Nullable. */
+    void  (*onMachineLoad)(void* paneHandle, MachineDescriptor* desc, void* ctx);
     void* ctx;
 };
 

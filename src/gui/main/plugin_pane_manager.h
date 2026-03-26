@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mmemu_plugin_api.h"
+#include "libcore/main/machine_desc.h"
 #include <wx/wx.h>
 #include <wx/aui/auibook.h>
 #include <string>
@@ -21,8 +22,9 @@ public:
 
     /**
      * Called when a machine is loaded or switched.
+     * desc may be nullptr if no machine descriptor is available.
      */
-    void onMachineSwitch(const std::string& machineId, wxWindow* parent, wxAuiNotebook* notebook);
+    void onMachineSwitch(const std::string& machineId, wxWindow* parent, wxAuiNotebook* notebook, MachineDescriptor* desc = nullptr);
 
     /**
      * Periodic refresh for all live panes.
