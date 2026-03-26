@@ -128,7 +128,11 @@ struct MachinePluginInfo {
 struct SimPluginManifest {
     uint32_t apiVersion;
     const char* pluginId;
+    const char* displayName;        // Human-readable name (e.g. "VICE ROM Importer")
     const char* version;
+
+    const char* const* deps;                 // Null-terminated list of required plugin IDs
+    const char* const* supportedMachineIds;  // Null-terminated list; nullptr = all machines
 
     int coreCount;
     struct CorePluginInfo* cores;

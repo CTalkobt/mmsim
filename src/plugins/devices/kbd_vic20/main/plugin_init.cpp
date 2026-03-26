@@ -45,7 +45,10 @@ static DevicePluginInfo s_devices[] = {
 static SimPluginManifest s_manifest = {
     MMEMU_PLUGIN_API_VERSION,
     "mmemu-plugin-kbd-vic20",
+    nullptr,        // displayName
     "1.0.0",
+    nullptr,        // deps
+    nullptr,        // supportedMachineIds
     0, nullptr,
     0, nullptr,
     1, s_devices,

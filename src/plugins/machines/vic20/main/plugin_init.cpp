@@ -11,7 +11,10 @@ static MachinePluginInfo s_machines[] = {
 static SimPluginManifest s_manifest = {
     MMEMU_PLUGIN_API_VERSION,
     "mmemu-plugin-vic20",
+    nullptr,        // displayName
     "1.0.0",
+    nullptr,        // deps
+    nullptr,        // supportedMachineIds
     0, nullptr,
     0, nullptr,
     0, nullptr,

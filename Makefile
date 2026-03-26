@@ -8,7 +8,8 @@ INCLUDES  = -Isrc -Isrc/include \
             -Isrc/libdevices/main -Isrc/libmem/main -Isrc/libtoolchain/main \
             -Isrc/mcp/main -Isrc/plugin_loader/main -Isrc/plugins/6502/main \
             -Isrc/plugins/devices/via6522/main -Isrc/plugins/devices/vic6560/main \
-            -Isrc/plugins/machines/vic20/main -Isrc/plugins/devices/kbd_vic20/main
+            -Isrc/plugins/machines/vic20/main -Isrc/plugins/devices/kbd_vic20/main \
+            -Isrc/plugins/viceImporter/main
 AR        = ar
 ARFLAGS   = rcs
 
@@ -30,7 +31,8 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-via6522.so \
           $(LIBDIR)/mmemu-plugin-vic6560.so \
           $(LIBDIR)/mmemu-plugin-vic20.so \
-          $(LIBDIR)/mmemu-plugin-kbd-vic20.so
+          $(LIBDIR)/mmemu-plugin-kbd-vic20.so \
+          $(LIBDIR)/mmemu-plugin-vice-importer.so
 
 CC       ?= gcc
 CFLAGS   ?= -std=c11 -Wall -Wextra -Wpedantic -O2 -fPIC
@@ -68,7 +70,10 @@ TEST_SRCS = tests/test_main.cpp src/libcore/test/test_libcore.cpp \
             src/cli/main/plugin_command_registry.cpp \
             src/mcp/main/plugin_tool_registry.cpp \
             src/gui/main/plugin_pane_manager.cpp \
-            tests/test_plugin_extension.cpp
+            tests/test_plugin_extension.cpp \
+            src/plugins/viceImporter/main/rom_discovery.cpp \
+            src/plugins/viceImporter/main/rom_importer.cpp \
+            tests/test_vice_importer.cpp
 
 # Library Sources
 LIBMEM_SRCS       = src/libmem/main/ibus.cpp src/libmem/main/memory_bus.cpp src/libmem/main/libmem.cpp
@@ -102,6 +107,12 @@ PLUGIN_KBDVIC20_SRCS = src/plugins/devices/kbd_vic20/main/kbd_vic20.cpp \
 # Plugin VIC-20 Machine Sources
 PLUGIN_VIC20_SRCS = src/plugins/machines/vic20/main/machine_vic20.cpp src/plugins/machines/vic20/main/plugin_init.cpp
 
+# Plugin VICE ROM Importer Sources
+PLUGIN_VICEIMPORTER_SRCS = src/plugins/viceImporter/main/plugin_main.cpp \
+                            src/plugins/viceImporter/main/rom_discovery.cpp \
+                            src/plugins/viceImporter/main/rom_importer.cpp \
+                            src/plugins/viceImporter/main/rom_import_pane.cpp
+
 # Objects
 LIBMEM_OBJS       = $(LIBMEM_SRCS:.cpp=.o)
 LIBCORE_OBJS      = $(LIBCORE_SRCS:.cpp=.o)
@@ -114,6 +125,7 @@ PLUGIN_VIA6522_OBJS = $(PLUGIN_VIA6522_SRCS:.cpp=.o)
 PLUGIN_VIC6560_OBJS = $(PLUGIN_VIC6560_SRCS:.cpp=.o)
 PLUGIN_KBDVIC20_OBJS = $(PLUGIN_KBDVIC20_SRCS:.cpp=.o)
 PLUGIN_VIC20_OBJS = $(PLUGIN_VIC20_SRCS:.cpp=.o)
+PLUGIN_VICEIMPORTER_OBJS = $(PLUGIN_VICEIMPORTER_SRCS:.cpp=.o)
 
 ALL_LIB_OBJS = $(LIBMEM_OBJS) $(LIBCORE_OBJS) $(LIBDEVICES_OBJS) \
                $(LIBTOOLCHAIN_OBJS) $(LIBDEBUG_OBJS) $(LIBPLUGINS_OBJS) \
@@ -193,6 +205,10 @@ $(LIBDIR)/mmemu-plugin-kbd-vic20.so: $(PLUGIN_KBDVIC20_OBJS) | $(LIBDIR)
 $(LIBDIR)/mmemu-plugin-vic20.so: $(PLUGIN_VIC20_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIC20_OBJS)
 
+# vice-importer pane uses wxWidgets headers; wx symbols are resolved from the host binary at runtime
+$(LIBDIR)/mmemu-plugin-vice-importer.so: $(PLUGIN_VICEIMPORTER_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VICEIMPORTER_OBJS)
+
 # ---------------------------------------------------------------------------
 # Binary rules
 # ---------------------------------------------------------------------------
@@ -222,10 +238,16 @@ PLUGIN_INCLUDES = -Isrc -Isrc/include \
                   -Isrc/plugins/devices/via6522/main \
                   -Isrc/plugins/devices/vic6560/main \
                   -Isrc/plugins/devices/kbd_vic20/main \
-                  -Isrc/plugins/machines/vic20/main
+                  -Isrc/plugins/machines/vic20/main \
+                  -Isrc/plugins/viceImporter/main
+
+# viceImporter pane sources also need wxWidgets headers
+PLUGIN_VICEIMPORTER_INCLUDES = $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
 
 $(PLUGIN_6502_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) \
 $(PLUGIN_KBDVIC20_OBJS) $(PLUGIN_VIC20_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
+
+$(PLUGIN_VICEIMPORTER_OBJS): INCLUDES := $(PLUGIN_VICEIMPORTER_INCLUDES)
 
 # ---------------------------------------------------------------------------
 # Generic object rule
@@ -247,4 +269,4 @@ test: $(TEST_BIN) $(C_CHECK_OBJ) plugins
 # ---------------------------------------------------------------------------
 
 clean:
-	rm -rf $(BINDIR) $(LIBDIR) $(ALL_LIB_OBJS) $(PLUGIN_6502_OBJS)
+	rm -rf $(BINDIR) $(LIBDIR) $(ALL_LIB_OBJS) $(PLUGIN_6502_OBJS) $(PLUGIN_VICEIMPORTER_OBJS)

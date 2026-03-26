@@ -37,6 +37,7 @@ The project prefers **camelCase** for local variables, function parameters, and 
 - Use `//` for single-line comments.
 - Use `/** ... */` for Doxygen-style documentation on public interfaces and class definitions.
 - Document complex logic or non-obvious design decisions.
+- Document all classes and any methods that are over 5 lines or are not obvious at first glance. 
 
 ## 5. Plugin ABI
 
