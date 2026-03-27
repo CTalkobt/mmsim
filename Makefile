@@ -43,6 +43,15 @@ CFLAGS   ?= -std=c11 -Wall -Wextra -Wpedantic -O2 -fPIC
 LIBS = $(ILIBDIR)/libmem.a $(ILIBDIR)/libcore.a $(ILIBDIR)/libdevices.a \
        $(ILIBDIR)/libtoolchain.a $(ILIBDIR)/libdebug.a $(ILIBDIR)/libplugins.a
 
+# Ensure archives are re-created if their member objects change.
+# Explicitly listing dependencies helps make -j avoid race conditions.
+$(ILIBDIR)/libmem.a: $(LIBMEM_OBJS)
+$(ILIBDIR)/libcore.a: $(LIBCORE_OBJS)
+$(ILIBDIR)/libdevices.a: $(LIBDEVICES_OBJS)
+$(ILIBDIR)/libtoolchain.a: $(LIBTOOLCHAIN_OBJS)
+$(ILIBDIR)/libdebug.a: $(LIBDEBUG_OBJS)
+$(ILIBDIR)/libplugins.a: $(LIBPLUGINS_OBJS)
+
 # C compatibility check object
 C_CHECK_OBJ = tests/test_c_compatibility.o
 

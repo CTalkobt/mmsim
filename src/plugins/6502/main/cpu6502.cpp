@@ -137,7 +137,7 @@ int MOS6502::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
     char operands[32] = "";
 
     switch (info.mode) {
-        case Mode::IMP:    std::snprintf(operands, sizeof(operands), ""); break;
+        case Mode::IMP:    break;
         case Mode::ACC:    std::snprintf(operands, sizeof(operands), "A"); break;
         case Mode::IMM:    std::snprintf(operands, sizeof(operands), "#$%02X", bus->peek8(addr+1)); bytes=2; break;
         case Mode::BP:     std::snprintf(operands, sizeof(operands), "$%02X", bus->peek8(addr+1)); bytes=2; break;
