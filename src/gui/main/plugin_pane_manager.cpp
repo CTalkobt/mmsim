@@ -77,6 +77,11 @@ void PluginPaneManager::tickAll(uint64_t cycles) {
     }
 }
 
+wxWindow* PluginPaneManager::getPaneWindow(const std::string& paneId) {
+    auto it = m_livePanes.find(paneId);
+    return (it != m_livePanes.end()) ? it->second.window : nullptr;
+}
+
 void PluginPaneManager::populateMenu(wxMenuBar* menuBar) {
     // This could be complex. For now, let's just log.
     // In a real app, we'd find/create menu categories.

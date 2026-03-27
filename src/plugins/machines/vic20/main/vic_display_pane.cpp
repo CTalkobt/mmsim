@@ -9,16 +9,34 @@ VicDisplayPane::VicDisplayPane(wxWindow* parent)
 {
     SetBackgroundStyle(wxBG_STYLE_PAINT);
 
-    m_ratioBtn = new wxToggleButton(this, wxID_ANY, "Lock Ratio");
+    m_ratioBtn   = new wxToggleButton(this, wxID_ANY, "Lock Ratio");
+    m_captureBtn = new wxToggleButton(this, wxID_ANY, "Capture Keyboard");
     m_ratioBtn->SetValue(true);
 
+    auto* toolbar = new wxBoxSizer(wxHORIZONTAL);
+    toolbar->Add(m_ratioBtn,   0, wxALL, 4);
+    toolbar->AddStretchSpacer();
+    toolbar->Add(m_captureBtn, 0, wxALL, 4);
+
     auto* sizer = new wxBoxSizer(wxVERTICAL);
-    sizer->Add(m_ratioBtn, 0, wxALL, 4);
+    sizer->Add(toolbar, 0, wxEXPAND);
     SetSizer(sizer);
 
-    Bind(wxEVT_PAINT, &VicDisplayPane::OnPaint, this);
-    Bind(wxEVT_SIZE,  &VicDisplayPane::OnSize,  this);
-    m_ratioBtn->Bind(wxEVT_TOGGLEBUTTON, [this](wxCommandEvent&) { Refresh(); });
+    Bind(wxEVT_PAINT, &VicDisplayPane::OnPaint,         this);
+    Bind(wxEVT_SIZE,  &VicDisplayPane::OnSize,           this);
+    m_ratioBtn->Bind(wxEVT_TOGGLEBUTTON,   [this](wxCommandEvent&) { Refresh(); });
+    m_captureBtn->Bind(wxEVT_TOGGLEBUTTON, &VicDisplayPane::OnCaptureToggle, this);
+}
+
+void VicDisplayPane::OnCaptureToggle(wxCommandEvent&) {
+    bool active = m_captureBtn->GetValue();
+    m_captureBtn->SetLabel(active ? "Keyboard Captured \u25cf" : "Capture Keyboard");
+    if (m_captureCallback) m_captureCallback(active);
+}
+
+void VicDisplayPane::SetCaptureActive(bool active) {
+    m_captureBtn->SetValue(active);
+    m_captureBtn->SetLabel(active ? "Keyboard Captured \u25cf" : "Capture Keyboard");
 }
 
 void VicDisplayPane::SetVideoOutput(IVideoOutput* vid) {

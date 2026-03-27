@@ -32,6 +32,11 @@ public:
     void tickAll(uint64_t cycles);
 
     /**
+     * Return the live window for a registered pane, or nullptr if not yet created.
+     */
+    wxWindow* getPaneWindow(const std::string& paneId);
+
+    /**
      * Integration with host menus.
      */
     void populateMenu(wxMenuBar* menuBar);

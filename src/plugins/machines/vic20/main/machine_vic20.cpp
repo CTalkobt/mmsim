@@ -178,8 +178,8 @@ static MachineDescriptor* createMachineVic20Impl(uint32_t expansionFlags,
     if (kbdHandler) {
         IKeyboardMatrix* kbd = dynamic_cast<IKeyboardMatrix*>(kbdHandler);
         if (kbd) {
-            via1->setPortADevice(kbd->getPort(0)); // ColumnPort → VIA1 Port A
-            via2->setPortBDevice(kbd->getPort(1)); // RowPort   → VIA2 Port B
+            via2->setPortBDevice(kbd->getPort(0)); // ColumnPort → VIA2 Port B (column select)
+            via2->setPortADevice(kbd->getPort(1)); // RowPort   → VIA2 Port A (row sense)
             io->registerHandler(kbdHandler);
             desc->onKey = [kbd](const std::string& keyName, bool down) {
                 return kbd->pressKeyByName(keyName, down);

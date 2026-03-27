@@ -11,11 +11,55 @@
 #include "dialogs/assemble_dialog.h"
 #include "plugin_loader/main/plugin_loader.h"
 #include "plugin_pane_manager.h"
+#include "ikeyboard_capture_pane.h"
 #include "libcore/main/machine_desc.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
 
 // mmemu - Multi Machine Emulator
+
+// ---------------------------------------------------------------------------
+// Key mapping helper — must be defined before MmemuApp::FilterEvent.
+// Returns the VIC-20 key name for a wxWidgets virtual key code, or "" if
+// the key has no VIC-20 equivalent.  Handles both upper and lower case
+// letter codes since wxGTK may return either.
+// ---------------------------------------------------------------------------
+static std::string wxKeyToVic20Name(int code) {
+    if (code >= 'A' && code <= 'Z') return std::string(1, (char)('a' + code - 'A'));
+    if (code >= 'a' && code <= 'z') return std::string(1, (char)code);
+    if (code >= '0' && code <= '9') return std::string(1, (char)code);
+    switch (code) {
+        case WXK_SPACE:   return "space";
+        case WXK_RETURN:  return "return";
+        case WXK_CONTROL: return "control";
+        case WXK_SHIFT:   return "left_shift";
+        case WXK_UP:      return "up";
+        case WXK_DOWN:    return "down";
+        case WXK_LEFT:    return "left";
+        case WXK_RIGHT:   return "right";
+        case WXK_HOME:    return "home";
+        case WXK_DELETE:
+        case WXK_BACK:    return "clear";
+        case WXK_ESCAPE:  return "arrow_left"; // ← / STOP on VIC-20
+        // PC F1/F3/F5/F7 map to VIC-20 physical function keys.
+        // Shift+F1 naturally generates left_shift+f1 → VIC-20 F2.
+        case WXK_F1:      return "f1";
+        case WXK_F3:      return "f3";
+        case WXK_F5:      return "f5";
+        case WXK_F7:      return "f7";
+        // Punctuation (ASCII values passed through by wxEVT_KEY_DOWN)
+        case ';':  return "semicolon";
+        case '=':  return "equal";
+        case '-':  return "minus";
+        case ',':  return "comma";
+        case '.':  return "period";
+        case '/':  return "slash";
+        case '@':  return "at";
+        case '[':  return "bracket_left";
+        case ']':  return "bracket_right";
+        default:   return {};
+    }
+}
 
 enum {
     ID_LOAD_MACHINE = wxID_HIGHEST + 1,
@@ -37,6 +81,9 @@ public:
     MmemuFrame();
     ~MmemuFrame() { m_timer.Stop(); }
 
+    /** Toggle keyboard-capture mode and sync all UI + app key handler. */
+    void setKeyCapture(bool active);
+
 private:
     void OnLoadMachine(wxCommandEvent& event);
     void OnStep(wxCommandEvent& event);
@@ -50,14 +97,13 @@ private:
     void OnSearchMem(wxCommandEvent& event);
     void OnKbdFocus(wxCommandEvent& event);
     void OnTimer(wxTimerEvent& event);
-    void OnKeyDown(wxKeyEvent& event);
-    void OnKeyUp(wxKeyEvent& event);
+    void OnCtrlShiftK(wxKeyEvent& event);
 
     MachineDescriptor* m_machine = nullptr;
     ICore* m_cpu = nullptr;
     IBus* m_bus = nullptr;
     IDisassembler* m_disasm = nullptr;
-    
+
     RegisterPane* m_regPane;
     MemoryPane* m_memPane;
     DisasmPane* m_disasmPane;
@@ -67,11 +113,46 @@ private:
     wxTimer m_timer;
     bool m_running = false;
     bool m_kbdFocus = false;
+    IKeyboardCapturePane* m_capturePane = nullptr;
+};
+
+/**
+ * Global event filter that intercepts keyboard events when capture is active.
+ * wxEventFilter::FilterEvent is guaranteed to be called by the wxWidgets event
+ * loop for every event before any window sees it — unlike wxApp::FilterEvent,
+ * which is port-specific and unreliable on GTK.
+ *
+ * We intercept wxEVT_CHAR_HOOK (the first keyboard event fired, before
+ * accelerators) for key press, and wxEVT_KEY_UP for key release.
+ * Ctrl+Shift+K is explicitly passed through so the frame toggle still works.
+ */
+class KeyboardCaptureFilter : public wxEventFilter {
+public:
+    int FilterEvent(wxEvent& event) override {
+        if (!m_handler) return Event_Skip;
+
+        const wxEventType t = event.GetEventType();
+        if (t == wxEVT_CHAR_HOOK || t == wxEVT_KEY_UP) {
+            auto& key = static_cast<wxKeyEvent&>(event);
+            // Always pass Ctrl+Shift+K through so OnCtrlShiftK can handle it.
+            if (key.GetKeyCode() == 'K' && key.ControlDown() && key.ShiftDown())
+                return Event_Skip;
+            std::string name = wxKeyToVic20Name(key.GetKeyCode());
+            if (!name.empty()) {
+                m_handler(name, t == wxEVT_CHAR_HOOK);
+                return Event_Processed;
+            }
+        }
+        return Event_Skip;
+    }
+
+    std::function<bool(const std::string&, bool)> m_handler;
 };
 
 class MmemuApp : public wxApp {
 public:
     bool OnInit() override {
+        wxEvtHandler::AddFilter(&m_keyFilter);
         PluginLoader::instance().setPaneRegisterFn([](const PluginPaneInfo* info) {
             PluginPaneManager::instance().registerPane(info);
         });
@@ -80,6 +161,13 @@ public:
         frame->Show(true);
         return true;
     }
+
+    int OnExit() override {
+        wxEvtHandler::RemoveFilter(&m_keyFilter);
+        return wxApp::OnExit();
+    }
+
+    KeyboardCaptureFilter m_keyFilter;
 };
 
 wxIMPLEMENT_APP(MmemuApp);
@@ -179,8 +267,8 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_TOOL, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
     Bind(wxEVT_TIMER, &MmemuFrame::OnTimer, this, ID_GUI_TIMER);
     
-    Bind(wxEVT_CHAR_HOOK, &MmemuFrame::OnKeyDown, this);
-    Bind(wxEVT_KEY_UP, &MmemuFrame::OnKeyUp, this);
+    // Ctrl+Shift+K toggles capture; FilterEvent routes all other keys.
+    Bind(wxEVT_CHAR_HOOK, &MmemuFrame::OnCtrlShiftK, this);
 
     m_timer.Start(33); // ~30 FPS
 }
@@ -204,10 +292,24 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             
             if (m_machine->onReset) m_machine->onReset(*m_machine);
 
+            // Release capture before switching machine.
+            m_capturePane = nullptr;
+            setKeyCapture(false);
+
             PluginPaneManager::instance().onMachineSwitch(id, this, m_notebook, m_machine);
 
+            // Wire the screen pane's Capture button (if present) to setKeyCapture().
+            wxWindow* screenWin = PluginPaneManager::instance().getPaneWindow("vic20.screen");
+            if (screenWin) {
+                m_capturePane = dynamic_cast<IKeyboardCapturePane*>(screenWin);
+                if (m_capturePane)
+                    m_capturePane->SetCaptureCallback([this](bool active) { setKeyCapture(active); });
+            }
+
+            std::string statusMsg = "Loaded machine: " + id;
+            if (!m_machine->onKey) statusMsg += " (no keyboard)";
             SetTitle("mmemu - " + m_machine->displayName);
-            SetStatusText("Loaded machine: " + id);
+            SetStatusText(statusMsg);
         }
     }
 }
@@ -359,13 +461,37 @@ void MmemuFrame::OnSearchMem(wxCommandEvent& event) {
     }
 }
 
-void MmemuFrame::OnKbdFocus(wxCommandEvent& event) {
-    m_kbdFocus = event.IsChecked();
-    if (m_kbdFocus) {
-        SetStatusText("Keyboard focus active. Press Ctrl-Shift-K to exit.");
+void MmemuFrame::setKeyCapture(bool active) {
+    m_kbdFocus = active;
+    GetToolBar()->ToggleTool(ID_KBD_FOCUS, active);
+    if (m_capturePane) m_capturePane->SetCaptureActive(active);
+    auto* app = static_cast<MmemuApp*>(wxTheApp);
+    if (active && m_machine && m_machine->onKey) {
+        app->m_keyFilter.m_handler = m_machine->onKey;
     } else {
-        SetStatusText("Keyboard focus released.");
+        app->m_keyFilter.m_handler = nullptr;
+        // Release any modifier keys that may have been left pressed (e.g., the
+        // Ctrl and Shift that were pressed as part of the Ctrl+Shift+K shortcut).
+        if (m_machine && m_machine->onKey) {
+            for (const char* mod : {"control", "left_shift", "right_shift"})
+                m_machine->onKey(mod, false);
+        }
     }
+    SetStatusText(active
+        ? "Keyboard captured \u2014 Ctrl+Shift+K or button to release."
+        : "Keyboard released.");
+}
+
+void MmemuFrame::OnKbdFocus(wxCommandEvent& event) {
+    setKeyCapture(event.IsChecked());
+}
+
+void MmemuFrame::OnCtrlShiftK(wxKeyEvent& event) {
+    if (event.GetKeyCode() == 'K' && event.ControlDown() && event.ShiftDown()) {
+        setKeyCapture(!m_kbdFocus);
+        return; // consumed
+    }
+    event.Skip();
 }
 
 void MmemuFrame::OnTimer(wxTimerEvent& event) {
@@ -378,66 +504,11 @@ void MmemuFrame::OnTimer(wxTimerEvent& event) {
         while (ran < CYCLES_PER_FRAME)
             ran += m_machine->schedulerStep(*m_machine);
     }
-    
+
     if (m_cpu) {
         m_regPane->RefreshValues();
         m_disasmPane->RefreshValues(m_cpu->pc());
         m_memPane->RefreshValues();
         PluginPaneManager::instance().tickAll(m_cpu->cycles());
-    }
-}
-
-void MmemuFrame::OnKeyDown(wxKeyEvent& event) {
-    if (event.GetKeyCode() == 'K' && event.ControlDown() && event.ShiftDown()) {
-        m_kbdFocus = !m_kbdFocus;
-        GetToolBar()->ToggleTool(ID_KBD_FOCUS, m_kbdFocus);
-        if (m_kbdFocus) SetStatusText("Keyboard focus active. Press Ctrl-Shift-K to exit.");
-        else SetStatusText("Keyboard focus released.");
-        return;
-    }
-
-    if (m_kbdFocus && m_machine && m_machine->onKey) {
-        // Map common keys to CBM matrix names
-        int code = event.GetKeyCode();
-        std::string name;
-        if (code >= 'A' && code <= 'Z') name = (char)std::tolower(code);
-        else if (code >= '0' && code <= '9') name = (char)code;
-        else if (code == WXK_SPACE) name = "space";
-        else if (code == WXK_RETURN) name = "return";
-        else if (code == WXK_CONTROL) name = "control";
-        else if (code == WXK_SHIFT) name = "left_shift";
-        else if (code == WXK_UP) name = "up";
-        else if (code == WXK_DOWN) name = "down";
-        else if (code == WXK_LEFT) name = "left";
-        else if (code == WXK_RIGHT) name = "right";
-
-        if (!name.empty()) {
-            m_machine->onKey(name, true);
-        }
-    } else {
-        event.Skip();
-    }
-}
-
-void MmemuFrame::OnKeyUp(wxKeyEvent& event) {
-    if (m_kbdFocus && m_machine && m_machine->onKey) {
-        int code = event.GetKeyCode();
-        std::string name;
-        if (code >= 'A' && code <= 'Z') name = (char)std::tolower(code);
-        else if (code >= '0' && code <= '9') name = (char)code;
-        else if (code == WXK_SPACE) name = "space";
-        else if (code == WXK_RETURN) name = "return";
-        else if (code == WXK_CONTROL) name = "control";
-        else if (code == WXK_SHIFT) name = "left_shift";
-        else if (code == WXK_UP) name = "up";
-        else if (code == WXK_DOWN) name = "down";
-        else if (code == WXK_LEFT) name = "left";
-        else if (code == WXK_RIGHT) name = "right";
-
-        if (!name.empty()) {
-            m_machine->onKey(name, false);
-        }
-    } else {
-        event.Skip();
     }
 }

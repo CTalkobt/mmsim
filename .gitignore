@@ -5,6 +5,8 @@ bin/*
 *.gcda
 *.gcno
 
+.idea/
+
 lib/*.a
 lib/*.so
 

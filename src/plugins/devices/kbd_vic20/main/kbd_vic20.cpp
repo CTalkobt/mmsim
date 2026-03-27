@@ -2,15 +2,44 @@
 #include <cstring>
 #include <algorithm>
 
+// VIC-20 keyboard matrix: pairs are {col, row_bit} == {PB-bit, PA-bit}.
+// The KERNAL drives VIA2 Port B low one column at a time and reads
+// the pressed rows from VIA2 Port A.
+//
+//          PB0   PB1        PB2    PB3       PB4     PB5   PB6      PB7
+// PA0:     1     arrow_left ctrl   run_stop  space   cbm   q        2
+// PA1:     3     w          a      left_shft z       s     e        4
+// PA2:     5     r          d      x         c       f     t        6
+// PA3:     7     y          g      v         b       h     u        8
+// PA4:     9     i          j      n         m       k     o        0
+// PA5:     plus  p          l      comma     period  minus at       arrow_up
+// PA6:     pound asterisk   semi   slash     r_shft  equal up       home
+// PA7:     del   return     right  down      f1      f3    f5       f7
 std::map<std::string, std::pair<int, int>> KbdVic20::s_keyMap = {
-    {"1", {0, 0}}, {"3", {0, 1}}, {"5", {0, 2}}, {"7", {0, 3}}, {"9", {0, 4}}, {"0", {0, 5}}, {"pound", {0, 6}}, {"f1", {0, 7}},
-    {"control", {1, 0}}, {"w", {1, 1}}, {"r", {1, 2}}, {"y", {1, 3}}, {"i", {1, 4}}, {"p", {1, 5}}, {"at", {1, 6}}, {"f3", {1, 7}},
-    {"left_shift", {2, 0}}, {"a", {2, 1}}, {"d", {2, 2}}, {"g", {2, 3}}, {"j", {2, 4}}, {"l", {2, 5}}, {"semicolon", {2, 6}}, {"f5", {2, 7}},
-    {"z", {3, 0}}, {"c", {3, 1}}, {"b", {3, 2}}, {"m", {3, 3}}, {"period", {3, 4}}, {"right_shift", {3, 5}}, {"equal", {3, 6}}, {"f7", {3, 7}},
-    {"space", {4, 0}}, {"s", {4, 1}}, {"f", {4, 2}}, {"h", {4, 3}}, {"k", {4, 4}}, {"comma", {4, 5}}, {"slash", {4, 6}}, {"down", {4, 7}},
-    {"q", {5, 0}}, {"e", {5, 1}}, {"t", {5, 2}}, {"u", {5, 3}}, {"o", {5, 4}}, {"bracket_left", {5, 5}}, {"return", {5, 6}}, {"up", {5, 7}},
-    {"2", {6, 0}}, {"4", {6, 1}}, {"6", {6, 2}}, {"8", {6, 3}}, {"0", {6, 4}}, {"minus", {6, 5}}, {"home", {6, 6}}, {"left", {6, 7}},
-    {"arrow_left", {7, 0}}, {"x", {7, 1}}, {"v", {7, 2}}, {"n", {7, 3}}, {"m", {7, 4}}, {"bracket_right", {7, 5}}, {"clear", {7, 6}}, {"right", {7, 7}}
+    // col 0 (PB0)
+    {"1",          {0, 0}}, {"3",          {0, 1}}, {"5",        {0, 2}}, {"7",     {0, 3}},
+    {"9",          {0, 4}}, {"plus",       {0, 5}}, {"pound",    {0, 6}}, {"delete",{0, 7}},
+    // col 1 (PB1)
+    {"arrow_left", {1, 0}}, {"w",          {1, 1}}, {"r",        {1, 2}}, {"y",     {1, 3}},
+    {"i",          {1, 4}}, {"p",          {1, 5}}, {"asterisk", {1, 6}}, {"return",{1, 7}},
+    // col 2 (PB2)
+    {"control",    {2, 0}}, {"a",          {2, 1}}, {"d",        {2, 2}}, {"g",     {2, 3}},
+    {"j",          {2, 4}}, {"l",          {2, 5}}, {"semicolon",{2, 6}}, {"right", {2, 7}},
+    // col 3 (PB3)
+    {"run_stop",   {3, 0}}, {"left_shift", {3, 1}}, {"x",        {3, 2}}, {"v",     {3, 3}},
+    {"n",          {3, 4}}, {"comma",      {3, 5}}, {"slash",    {3, 6}}, {"down",  {3, 7}},
+    // col 4 (PB4)
+    {"space",      {4, 0}}, {"z",          {4, 1}}, {"c",        {4, 2}}, {"b",     {4, 3}},
+    {"m",          {4, 4}}, {"period",     {4, 5}}, {"right_shift",{4,6}},{"f1",    {4, 7}},
+    // col 5 (PB5)
+    {"cbm",        {5, 0}}, {"s",          {5, 1}}, {"f",        {5, 2}}, {"h",     {5, 3}},
+    {"k",          {5, 4}}, {"minus",      {5, 5}}, {"equal",    {5, 6}}, {"f3",    {5, 7}},
+    // col 6 (PB6)
+    {"q",          {6, 0}}, {"e",          {6, 1}}, {"t",        {6, 2}}, {"u",     {6, 3}},
+    {"o",          {6, 4}}, {"at",         {6, 5}}, {"up",       {6, 6}}, {"f5",    {6, 7}},
+    // col 7 (PB7)
+    {"2",          {7, 0}}, {"4",          {7, 1}}, {"6",        {7, 2}}, {"8",     {7, 3}},
+    {"0",          {7, 4}}, {"arrow_up",   {7, 5}}, {"home",     {7, 6}}, {"f7",    {7, 7}},
 };
 
 KbdVic20::KbdVic20()
@@ -24,6 +53,8 @@ void KbdVic20::clearKeys() {
     updateMatrix();
 }
 
+// Interface uses (row, col) but for VIC-20 the first arg selects the PB
+// column and the second is the PA row bit — consistent with the key map.
 void KbdVic20::keyDown(int row, int col) {
     if (row >= 0 && row < 8 && col >= 0 && col < 8) {
         m_matrix[row] &= ~(1 << col);

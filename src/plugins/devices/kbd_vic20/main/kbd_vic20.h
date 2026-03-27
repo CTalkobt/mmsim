@@ -27,7 +27,7 @@ public:
 
     /**
      * Port implementation for the "Output" port (Columns).
-     * Usually wired to VIA1 Port A.
+     * Wired to VIA2 Port B ($9120) — CPU writes column select here.
      */
     class ColumnPort : public IPortDevice {
     public:
@@ -42,7 +42,7 @@ public:
 
     /**
      * Port implementation for the "Input" port (Rows).
-     * Usually wired to VIA2 Port B.
+     * Wired to VIA2 Port A ($9121) — CPU reads row sense here.
      */
     class RowPort : public IPortDevice {
     public:
