@@ -28,6 +28,44 @@ private:
     bool   m_level = false;
 };
 
+// Expansion RAM block descriptors
+struct RamBlock { uint32_t base; uint32_t size; };
+static constexpr RamBlock VIC20_BLK0 = {0x0400, 0x0C00}; // +3K
+static constexpr RamBlock VIC20_BLK1 = {0x2000, 0x2000}; // +8K
+static constexpr RamBlock VIC20_BLK2 = {0x4000, 0x2000}; // +8K
+static constexpr RamBlock VIC20_BLK3 = {0x6000, 0x2000}; // +8K
+static constexpr RamBlock VIC20_BLK5 = {0xA000, 0x2000}; // +8K
+
+static constexpr uint32_t EXP_BLK0 = 1u << 0;
+static constexpr uint32_t EXP_BLK1 = 1u << 1;
+static constexpr uint32_t EXP_BLK2 = 1u << 2;
+static constexpr uint32_t EXP_BLK3 = 1u << 3;
+static constexpr uint32_t EXP_BLK5 = 1u << 4;
+
+// Open-bus handler: covers an unmapped address range, returns 0xFF on reads.
+class OpenBusHandler : public IOHandler {
+public:
+    OpenBusHandler(const char* n, uint32_t base, uint32_t size)
+        : m_name(n), m_base(base), m_size(size) {}
+    const char* name()     const override { return m_name; }
+    uint32_t    baseAddr() const override { return m_base; }
+    uint32_t    addrMask() const override { return m_size - 1; }
+    bool ioRead(IBus*, uint32_t addr, uint8_t* val) override {
+        if (addr < m_base || addr >= m_base + m_size) return false;
+        *val = 0xFF;
+        return true;
+    }
+    bool ioWrite(IBus*, uint32_t addr, uint8_t) override {
+        return addr >= m_base && addr < m_base + m_size;
+    }
+    void reset() override {}
+    void tick(uint64_t) override {}
+private:
+    const char* m_name;
+    uint32_t m_base;
+    uint32_t m_size;
+};
+
 // Register Color RAM as a simple IOHandler so it's accessible via bus
 class ColorRamHandler : public IOHandler {
 public:
@@ -52,12 +90,17 @@ private:
 };
 
 /**
- * VIC-20 Machine Descriptor Factory.
+ * VIC-20 Machine Descriptor Factory — shared implementation.
+ * @param expansionFlags  Bitmask of EXP_BLKx constants for fitted RAM expansions.
+ * @param machineId       Registry ID (e.g. "vic20+8k").
+ * @param displayName     Human-readable name.
  */
-MachineDescriptor* createMachineVic20() {
+static MachineDescriptor* createMachineVic20Impl(uint32_t expansionFlags,
+                                                  const char* machineId,
+                                                  const char* displayName) {
     auto* desc = new MachineDescriptor();
-    desc->machineId = "vic20";
-    desc->displayName = "Commodore VIC-20";
+    desc->machineId = machineId;
+    desc->displayName = displayName;
     desc->licenseClass = "proprietary"; // ROMs are proprietary
 
     // 1. Memory Bus
@@ -182,6 +225,21 @@ MachineDescriptor* createMachineVic20() {
         std::cerr << "VIC-20: Warning: kernal.bin not found." << std::endl;
     }
 
+    // 5. Mark expansion blocks that are NOT fitted as open bus so that
+    //    reads from those ranges return 0xFF instead of flat backing RAM.
+    struct { uint32_t flag; RamBlock blk; const char* lbl; } expansionBlocks[] = {
+        {EXP_BLK0, VIC20_BLK0, "OpenBus-BLK0"},
+        {EXP_BLK1, VIC20_BLK1, "OpenBus-BLK1"},
+        {EXP_BLK2, VIC20_BLK2, "OpenBus-BLK2"},
+        {EXP_BLK3, VIC20_BLK3, "OpenBus-BLK3"},
+        {EXP_BLK5, VIC20_BLK5, "OpenBus-BLK5"},
+    };
+    for (const auto& e : expansionBlocks) {
+        if (!(expansionFlags & e.flag)) {
+            io->registerHandler(new OpenBusHandler(e.lbl, e.blk.base, e.blk.size));
+        }
+    }
+
     desc->onReset = [](MachineDescriptor& d) {
         if (d.ioRegistry) d.ioRegistry->resetAll(); // resets all devices incl. keyboard
         for (auto& slot : d.cpus) {
@@ -202,4 +260,26 @@ MachineDescriptor* createMachineVic20() {
     };
 
     return desc;
+}
+
+// Public factory entry points — one per RAM configuration.
+MachineDescriptor* createMachineVic20() {
+    return createMachineVic20Impl(0,
+        "vic20", "Commodore VIC-20");
+}
+MachineDescriptor* createMachineVic20_3K() {
+    return createMachineVic20Impl(EXP_BLK0,
+        "vic20+3k", "Commodore VIC-20 +3K");
+}
+MachineDescriptor* createMachineVic20_8K() {
+    return createMachineVic20Impl(EXP_BLK1,
+        "vic20+8k", "Commodore VIC-20 +8K");
+}
+MachineDescriptor* createMachineVic20_16K() {
+    return createMachineVic20Impl(EXP_BLK1 | EXP_BLK2,
+        "vic20+16k", "Commodore VIC-20 +16K");
+}
+MachineDescriptor* createMachineVic20_32K() {
+    return createMachineVic20Impl(EXP_BLK1 | EXP_BLK2 | EXP_BLK3 | EXP_BLK5,
+        "vic20+32k", "Commodore VIC-20 +32K");
 }

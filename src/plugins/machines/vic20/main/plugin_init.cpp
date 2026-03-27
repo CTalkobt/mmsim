@@ -5,18 +5,26 @@
 #include "vic_display_pane.h"
 #include <vector>
 
-// Forward declaration of the factory function in machine_vic20.cpp
+// Forward declarations of factory functions in machine_vic20.cpp
 MachineDescriptor* createMachineVic20();
+MachineDescriptor* createMachineVic20_3K();
+MachineDescriptor* createMachineVic20_8K();
+MachineDescriptor* createMachineVic20_16K();
+MachineDescriptor* createMachineVic20_32K();
 
 static MachinePluginInfo s_machines[] = {
-    {"vic20", createMachineVic20}
+    {"vic20",      createMachineVic20},
+    {"vic20+3k",   createMachineVic20_3K},
+    {"vic20+8k",   createMachineVic20_8K},
+    {"vic20+16k",  createMachineVic20_16K},
+    {"vic20+32k",  createMachineVic20_32K},
 };
 
 // ---------------------------------------------------------------------------
 // VIC display pane — registered as a plugin pane, shown for "vic20" machines.
 // ---------------------------------------------------------------------------
 
-static const char* s_vic20Ids[] = {"vic20", nullptr};
+static const char* s_vic20Ids[] = {"vic20", "vic20+3k", "vic20+8k", "vic20+16k", "vic20+32k", nullptr};
 
 static void* createVicDisplayPane(void* parentHandle, void* /*ctx*/) {
     auto* parent = static_cast<wxWindow*>(parentHandle);
@@ -65,7 +73,7 @@ static SimPluginManifest s_manifest = {
     0, nullptr,
     0, nullptr,
     0, nullptr,
-    1, s_machines
+    5, s_machines
 };
 
 #include "libcore/main/core_registry.h"
