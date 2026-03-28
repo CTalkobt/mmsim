@@ -159,3 +159,14 @@ Supports full standard 6502 assembly syntax for both the CLI `.` (direct execute
 - **Source Location**: `src/plugins/6502/`
 - **Class**: `MOS6502`
 - **ABI Compliance**: Exports `mmemuPluginInit`.
+
+---
+
+## 6. MOS 6510 Variant
+
+The same plugin also provides the **MOS 6510** — the CPU used in the Commodore 64. It extends `MOS6502` with a built-in 6-bit parallel I/O port at addresses $0000 (DDR) and $0001 (DATA) that drives the C64 PLA banking lines. See [README-6510.md](README-6510.md) for full details.
+
+| Registration Name | Class | Machine Preset |
+|-------------------|-------|----------------|
+| `"6502"` | `MOS6502` | `"raw6502"` |
+| `"6510"` | `MOS6510` | `"raw6510"` |

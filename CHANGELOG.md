@@ -2,6 +2,57 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0-dev] - 2026-03-28
+
+### Added
+- **MOS 6510 CPU (Phase 11.1)**:
+    - Implemented `MOS6510 : public MOS6502` in `src/plugins/6502/main/cpu6510.h/cpp`.
+    - Built-in 6-bit I/O port at $0000 (DDR) and $0001 (DATA) using a `PortBus` proxy, since `MOS6502::read/write` are private non-virtual.
+    - Power-on defaults: DDR=$00, DATA=$3F — all lines pulled high (KERNAL+BASIC+I/O visible immediately after reset).
+    - Three `ISignalLine*` outputs (`signalLoram()`, `signalHiram()`, `signalCharen()`) for the C64 PLA.
+    - Registered as core `"6510"` and machine preset `"raw6510"` in `mmemu-plugin-6502.so`.
+- **C64 PLA Banking Controller (Phase 11.2)**:
+    - Implemented `C64PLA : public IOHandler` in `src/plugins/devices/c64_pla/`.
+    - Monitors LORAM/HIRAM/CHAREN signal lines to route BASIC ROM ($A000–$BFFF), KERNAL ROM ($E000–$FFFF), Character ROM or I/O ($D000–$DFFF) on every read.
+    - Registered with `baseAddr()=0xA000` so IORegistry sort order places it before $D000 device handlers.
+    - Returns `false` for I/O-visible state, allowing VIC-II/SID/CIA handlers to respond.
+    - Plugin: `lib/mmemu-plugin-c64-pla.so`; registration name `"c64pla"`.
+- **MOS 6526 CIA (Phase 11.3)**:
+    - Implemented `CIA6526 : public IOHandler` in `src/plugins/devices/cia6526/`.
+    - 16-register interface (`addrMask=0x000F`); configurable base address for CIA #1 ($DC00) and CIA #2 ($DD00).
+    - Timer A and Timer B: 16-bit countdown with latches, continuous/one-shot modes; Timer B can count Timer A underflows.
+    - TOD BCD clock with freeze/latch behavior on TODHR read and alarm interrupt.
+    - ICR set/clear/read-to-clear semantics; IRQ propagated via `ISignalLine`.
+    - Peripheral injection via `IPortDevice` for keyboard matrices and joysticks.
+    - Plugin: `lib/mmemu-plugin-cia6526.so`; registration name `"6526"`.
+- **MOS 6567/6569 VIC-II (Phase 11.4)**:
+    - Implemented `VIC2 : public IOHandler, public IVideoOutput` in `src/plugins/devices/vic2/`.
+    - Five video modes: Standard/Multicolor Text, Standard/Multicolor Bitmap, Extended Background Color.
+    - 8-sprite engine with X/Y expansion, priority, mono/multicolor, hardware sprite-sprite and sprite-BG collision.
+    - 384×272 total frame (RGBA8888) with 320×200 active display area and 32/36px borders.
+    - Raster IRQ via `ISignalLine`; write-1-to-clear $D019 semantics.
+    - VIC-II banking via `setBankBase()`; character ROM always visible at bank offsets $1000 and $9000.
+    - DMA reads through dedicated `IBus*`; color RAM read via `m_dmaBus->peek8(0xD800+cellIdx)`.
+    - Plugin: `lib/mmemu-plugin-vic2.so`; registration name `"6567"`.
+- **MOS 6581 SID (Phase 11.5)**:
+    - Implemented `SID6581 : public IOHandler, public IAudioOutput` in `src/plugins/devices/sid6581/`.
+    - Three voices: 24-bit phase accumulator, Triangle/Sawtooth/Pulse/Noise waveforms (ANDed when combined).
+    - 23-bit LFSR noise (taps 22,17) clocked on phase bit-19 rising edge.
+    - ADSR envelope generator with 16 attack and 16 decay/release rate levels.
+    - Hard sync (reset by previous voice overflow) and ring modulation (triangle XOR'd with previous voice MSB).
+    - Chamberlin state-variable filter: LP/BP/HP individually selectable per $D418 mode bits.
+    - `IAudioOutput` pull model: `tick()` fills 8192-sample ring buffer; `pullSamples()` drains it.
+    - Plugin: `lib/mmemu-plugin-sid6581.so`; registration name `"6581"`.
+- **Documentation (Phase 11.1–11.5)**:
+    - Created `README-6510.md` — MOS 6510 I/O port and PortBus proxy.
+    - Created `README-C64PLA.md` — C64 PLA banking matrix and signal wiring.
+    - Created `README-6526.md` — CIA 6526 register map, timer, TOD, and ICR details.
+    - Created `README-VIC2.md` — VIC-II video modes, sprite engine, banking, and register map.
+    - Created `README-SID.md` — SID voice architecture, ADSR, filter, and audio output.
+    - Updated `README-6502.md` — added MOS 6510 variant section.
+    - Updated `README-PLUGINS.md` — added all Phase 11 plugins; updated distribution strategy.
+    - Updated `README.md` — expanded quick links and roadmap.
+
 ## [0.1.0-dev] - 2026-03-23
 
 ### Added

@@ -94,8 +94,10 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 
 ## 6. Implementation Roadmap
 
-- **Phase 9+: libdevices & Machines**: Implementation of classic hardware components (VIC-II, SID, CIA) and machine presets (C64, VIC-20).
-- **Phase 12: Performance Profiling**: Advanced cycle-accurate profiling and execution heatmaps.
+- **Phase 10 (Complete)**: VIC-20 peripheral integration — VIA 6522, VIC-I 6560, keyboard matrix, machine factory.
+- **Phase 11 (In Progress)**: C64 peripheral implementation — MOS 6510, C64 PLA, CIA 6526, VIC-II, SID 6581.
+- **Phase 11.6**: C64 machine factory wiring all Phase 11 components into a complete machine preset.
+- **Phase 12**: Performance profiling — cycle-accurate profiling and execution heatmaps.
 
 ---
 
@@ -104,9 +106,14 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 **mmsim** utilizes a modular plugin architecture. For a complete list of available processors, devices, and machine presets, see the **[Plugin Index (README-PLUGINS.md)](README-PLUGINS.md)**.
 
 ### Quick Links:
-- [6502 Processor Implementation](README-6502.md)
+- [6502/6510 Processor Implementation](README-6502.md)
+- [6510 I/O Port & Banking](README-6510.md)
 - [6522 VIA Implementation](README-6522.md)
+- [6526 CIA Implementation](README-6526.md)
 - [6560 VIC-I Implementation](README-6560.md)
+- [6567/6569 VIC-II Implementation](README-VIC2.md)
+- [6581 SID Implementation](README-SID.md)
+- [C64 PLA Banking Controller](README-C64PLA.md)
 - [VIC-20 Keyboard Implementation](README-KBD-VIC20.md)
 - [VIC-20 Machine Implementation](README-VIC20.md)
 
