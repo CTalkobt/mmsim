@@ -1,0 +1,137 @@
+#pragma once
+
+#include "cpu6502.h"
+#include "libdevices/main/isignal_line.h"
+#include "libmem/main/ibus.h"
+
+/**
+ * MOS 6510 CPU — MOS 6502 with a built-in 6-bit I/O port at $00/$01.
+ *
+ * $00 = DDR  (Data Direction Register): 1 = output, 0 = input (floats high via pull-ups)
+ * $01 = DATA: write drives output bits; read returns (DATA & DDR) | (~DDR & 0xFF)
+ *
+ * Port bit assignments:
+ *   bit 0 = LORAM  (0 = RAM visible at $A000, 1 = BASIC ROM)
+ *   bit 1 = HIRAM  (0 = RAM visible at $E000, 1 = KERNAL ROM)
+ *   bit 2 = CHAREN (0 = Character ROM at $D000, 1 = I/O)
+ *   bit 3 = Cassette write output   (not used for banking)
+ *   bit 4 = Cassette motor control  (not used for banking)
+ *   bit 5 = Cassette sense input    (not used for banking)
+ *
+ * The three banking lines are exposed as ISignalLine* so the PLA handler
+ * (Phase 11.2) can observe them and reconfigure the memory map accordingly.
+ *
+ * Implementation note: because MOS6502::read/write are private, this class
+ * installs a thin proxy bus (PortBus) that intercepts $00/$01 before passing
+ * all other accesses through to the real bus.
+ */
+class MOS6510 : public MOS6502 {
+public:
+    MOS6510();
+    ~MOS6510() override;
+
+    const char* variantName() const override { return "MOS 6510"; }
+
+    // Override bus attachment to install the port proxy.
+    void setDataBus(IBus* bus) override;
+    void setCodeBus(IBus* bus) override;
+
+    // Banking signal outputs.
+    ISignalLine* signalLoram()  { return &m_loram; }
+    ISignalLine* signalHiram()  { return &m_hiram; }
+    ISignalLine* signalCharen() { return &m_charen; }
+
+    // Direct read-back of port registers (for debugger use).
+    uint8_t portDDR()  const { return m_ddr; }
+    uint8_t portData() const { return m_data; }
+
+private:
+    // -----------------------------------------------------------------------
+    // Simple edge-triggered signal line implementation.
+    // -----------------------------------------------------------------------
+    struct SignalLine : public ISignalLine {
+        bool m_level = true; // pull-ups default high
+        bool get()  const override { return m_level; }
+        void set(bool level) override { m_level = level; }
+        void pulse() override { m_level = !m_level; m_level = !m_level; }
+    };
+
+    // -----------------------------------------------------------------------
+    // Proxy bus: sits between the CPU core and the real system bus.
+    // Intercepts $00 (DDR) and $01 (DATA); passes everything else through.
+    // -----------------------------------------------------------------------
+    class PortBus : public IBus {
+    public:
+        explicit PortBus(MOS6510* owner, IBus* real)
+            : m_owner(owner), m_real(real) {}
+
+        const BusConfig& config() const override { return m_real->config(); }
+        const char*      name()   const override { return m_real->name(); }
+
+        uint8_t read8(uint32_t addr) override {
+            if (addr == 0x0000) return m_owner->m_ddr;
+            if (addr == 0x0001) return m_owner->portRead();
+            return m_real->read8(addr);
+        }
+
+        void write8(uint32_t addr, uint8_t val) override {
+            if (addr == 0x0000) { m_owner->ddrWrite(val);  return; }
+            if (addr == 0x0001) { m_owner->dataWrite(val); return; }
+            m_real->write8(addr, val);
+        }
+
+        uint8_t peek8(uint32_t addr) override {
+            if (addr == 0x0000) return m_owner->m_ddr;
+            if (addr == 0x0001) return m_owner->portRead();
+            return m_real->peek8(addr);
+        }
+
+        // Delegate snapshot / write-log helpers to the real bus.
+        void     reset()                                    override { m_real->reset(); }
+        size_t   stateSize()                          const override { return m_real->stateSize(); }
+        void     saveState(uint8_t* buf)              const override { m_real->saveState(buf); }
+        void     loadState(const uint8_t* buf)              override { m_real->loadState(buf); }
+        int      writeCount()                         const override { return m_real->writeCount(); }
+        void     getWrites(uint32_t* a, uint8_t* b,
+                           uint8_t* c, int max)       const override { m_real->getWrites(a,b,c,max); }
+        void     clearWriteLog()                            override { m_real->clearWriteLog(); }
+
+    private:
+        MOS6510* m_owner;
+        IBus*    m_real;
+    };
+
+    // -----------------------------------------------------------------------
+    // Port state
+    // -----------------------------------------------------------------------
+    uint8_t     m_ddr     = 0x00; // all inputs on power-up
+    uint8_t     m_data    = 0x3F; // C64 pull-ups: bits 0-5 high
+
+    SignalLine  m_loram;
+    SignalLine  m_hiram;
+    SignalLine  m_charen;
+
+    PortBus*    m_portBus = nullptr;
+    IBus*       m_realBus = nullptr;
+
+    // -----------------------------------------------------------------------
+    // Internal helpers (called from PortBus)
+    // -----------------------------------------------------------------------
+    uint8_t portRead() const {
+        // Input bits float high (pull-up); output bits return DATA.
+        return (m_data & m_ddr) | (~m_ddr & 0xFF);
+    }
+
+    void ddrWrite(uint8_t val) {
+        m_ddr = val & 0x3F; // only 6 bits exist
+        updateSignals();
+    }
+
+    void dataWrite(uint8_t val) {
+        m_data = val & 0x3F;
+        updateSignals();
+    }
+
+    void updateSignals();
+    void installBus(IBus* bus);
+};

@@ -9,7 +9,8 @@ INCLUDES  = -Isrc -Isrc/include \
             -Isrc/mcp/main -Isrc/plugin_loader/main -Isrc/plugins/6502/main \
             -Isrc/plugins/devices/via6522/main -Isrc/plugins/devices/vic6560/main \
             -Isrc/plugins/machines/vic20/main -Isrc/plugins/devices/kbd_vic20/main \
-            -Isrc/plugins/viceImporter/main
+            -Isrc/plugins/viceImporter/main \
+            -Isrc/plugins/devices/c64_pla/main -Isrc/plugins/devices/cia6526/main
 AR        = ar
 ARFLAGS   = rcs
 
@@ -32,7 +33,9 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-vic6560.so \
           $(LIBDIR)/mmemu-plugin-vic20.so \
           $(LIBDIR)/mmemu-plugin-kbd-vic20.so \
-          $(LIBDIR)/mmemu-plugin-vice-importer.so
+          $(LIBDIR)/mmemu-plugin-vice-importer.so \
+          $(LIBDIR)/mmemu-plugin-c64-pla.so \
+          $(LIBDIR)/mmemu-plugin-cia6526.so
 
 CC       ?= gcc
 CFLAGS   ?= -std=c11 -Wall -Wextra -Wpedantic -O2 -fPIC
@@ -98,7 +101,8 @@ LIBDEBUG_SRCS     = src/libdebug/main/breakpoint_list.cpp src/libdebug/main/debu
 LIBPLUGINS_SRCS   = src/plugin_loader/main/plugin_loader.cpp
 
 # Plugin 6502 Sources
-PLUGIN_6502_SRCS  = src/plugins/6502/main/cpu6502.cpp src/plugins/6502/main/disassembler_6502.cpp \
+PLUGIN_6502_SRCS  = src/plugins/6502/main/cpu6502.cpp src/plugins/6502/main/cpu6510.cpp \
+                    src/plugins/6502/main/disassembler_6502.cpp \
                     src/plugins/6502/main/assembler_6502.cpp src/plugins/6502/main/kickassembler.cpp \
                     src/plugins/6502/main/plugin_init.cpp
 
@@ -126,6 +130,14 @@ PLUGIN_VICEIMPORTER_SRCS = src/plugins/viceImporter/main/plugin_main.cpp \
                             src/plugins/viceImporter/main/rom_importer.cpp \
                             src/plugins/viceImporter/main/rom_import_pane.cpp
 
+# Plugin C64 PLA Sources
+PLUGIN_C64PLA_SRCS = src/plugins/devices/c64_pla/main/c64_pla.cpp \
+                     src/plugins/devices/c64_pla/main/plugin_init.cpp
+
+# Plugin CIA 6526 Sources
+PLUGIN_CIA6526_SRCS = src/plugins/devices/cia6526/main/cia6526.cpp \
+                      src/plugins/devices/cia6526/main/plugin_init.cpp
+
 # Objects
 LIBMEM_OBJS       = $(LIBMEM_SRCS:.cpp=.o)
 LIBCORE_OBJS      = $(LIBCORE_SRCS:.cpp=.o)
@@ -141,6 +153,8 @@ PLUGIN_VIC20_CORE_OBJS = $(PLUGIN_VIC20_CORE_SRCS:.cpp=.o)
 PLUGIN_VIC20_GUI_OBJS  = $(PLUGIN_VIC20_GUI_SRCS:.cpp=.o)
 PLUGIN_VIC20_OBJS      = $(PLUGIN_VIC20_CORE_OBJS) $(PLUGIN_VIC20_GUI_OBJS)
 PLUGIN_VICEIMPORTER_OBJS = $(PLUGIN_VICEIMPORTER_SRCS:.cpp=.o)
+PLUGIN_C64PLA_OBJS   = $(PLUGIN_C64PLA_SRCS:.cpp=.o)
+PLUGIN_CIA6526_OBJS  = $(PLUGIN_CIA6526_SRCS:.cpp=.o)
 
 ALL_LIB_OBJS = $(LIBMEM_OBJS) $(LIBCORE_OBJS) $(LIBDEVICES_OBJS) \
                $(LIBTOOLCHAIN_OBJS) $(LIBDEBUG_OBJS) $(LIBPLUGINS_OBJS) \
@@ -224,6 +238,12 @@ $(LIBDIR)/mmemu-plugin-vic20.so: $(PLUGIN_VIC20_OBJS) | $(LIBDIR)
 $(LIBDIR)/mmemu-plugin-vice-importer.so: $(PLUGIN_VICEIMPORTER_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VICEIMPORTER_OBJS)
 
+$(LIBDIR)/mmemu-plugin-c64-pla.so: $(PLUGIN_C64PLA_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_C64PLA_OBJS)
+
+$(LIBDIR)/mmemu-plugin-cia6526.so: $(PLUGIN_CIA6526_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_CIA6526_OBJS)
+
 # ---------------------------------------------------------------------------
 # Binary rules
 # ---------------------------------------------------------------------------
@@ -256,13 +276,16 @@ PLUGIN_INCLUDES = -Isrc -Isrc/include \
                   -Isrc/plugins/devices/vic6560/main \
                   -Isrc/plugins/devices/kbd_vic20/main \
                   -Isrc/plugins/machines/vic20/main \
-                  -Isrc/plugins/viceImporter/main
+                  -Isrc/plugins/viceImporter/main \
+                  -Isrc/plugins/devices/c64_pla/main \
+                  -Isrc/plugins/devices/cia6526/main
 
 # viceImporter pane sources also need wxWidgets headers
 PLUGIN_VICEIMPORTER_INCLUDES = $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
 
 $(PLUGIN_6502_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) \
-$(PLUGIN_KBDVIC20_OBJS) $(PLUGIN_VIC20_CORE_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
+$(PLUGIN_KBDVIC20_OBJS) $(PLUGIN_VIC20_CORE_OBJS) \
+$(PLUGIN_C64PLA_OBJS) $(PLUGIN_CIA6526_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
 
 $(PLUGIN_VIC20_GUI_OBJS): INCLUDES := $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
 
@@ -288,4 +311,5 @@ test: $(TEST_BIN) $(C_CHECK_OBJ) plugins
 # ---------------------------------------------------------------------------
 
 clean:
-	rm -rf $(BINDIR) $(LIBDIR) $(ALL_LIB_OBJS) $(PLUGIN_6502_OBJS) $(PLUGIN_VICEIMPORTER_OBJS)
+	rm -rf $(BINDIR) $(LIBDIR) $(ALL_LIB_OBJS) $(PLUGIN_6502_OBJS) $(PLUGIN_VICEIMPORTER_OBJS) \
+	       $(PLUGIN_C64PLA_OBJS) $(PLUGIN_CIA6526_OBJS)
