@@ -10,7 +10,8 @@ INCLUDES  = -Isrc -Isrc/include \
             -Isrc/plugins/devices/via6522/main -Isrc/plugins/devices/vic6560/main \
             -Isrc/plugins/machines/vic20/main -Isrc/plugins/devices/kbd_vic20/main \
             -Isrc/plugins/viceImporter/main \
-            -Isrc/plugins/devices/c64_pla/main -Isrc/plugins/devices/cia6526/main
+            -Isrc/plugins/devices/c64_pla/main -Isrc/plugins/devices/cia6526/main \
+            -Isrc/plugins/devices/vic2/main
 AR        = ar
 ARFLAGS   = rcs
 
@@ -35,7 +36,8 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-kbd-vic20.so \
           $(LIBDIR)/mmemu-plugin-vice-importer.so \
           $(LIBDIR)/mmemu-plugin-c64-pla.so \
-          $(LIBDIR)/mmemu-plugin-cia6526.so
+          $(LIBDIR)/mmemu-plugin-cia6526.so \
+          $(LIBDIR)/mmemu-plugin-vic2.so
 
 CC       ?= gcc
 CFLAGS   ?= -std=c11 -Wall -Wextra -Wpedantic -O2 -fPIC
@@ -138,6 +140,10 @@ PLUGIN_C64PLA_SRCS = src/plugins/devices/c64_pla/main/c64_pla.cpp \
 PLUGIN_CIA6526_SRCS = src/plugins/devices/cia6526/main/cia6526.cpp \
                       src/plugins/devices/cia6526/main/plugin_init.cpp
 
+# Plugin VIC-II Sources
+PLUGIN_VIC2_SRCS = src/plugins/devices/vic2/main/vic2.cpp \
+                   src/plugins/devices/vic2/main/plugin_init.cpp
+
 # Objects
 LIBMEM_OBJS       = $(LIBMEM_SRCS:.cpp=.o)
 LIBCORE_OBJS      = $(LIBCORE_SRCS:.cpp=.o)
@@ -155,6 +161,7 @@ PLUGIN_VIC20_OBJS      = $(PLUGIN_VIC20_CORE_OBJS) $(PLUGIN_VIC20_GUI_OBJS)
 PLUGIN_VICEIMPORTER_OBJS = $(PLUGIN_VICEIMPORTER_SRCS:.cpp=.o)
 PLUGIN_C64PLA_OBJS   = $(PLUGIN_C64PLA_SRCS:.cpp=.o)
 PLUGIN_CIA6526_OBJS  = $(PLUGIN_CIA6526_SRCS:.cpp=.o)
+PLUGIN_VIC2_OBJS     = $(PLUGIN_VIC2_SRCS:.cpp=.o)
 
 ALL_LIB_OBJS = $(LIBMEM_OBJS) $(LIBCORE_OBJS) $(LIBDEVICES_OBJS) \
                $(LIBTOOLCHAIN_OBJS) $(LIBDEBUG_OBJS) $(LIBPLUGINS_OBJS) \
@@ -244,6 +251,9 @@ $(LIBDIR)/mmemu-plugin-c64-pla.so: $(PLUGIN_C64PLA_OBJS) | $(LIBDIR)
 $(LIBDIR)/mmemu-plugin-cia6526.so: $(PLUGIN_CIA6526_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_CIA6526_OBJS)
 
+$(LIBDIR)/mmemu-plugin-vic2.so: $(PLUGIN_VIC2_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIC2_OBJS)
+
 # ---------------------------------------------------------------------------
 # Binary rules
 # ---------------------------------------------------------------------------
@@ -278,14 +288,15 @@ PLUGIN_INCLUDES = -Isrc -Isrc/include \
                   -Isrc/plugins/machines/vic20/main \
                   -Isrc/plugins/viceImporter/main \
                   -Isrc/plugins/devices/c64_pla/main \
-                  -Isrc/plugins/devices/cia6526/main
+                  -Isrc/plugins/devices/cia6526/main \
+                  -Isrc/plugins/devices/vic2/main
 
 # viceImporter pane sources also need wxWidgets headers
 PLUGIN_VICEIMPORTER_INCLUDES = $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
 
 $(PLUGIN_6502_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) \
 $(PLUGIN_KBDVIC20_OBJS) $(PLUGIN_VIC20_CORE_OBJS) \
-$(PLUGIN_C64PLA_OBJS) $(PLUGIN_CIA6526_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
+$(PLUGIN_C64PLA_OBJS) $(PLUGIN_CIA6526_OBJS) $(PLUGIN_VIC2_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
 
 $(PLUGIN_VIC20_GUI_OBJS): INCLUDES := $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
 
@@ -312,4 +323,4 @@ test: $(TEST_BIN) $(C_CHECK_OBJ) plugins
 
 clean:
 	rm -rf $(BINDIR) $(LIBDIR) $(ALL_LIB_OBJS) $(PLUGIN_6502_OBJS) $(PLUGIN_VICEIMPORTER_OBJS) \
-	       $(PLUGIN_C64PLA_OBJS) $(PLUGIN_CIA6526_OBJS)
+	       $(PLUGIN_C64PLA_OBJS) $(PLUGIN_CIA6526_OBJS) $(PLUGIN_VIC2_OBJS)
