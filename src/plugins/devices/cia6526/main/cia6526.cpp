@@ -135,6 +135,7 @@ bool CIA6526::ioWrite(IBus* /*bus*/, uint32_t addr, uint8_t val) {
         case PRA:
             m_pra = val;
             if (m_portADevice) m_portADevice->writePort(val);
+            if (m_portAWriteCallback) m_portAWriteCallback(m_pra, m_ddra);
             break;
         case PRB:
             m_prb = val;
@@ -143,6 +144,7 @@ bool CIA6526::ioWrite(IBus* /*bus*/, uint32_t addr, uint8_t val) {
         case DDRA:
             m_ddra = val;
             if (m_portADevice) m_portADevice->setDdr(val);
+            if (m_portAWriteCallback) m_portAWriteCallback(m_pra, m_ddra);
             break;
         case DDRB:
             m_ddrb = val;

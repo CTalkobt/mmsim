@@ -1,5 +1,8 @@
 # mmemu — Multi Machine Emulator
 # Top-level Makefile
+.PHONY: all cli gui mcp libs test plugins clean
+
+all: cli gui mcp plugins
 
 CXX      ?= g++
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -Wpedantic -Wno-unused-parameter -O2 -fPIC
@@ -11,7 +14,8 @@ INCLUDES  = -Isrc -Isrc/include \
             -Isrc/plugins/machines/vic20/main -Isrc/plugins/devices/kbd_vic20/main \
             -Isrc/plugins/viceImporter/main \
             -Isrc/plugins/devices/c64_pla/main -Isrc/plugins/devices/cia6526/main \
-            -Isrc/plugins/devices/vic2/main -Isrc/plugins/devices/sid6581/main
+            -Isrc/plugins/devices/vic2/main -Isrc/plugins/devices/sid6581/main \
+            -Isrc/plugins/machines/c64/main
 AR        = ar
 ARFLAGS   = rcs
 
@@ -38,7 +42,8 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-c64-pla.so \
           $(LIBDIR)/mmemu-plugin-cia6526.so \
           $(LIBDIR)/mmemu-plugin-vic2.so \
-          $(LIBDIR)/mmemu-plugin-sid6581.so
+          $(LIBDIR)/mmemu-plugin-sid6581.so \
+          $(LIBDIR)/mmemu-plugin-c64.so
 
 CC       ?= gcc
 CFLAGS   ?= -std=c11 -Wall -Wextra -Wpedantic -O2 -fPIC
@@ -89,7 +94,8 @@ TEST_SRCS = tests/test_main.cpp src/libcore/test/test_libcore.cpp \
             src/plugins/viceImporter/main/rom_discovery.cpp \
             src/plugins/viceImporter/main/rom_importer.cpp \
             tests/test_vice_importer.cpp \
-            src/plugins/machines/vic20/test/test_vic20_integration.cpp
+            src/plugins/machines/vic20/test/test_vic20_integration.cpp \
+            src/plugins/machines/c64/test/test_c64_integration.cpp
 
 # Library Sources
 LIBMEM_SRCS       = src/libmem/main/ibus.cpp src/libmem/main/memory_bus.cpp src/libmem/main/libmem.cpp
@@ -149,6 +155,12 @@ PLUGIN_VIC2_SRCS = src/plugins/devices/vic2/main/vic2.cpp \
 PLUGIN_SID6581_SRCS = src/plugins/devices/sid6581/main/sid6581.cpp \
                       src/plugins/devices/sid6581/main/plugin_init.cpp
 
+# Plugin C64 Machine Sources — split so the wx pane gets wx compile flags
+PLUGIN_C64_CORE_SRCS = src/plugins/machines/c64/main/machine_c64.cpp
+PLUGIN_C64_GUI_SRCS  = src/plugins/machines/c64/main/plugin_init.cpp \
+                       src/plugins/machines/vic20/main/vic_display_pane.cpp
+PLUGIN_C64_SRCS      = $(PLUGIN_C64_CORE_SRCS) $(PLUGIN_C64_GUI_SRCS)
+
 # Objects
 LIBMEM_OBJS       = $(LIBMEM_SRCS:.cpp=.o)
 LIBCORE_OBJS      = $(LIBCORE_SRCS:.cpp=.o)
@@ -168,6 +180,9 @@ PLUGIN_C64PLA_OBJS   = $(PLUGIN_C64PLA_SRCS:.cpp=.o)
 PLUGIN_CIA6526_OBJS  = $(PLUGIN_CIA6526_SRCS:.cpp=.o)
 PLUGIN_VIC2_OBJS     = $(PLUGIN_VIC2_SRCS:.cpp=.o)
 PLUGIN_SID6581_OBJS  = $(PLUGIN_SID6581_SRCS:.cpp=.o)
+PLUGIN_C64_CORE_OBJS = $(PLUGIN_C64_CORE_SRCS:.cpp=.o)
+PLUGIN_C64_GUI_OBJS  = $(PLUGIN_C64_GUI_SRCS:.cpp=.o)
+PLUGIN_C64_OBJS      = $(PLUGIN_C64_CORE_OBJS) $(PLUGIN_C64_GUI_OBJS)
 
 ALL_LIB_OBJS = $(LIBMEM_OBJS) $(LIBCORE_OBJS) $(LIBDEVICES_OBJS) \
                $(LIBTOOLCHAIN_OBJS) $(LIBDEBUG_OBJS) $(LIBPLUGINS_OBJS) \
@@ -185,9 +200,6 @@ endif
 # Phony targets
 # ---------------------------------------------------------------------------
 
-.PHONY: all cli gui mcp libs test plugins clean
-
-all: cli gui mcp plugins
 
 cli: $(CLI_BIN)
 
@@ -263,6 +275,9 @@ $(LIBDIR)/mmemu-plugin-vic2.so: $(PLUGIN_VIC2_OBJS) | $(LIBDIR)
 $(LIBDIR)/mmemu-plugin-sid6581.so: $(PLUGIN_SID6581_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_SID6581_OBJS)
 
+$(LIBDIR)/mmemu-plugin-c64.so: $(PLUGIN_C64_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_C64_OBJS)
+
 # ---------------------------------------------------------------------------
 # Binary rules
 # ---------------------------------------------------------------------------
@@ -282,7 +297,12 @@ $(MCP_BIN): $(MCP_SRCS) $(LIBS) | $(BINDIR)
 # Device implementation objects linked directly into the test binary (tests don't use dlopen)
 DEVICE_TEST_OBJS = src/plugins/devices/via6522/main/via6522.o \
                    src/plugins/devices/vic6560/main/vic6560.o \
-                   src/plugins/machines/vic20/main/machine_vic20.o
+                   src/plugins/machines/vic20/main/machine_vic20.o \
+                   src/plugins/devices/c64_pla/main/c64_pla.o \
+                   src/plugins/devices/cia6526/main/cia6526.o \
+                   src/plugins/devices/vic2/main/vic2.o \
+                   src/plugins/devices/sid6581/main/sid6581.o \
+                   src/plugins/machines/c64/main/machine_c64.o
 
 $(TEST_BIN): $(TEST_SRCS) $(LIBS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -Itests -rdynamic -o $@ $(TEST_SRCS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) $(BASE_LIBS) $(WXLIBS)
@@ -295,6 +315,7 @@ PLUGIN_INCLUDES = -Isrc -Isrc/include \
                   -Isrc/plugins/devices/vic6560/main \
                   -Isrc/plugins/devices/kbd_vic20/main \
                   -Isrc/plugins/machines/vic20/main \
+                  -Isrc/plugins/machines/c64/main \
                   -Isrc/plugins/viceImporter/main \
                   -Isrc/plugins/devices/c64_pla/main \
                   -Isrc/plugins/devices/cia6526/main \
@@ -307,9 +328,9 @@ PLUGIN_VICEIMPORTER_INCLUDES = $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
 $(PLUGIN_6502_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) \
 $(PLUGIN_KBDVIC20_OBJS) $(PLUGIN_VIC20_CORE_OBJS) \
 $(PLUGIN_C64PLA_OBJS) $(PLUGIN_CIA6526_OBJS) $(PLUGIN_VIC2_OBJS) \
-$(PLUGIN_SID6581_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
+$(PLUGIN_SID6581_OBJS) $(PLUGIN_C64_CORE_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
 
-$(PLUGIN_VIC20_GUI_OBJS): INCLUDES := $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
+$(PLUGIN_VIC20_GUI_OBJS) $(PLUGIN_C64_GUI_OBJS): INCLUDES := $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
 
 $(PLUGIN_VICEIMPORTER_OBJS): INCLUDES := $(PLUGIN_VICEIMPORTER_INCLUDES)
 
@@ -335,4 +356,5 @@ test: $(TEST_BIN) $(C_CHECK_OBJ) plugins
 clean:
 	rm -rf $(BINDIR) $(LIBDIR) $(ALL_LIB_OBJS) $(PLUGIN_6502_OBJS) $(PLUGIN_VICEIMPORTER_OBJS) \
 	       $(PLUGIN_C64PLA_OBJS) $(PLUGIN_CIA6526_OBJS) $(PLUGIN_VIC2_OBJS) \
-	       $(PLUGIN_SID6581_OBJS)
+	       $(PLUGIN_SID6581_OBJS) $(PLUGIN_C64_CORE_OBJS) \
+	       src/plugins/machines/c64/main/plugin_init.o

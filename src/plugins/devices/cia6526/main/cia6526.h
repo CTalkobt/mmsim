@@ -4,6 +4,7 @@
 #include "libdevices/main/iport_device.h"
 #include "libdevices/main/isignal_line.h"
 #include <cstdint>
+#include <functional>
 #include <string>
 
 /**
@@ -47,6 +48,12 @@ public:
     void setPortADevice(IPortDevice* d) { m_portADevice = d; }
     void setPortBDevice(IPortDevice* d) { m_portBDevice = d; }
     void setIrqLine(ISignalLine* line)  { m_irqLine = line; }
+
+    /** Called after every write to PRA or DDRA with the new (pra, ddra) values.
+     *  Useful for CIA2 VIC-II bank switching in the C64 machine factory. */
+    void setPortAWriteCallback(std::function<void(uint8_t pra, uint8_t ddra)> cb) {
+        m_portAWriteCallback = std::move(cb);
+    }
 
     // -----------------------------------------------------------------------
     // IOHandler interface
@@ -160,4 +167,6 @@ private:
     IPortDevice* m_portADevice = nullptr;
     IPortDevice* m_portBDevice = nullptr;
     ISignalLine* m_irqLine     = nullptr;
+
+    std::function<void(uint8_t, uint8_t)> m_portAWriteCallback;
 };
