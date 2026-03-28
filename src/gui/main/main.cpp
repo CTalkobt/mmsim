@@ -12,8 +12,11 @@
 #include "plugin_loader/main/plugin_loader.h"
 #include "plugin_pane_manager.h"
 #include "ikeyboard_capture_pane.h"
+#include "audio_output.h"
 #include "libcore/main/machine_desc.h"
 #include "libcore/main/machines/machine_registry.h"
+#include "libdevices/main/iaudio_output.h"
+#include "libdevices/main/io_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
 
 // mmemu - Multi Machine Emulator
@@ -39,8 +42,8 @@ static std::string wxKeyToVic20Name(int code) {
         case WXK_RIGHT:   return "right";
         case WXK_HOME:    return "home";
         case WXK_DELETE:
-        case WXK_BACK:    return "clear";
-        case WXK_ESCAPE:  return "arrow_left"; // ← / STOP on VIC-20
+        case WXK_BACK:    return "delete";
+        case WXK_ESCAPE:  return "run_stop";
         // PC F1/F3/F5/F7 map to VIC-20 physical function keys.
         // Shift+F1 naturally generates left_shift+f1 → VIC-20 F2.
         case WXK_F1:      return "f1";
@@ -79,7 +82,7 @@ enum {
 class MmemuFrame : public wxFrame {
 public:
     MmemuFrame();
-    ~MmemuFrame() { m_timer.Stop(); }
+    ~MmemuFrame() { m_timer.Stop(); delete m_audio; }
 
     /** Toggle keyboard-capture mode and sync all UI + app key handler. */
     void setKeyCapture(bool active);
@@ -103,6 +106,7 @@ private:
     ICore* m_cpu = nullptr;
     IBus* m_bus = nullptr;
     IDisassembler* m_disasm = nullptr;
+    AudioOutput* m_audio = nullptr;
 
     RegisterPane* m_regPane;
     MemoryPane* m_memPane;
@@ -291,6 +295,25 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             m_consolePane->SetContext(m_cpu, m_bus);
             
             if (m_machine->onReset) m_machine->onReset(*m_machine);
+
+            // Discover and start audio output for any IAudioOutput device in
+            // the new machine's IO registry.
+            delete m_audio;
+            m_audio = nullptr;
+            if (m_machine->ioRegistry) {
+                std::vector<IOHandler*> handlers;
+                m_machine->ioRegistry->enumerate(handlers);
+                for (auto* h : handlers) {
+                    if (auto* ao = dynamic_cast<IAudioOutput*>(h)) {
+                        m_audio = new AudioOutput();
+                        if (!m_audio->start(ao)) {
+                            delete m_audio;
+                            m_audio = nullptr;
+                        }
+                        break;
+                    }
+                }
+            }
 
             // Release capture before switching machine.
             m_capturePane = nullptr;

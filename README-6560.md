@@ -21,9 +21,16 @@ The VIC-I is the primary video and sound generator for the Commodore VIC-20. It 
 - **Side-effect Free**: Uses `IBus::peek8()` for all background rendering tasks to avoid triggering I/O side effects in the machine.
 - **Dynamic Addressing**: Respects VIC registers for Screen RAM and Character Generator base addresses.
 
-### 2.3 Sound Simulation
-- **Four Channels**: Three square-wave generators and one noise channel.
-- **Simplified Model**: Currently implements an amplitude model; waveform synthesis is a planned upgrade.
+### 2.3 Sound Synthesis
+- **Four Channels**: Three square-wave tone generators and one pseudo-random noise channel.
+- **Tone oscillators** (`$900A`–`$900C`): Each register's bit 7 enables the voice; bits 6–0 set the
+  frequency divisor F (0–127). Half-period in CPU cycles = `PRESCALER × (128 − F)` where
+  PRESCALER = 128 / 64 / 32 for voices 1–3, giving ranges ≈ 31–3995 Hz / 62–7990 Hz / 125–15980 Hz.
+- **Noise channel** (`$900D`): Same enable/frequency register format; drives a Galois 16-bit LFSR
+  (polynomial 0xB400) clocked at half-period = `16 × (128 − F)`.
+- **Volume** (`$900E` bits 3–0): Single master volume 0–15 applied after mixing all four channels.
+- **Output interface**: Implements `IAudioOutput`; the host calls `pullSamples()` to drain the
+  internal 8192-sample ring buffer that `tick()` fills at the configured sample rate (default 44100 Hz).
 
 ---
 

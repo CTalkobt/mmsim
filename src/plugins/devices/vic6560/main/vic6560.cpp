@@ -8,10 +8,21 @@ VIC6560::VIC6560(const std::string& name, uint32_t baseAddr)
     reset();
 }
 
+// Constexpr array definitions (ODR-used by tickAudio)
+constexpr uint32_t VIC6560::PRESCALER[4];
+
 void VIC6560::reset() {
     std::memset(m_regs, 0, sizeof(m_regs));
     m_rasterCounter = 0;
     if (m_irqLine) m_irqLine->set(false);
+
+    std::memset(m_voiceAccum, 0, sizeof(m_voiceAccum));
+    std::memset(m_voiceOut,   0, sizeof(m_voiceOut));
+    m_lfsr         = 0xACE1;
+    m_sampleFrac   = 0;
+    m_audioBufRead  = 0;
+    m_audioBufWrite = 0;
+    m_audioBufCount = 0;
 }
 
 bool VIC6560::ioRead(IBus* bus, uint32_t addr, uint8_t* val) {
@@ -57,6 +68,95 @@ void VIC6560::tick(uint64_t cycles) {
     // Interrupt generation in the VIC-20 is handled entirely by the 6522 VIAs.
     (void)currRaster;
     (void)prevRaster;
+
+    tickAudio(cycles);
+}
+
+// ---------------------------------------------------------------------------
+// Sound synthesis
+// ---------------------------------------------------------------------------
+
+void VIC6560::pushSample(float s) {
+    if (m_audioBufCount >= AUDIO_BUF) return; // buffer full: drop new sample
+    m_audioBuf[m_audioBufWrite] = s;
+    m_audioBufWrite = (m_audioBufWrite + 1) & (AUDIO_BUF - 1);
+    ++m_audioBufCount;
+}
+
+int VIC6560::pullSamples(float* buffer, int maxSamples) {
+    int n = (maxSamples < m_audioBufCount) ? maxSamples : m_audioBufCount;
+    for (int i = 0; i < n; ++i) {
+        buffer[i] = m_audioBuf[m_audioBufRead];
+        m_audioBufRead = (m_audioBufRead + 1) & (AUDIO_BUF - 1);
+    }
+    m_audioBufCount -= n;
+    return n;
+}
+
+void VIC6560::tickAudio(uint64_t cycles) {
+    // --- Advance the three square-wave tone oscillators ($900A–$900C) ---
+    for (int v = 0; v < 3; ++v) {
+        uint8_t reg = m_regs[0xA + v];
+        if (!(reg & 0x80)) {
+            // Voice disabled: silence and reset accumulator so it starts
+            // cleanly when re-enabled.
+            m_voiceOut[v]   = 0;
+            m_voiceAccum[v] = 0;
+            continue;
+        }
+        uint32_t F          = reg & 0x7Fu;
+        uint32_t halfPeriod = PRESCALER[v] * (128u - F);
+        m_voiceAccum[v] += cycles;
+        uint32_t toggles    = (uint32_t)(m_voiceAccum[v] / halfPeriod);
+        m_voiceAccum[v]    %= halfPeriod;
+        m_voiceOut[v]      ^= (uint8_t)(toggles & 1u);
+    }
+
+    // --- Advance the noise channel ($900D) via a Galois 16-bit LFSR ---
+    {
+        uint8_t reg = m_regs[0xD];
+        if (!(reg & 0x80)) {
+            m_voiceOut[3]   = 0;
+            m_voiceAccum[3] = 0;
+        } else {
+            uint32_t F          = reg & 0x7Fu;
+            uint32_t halfPeriod = PRESCALER[3] * (128u - F);
+            m_voiceAccum[3] += cycles;
+            uint32_t steps      = (uint32_t)(m_voiceAccum[3] / halfPeriod);
+            m_voiceAccum[3]    %= halfPeriod;
+            // Advance LFSR: Galois form, polynomial 0xB400
+            // (maximal-length 16-bit sequence, taps at 16,15,13,4)
+            for (uint32_t i = 0; i < steps; ++i) {
+                uint16_t out = m_lfsr & 1u;
+                m_lfsr >>= 1;
+                if (out) m_lfsr ^= 0xB400u;
+            }
+            m_voiceOut[3] = m_lfsr & 1u;
+        }
+    }
+
+    // --- Mix and emit samples ---
+    // Volume: $900E bits 3-0 (0 = mute, 15 = full).
+    // Each active channel contributes ±0.25 so four voices sum to ±1.0.
+    uint8_t vol = m_regs[0xE] & 0x0Fu;
+    float amplitude = vol / 15.0f;
+
+    float mix = 0.0f;
+    for (int v = 0; v < 4; ++v) {
+        uint8_t reg = (v < 3) ? m_regs[0xA + v] : m_regs[0xD];
+        if (reg & 0x80) {
+            mix += m_voiceOut[v] ? 0.25f : -0.25f;
+        }
+    }
+    float sample = mix * amplitude;
+
+    // Determine how many output samples this tick spans and push each one.
+    m_sampleFrac += (uint64_t)cycles * (uint32_t)m_sampleRate;
+    uint32_t newSamples = (uint32_t)(m_sampleFrac / PHI2_NTSC);
+    m_sampleFrac       %= PHI2_NTSC;
+    for (uint32_t i = 0; i < newSamples; ++i) {
+        pushSample(sample);
+    }
 }
 
 IVideoOutput::VideoDimensions VIC6560::getDimensions() const {

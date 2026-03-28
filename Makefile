@@ -67,7 +67,7 @@ GUI_SRCS = src/gui/main/main.cpp src/gui/main/machine_selector.cpp src/gui/main/
            src/gui/main/memory_pane.cpp src/gui/main/disasm_pane.cpp src/gui/main/console_pane.cpp \
            src/gui/main/dialogs/memory_dialogs.cpp src/gui/main/dialogs/assemble_dialog.cpp \
            src/cli/main/cli_interpreter.cpp src/gui/main/plugin_pane_manager.cpp \
-           src/cli/main/plugin_command_registry.cpp
+           src/cli/main/plugin_command_registry.cpp src/gui/main/audio_output.cpp
 MCP_SRCS = src/mcp/main/main.cpp src/mcp/main/plugin_tool_registry.cpp
 TEST_SRCS = tests/test_main.cpp src/libcore/test/test_libcore.cpp \
             src/libmem/test/test_flatmembus.cpp src/libdebug/test/test_debug.cpp \
@@ -235,7 +235,7 @@ $(CLI_BIN): $(CLI_SRCS) $(LIBS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -rdynamic -o $@ $(CLI_SRCS) $(BASE_LIBS)
 
 $(GUI_BIN): $(GUI_SRCS) $(LIBS) | $(BINDIR)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -rdynamic -o $@ $(GUI_SRCS) $(BASE_LIBS) $(WXLIBS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -rdynamic -o $@ $(GUI_SRCS) $(BASE_LIBS) $(WXLIBS) -lasound
 
 $(MCP_BIN): $(MCP_SRCS) $(LIBS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -rdynamic -o $@ $(MCP_SRCS) $(BASE_LIBS)
