@@ -1,8 +1,10 @@
 #include "cli_interpreter.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
+#include "libcore/main/image_loader.h"
 #include "plugin_command_registry.h"
 #include <iostream>
+#include <fstream>
 
 void CliInterpreter::processLine(const std::string& line) {
     if (m_asmMode) {
@@ -79,6 +81,90 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         if (ss >> n) {} else { n = 1; }
         for (int i = 0; i < n; ++i) m_ctx.cpu->step();
         showRegisters();
+    } else if (cmd == "run") {
+        if (!m_ctx.cpu) { m_output("No machine created.\n"); return; }
+        std::string addrStr;
+        if (ss >> addrStr) {
+            uint32_t addr = std::stoul(addrStr, nullptr, 16);
+            m_ctx.cpu->setPc(addr);
+        } else if (m_ctx.lastLoadAddr != 0) {
+            m_ctx.cpu->setPc(m_ctx.lastLoadAddr);
+        }
+        m_output("Running... (Ctrl-C to stop - actually not supported in CLI yet, will run until break)\n");
+        while (true) {
+            m_ctx.cpu->step();
+            if (m_ctx.cpu->isProgramEnd(m_ctx.bus)) break;
+            if (m_ctx.dbg->breakpoints().checkExec(m_ctx.cpu->pc())) break;
+        }
+        showRegisters();
+    } else if (cmd == "load") {
+        if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
+        std::string path, addrStr;
+        if (ss >> path) {
+            uint32_t addr = 0;
+            bool hasAddr = false;
+            if (ss >> addrStr) {
+                addr = std::stoul(addrStr, nullptr, 16);
+                hasAddr = true;
+            }
+            auto* loader = ImageLoaderRegistry::instance().findLoader(path);
+            if (loader) {
+                if (loader->load(path, m_ctx.bus, m_ctx.machine, addr)) {
+                    m_output("Loaded '" + path + "' using " + loader->name() + "\n");
+                    // Extract load address if not provided (for .prg)
+                    if (!hasAddr && std::string(loader->name()).find("PRG") != std::string::npos) {
+                        std::ifstream f(path, std::ios::binary);
+                        uint8_t h[2];
+                        f.read((char*)h, 2);
+                        m_ctx.lastLoadAddr = h[0] | (h[1] << 8);
+                    } else if (hasAddr) {
+                        m_ctx.lastLoadAddr = addr;
+                    }
+                } else {
+                    m_output("Failed to load '" + path + "'\n");
+                }
+            } else {
+                m_output("No loader found for '" + path + "'\n");
+            }
+        } else {
+            m_output("Syntax: load <path> [address]\n");
+        }
+    } else if (cmd == "cart") {
+        if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
+        std::string path;
+        if (ss >> path) {
+            auto handler = ImageLoaderRegistry::instance().createCartridgeHandler(path);
+            if (handler) {
+                if (handler->attach(m_ctx.bus, m_ctx.machine)) {
+                    auto md = handler->metadata();
+                    m_output("Attached cartridge: " + md.displayName + " (" + md.type + ")\n");
+                    ImageLoaderRegistry::instance().setActiveCartridge(m_ctx.bus, std::move(handler));
+                    // Optional: Trigger reset
+                    m_output("Resetting machine...\n");
+                    m_ctx.machine->onReset(*m_ctx.machine);
+                    showRegisters();
+                } else {
+                    m_output("Failed to attach cartridge '" + path + "'\n");
+                }
+            } else {
+                m_output("Unsupported cartridge format: '" + path + "'\n");
+            }
+        } else {
+            m_output("Syntax: cart <path>\n");
+        }
+    } else if (cmd == "eject") {
+        if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
+        auto* cart = ImageLoaderRegistry::instance().getActiveCartridge(m_ctx.bus);
+        if (cart) {
+            cart->eject(m_ctx.bus);
+            ImageLoaderRegistry::instance().setActiveCartridge(m_ctx.bus, nullptr);
+            m_output("Cartridge ejected.\n");
+            m_output("Resetting machine...\n");
+            m_ctx.machine->onReset(*m_ctx.machine);
+            showRegisters();
+        } else {
+            m_output("No cartridge attached.\n");
+        }
     } else if (cmd == "setpc") {
         if (!m_ctx.cpu) { m_output("No machine created.\n"); return; }
         std::string addrStr;
@@ -265,7 +351,10 @@ void CliInterpreter::printHelp() {
              "  disasm <addr> [n]- Disassemble N instructions\n"
              "  asm <addr>       - Interactive assembly mode (end with '.')\n"
              "  key <name> <state>- Press/release a key (state: 1/0 or down/up)\n"
-             "  load <path> <addr> - Load a binary file into memory\n"
+             "  load <path> [addr]- Load a program/binary file\n"
+             "  cart <path>      - Attach a cartridge image\n"
+             "  eject            - Eject currently attached cartridge\n"
+             "  run [addr]       - Run from address (or last loaded address)\n"
              "  .<instr>         - Assemble and execute a single instruction\n"
              "  quit, q          - Exit the program\n");
 

@@ -17,6 +17,7 @@ struct CliContext {
     IDisassembler* disasm = nullptr;
     IAssembler* assem = nullptr;
     DebugContext* dbg = nullptr;
+    uint32_t lastLoadAddr = 0;
     bool quit = false;
 };
 

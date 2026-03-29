@@ -716,75 +716,98 @@ the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 
 ## Phase 13: Runtime Image and Cartridge Loading
 
-*Goal: Enable dynamic loading of .prg (RAM injection), .bin (raw memory), and 
-cartridge images (.crt or raw) into a running machine via CLI, GUI, and MCP.*
+*Goal: Enable dynamic loading of .prg (RAM injection), .bin (raw memory), and
+cartridge images (.crt or raw) into a running machine via CLI, GUI, and MCP.
+Format-specific parsers live in machine-family plugins; `libcore` provides only
+the registration mechanism and the format-agnostic BIN loader.*
 
-### Phase 13.1: Core Image Loading Logic (`src/libcore/main/image_loader.h/cpp`)
+### Phase 13.1: Core Loader Infrastructure (`src/libcore/main/image_loader.h/cpp`)
 
-- [ ] **CBM PRG Loader**: Implement a parser for Commodore .prg files (2-byte 
-      header for load address, followed by data); inject data into the active 
-      machine's `IBus`.
-- [ ] **Atari XEX Loader**: Implement a multi-segment parser for Atari .xex 
-      files (optional $FFFF header, segment start/end addresses). Support 
-      patching system RUNAD ($02E0) and INITAD ($02E2) vectors.
-- [ ] **BIN Loader**: Implement raw binary data loading at a user-specified 
-      physical or virtual address.
-- [ ] **CBM Cartridge Support**: Implement basic 8KB/16KB Commodore cartridge 
-      mapping using the `IBus` overlay system. For C64, this includes driving 
-      the EXROM/GAME signal lines.
-- [ ] **CBM CRT Parser**: Support for the OpenC64Cart (.crt) file format, 
-      including reading headers for cartridge type, hardware IDs, and bank counts.
-- [ ] **Atari CAR Parser**: Support for the Atari .car file format, including 
-      reading the 16-byte header for cartridge type and banking metadata.
-- [ ] **Snapshot Integration**: Ensure current cartridge and image state is 
-      included in machine snapshots.
+- [x] Define `IImageLoader` interface: `canLoad(path)`, `load(path, IBus*, machine)`.
+- [x] Define `ICartridgeHandler` interface: `attach(IBus*)`, `eject(IBus*)`,
+      `metadata()` (returns type string, bank count, address range).
+- [x] Implement `ImageLoaderRegistry` — singleton, same pattern as `DeviceRegistry`.
+- [x] **BIN Loader**: Implement `BinLoader : public IImageLoader` for raw binary
+      data loading at a user-specified physical address. Register in the host binary.
+- [x] CLI/GUI/MCP delegate `load`, `cart`, and `eject` commands through the
+      registry without knowing any specific file format.
 
-### Phase 13.2: CLI Interface Extensions
+### Phase 13.2: CBM Loader Plugin (`src/plugins/cbm-loader/`)
 
-- [ ] `load <filename> [address]`: Loads a `.prg` / `.xex` (using header) or 
-      `.bin` (requiring manual address) into memory.
-- [ ] `cart <filename>`: Attaches a cartridge image and triggers a machine 
-      reset if necessary.
-- [ ] `run`: Sets the PC to the start address of the last loaded image and 
+*Handles all Commodore-family program and cartridge image formats. Shared by
+VIC-20, C64, PET, and C128.*
+
+- [x] Implement `PrgLoader : public IImageLoader` for Commodore `.prg` files
+      (2-byte little-endian load address header, data follows); inject into the
+      active machine's `IBus`.
+- [x] Implement `CrtParser` for the OpenC64Cart `.crt` format: file/CHIP packet
+      headers, cartridge type, hardware ID, bank count.
+- [x] Implement `CbmCartridgeHandler : public ICartridgeHandler` for basic 8 KB /
+      16 KB ROM mapping via `IBus` overlay; drive EXROM/GAME signal lines for C64.
+- [x] Register `PrgLoader` and `CbmCartridgeHandler` via `mmemuPluginInit` into
+      `ImageLoaderRegistry`.
+- [x] **Snapshot Integration**: Include active cartridge image path and bank state
+      in machine snapshots.
+
+### Phase 13.3: Atari Loader Plugin (`src/plugins/atari-loader/`)
+
+*Handles Atari 8-bit program and cartridge image formats. Shared across all
+Atari machine targets.*
+
+- [ ] Implement `XexLoader : public IImageLoader` for Atari `.xex` files
+      (optional $FFFF leader, segment start/end address pairs); inject each
+      segment and patch RUNAD ($02E0) / INITAD ($02E2) vectors.
+- [ ] Implement `CarParser` for the Atari `.car` format (16-byte header, cartridge
+      type ID, banking metadata).
+- [ ] Implement `AtariCartridgeHandler : public ICartridgeHandler` for `.car`
+      ROM mapping at the correct Atari address window.
+- [ ] Register via `mmemuPluginInit` into `ImageLoaderRegistry`.
+
+### Phase 13.4: CLI Interface Extensions
+
+- [x] `load <filename> [address]`: Delegates to `ImageLoaderRegistry`; uses header
+      for `.prg` / `.xex`, requires address for `.bin`.
+- [x] `cart <filename>`: Attaches a cartridge image via `ICartridgeHandler` and
+      triggers a machine reset if necessary.
+- [x] `run`: Sets the PC to the start address of the last loaded image and
       resumes execution.
-- [ ] `eject`: Removes the active cartridge and restores the machine's default 
-      memory mapping.
+- [x] `eject`: Calls `ICartridgeHandler::eject()` and restores the machine's
+      default memory mapping.
 
-### Phase 13.3: GUI Image Management
+### Phase 13.5: GUI Image Management
 
-- [ ] **Load Image Dialog**: Provide a standard file picker with options to 
-      specify a load address and a "Run after load" checkbox.
-- [ ] **Cartridge Pane**: Implement a dedicated pane to display currently 
-      attached cartridge details (type, bank count, memory range).
-- [ ] **Drag-and-Drop**: Enable dragging `.prg`/`.xex` or `.crt`/`.car` files 
-      into the machine display window to trigger immediate loading or attachment.
-- [ ] **File History**: Maintain a list of recently loaded images for quick 
-      reattachment.
+- [x] **Load Image Dialog**: File picker with optional load address override and
+      a "Run after load" checkbox.
+- [x] **Cartridge Pane**: Displays currently attached cartridge metadata (type,
+      bank count, address range) sourced from `ICartridgeHandler::metadata()`.
+- [x] **Drag-and-Drop**: Dragging `.prg`/`.xex` or `.crt`/`.car` into the
+      machine display window triggers immediate loading or attachment.
+- [x] **File History**: Recently loaded images list for quick reattachment.
 
-### Phase 13.4: MCP Integration
+### Phase 13.6: MCP Integration
 
-- [ ] `load_image` tool: Accepts `path`, `address`, and `autoStart` boolean; 
+- [x] `load_image` tool: Accepts `path`, `address`, and `autoStart` boolean;
       returns the final load address and size.
-- [ ] `attach_cartridge` tool: Accepts `path` and `reset` boolean; returns 
-      cartridge metadata.
-- [ ] `eject_cartridge` tool: Clears the current cartridge slot.
+- [x] `attach_cartridge` tool: Accepts `path` and `reset` boolean; returns
+      cartridge metadata from `ICartridgeHandler::metadata()`.
+- [x] `eject_cartridge` tool: Calls `ICartridgeHandler::eject()`.
 
-### Phase 13.5: Integration Tests
+### Phase 13.7: Integration Tests
 
-- [ ] **CBM PRG Test**: Load a .prg and verify the first two bytes of data end 
-      up at the address specified in the header.
-- [ ] **Atari XEX Test**: Load a multi-segment .xex; verify each segment is 
-      written to its respective range and `RUNAD` is patched correctly.
-- [ ] **BIN Test**: Load a raw binary to a specific address and verify memory 
-      content via `IBus::peek8()`.
-- [ ] **CBM Cartridge Overlay Test**: Attach a .crt cartridge and verify that 
-      reading the $8000–$9FFF range returns data from the cartridge.
-- [ ] **Atari Cartridge Overlay Test**: Attach a .car cartridge; verify 
-      the 16-byte header is parsed and the correct banking logic is active.
-- [ ] **Eject Test**: Detach a cartridge and verify RAM is visible again at 
-      the previous cartridge range.
-
----
+- [x] **Registry Test**: Verify `ImageLoaderRegistry` correctly dispatches to the
+      right `IImageLoader` based on file extension.
+- [x] **BIN Test**: Load a raw binary to a specific address; verify memory content
+      via `IBus::peek8()`.
+- [x] **CBM PRG Test** (cbm-loader plugin): Load a `.prg`; verify data lands at
+      the address given in the 2-byte header.
+- [x] **CBM Cartridge Overlay Test** (cbm-loader plugin): Attach a `.crt`;
+      verify reads at $8000–$9FFF return cartridge data.
+- [ ] **Atari XEX Test** (atari-loader plugin): Load a multi-segment `.xex`;
+      verify each segment is written to its range and RUNAD is patched.
+- [ ] **Atari Cartridge Overlay Test** (atari-loader plugin): Attach a `.car`;
+      verify header parsing and ROM visible at the correct address window.
+- [x] **Eject Test**: Detach a cartridge; verify RAM is visible again at the
+      previous cartridge range.
 
 ---
 
@@ -793,11 +816,12 @@ cartridge images (.crt or raw) into a running machine via CLI, GUI, and MCP.*
 *Goal: Implement the Commodore Datasette (tape) interface, supporting the .tap 
 pulse-encoded format for VIC-20, C64, and PET.*
 
-### Phase 14.1: .tap Archive Parser (`src/libcore/main/tap_loader.h/cpp`)
+### Phase 14.1: .tap Archive Parser (`src/plugins/cbm-loader/`)
 
 - [ ] Implement `TapArchive` class to parse "C64-TAPE-RAW" headers.
 - [ ] Decoder for pulse timings (converting .tap byte values to CPU cycles).
 - [ ] Support for both Version 0 and Version 1 .tap files.
+- [ ] Co-located with other CBM format parsers in the `cbm-loader` plugin.
 
 ### Phase 14.2: Datasette Device (`src/plugins/devices/datasette/`)
 
@@ -843,7 +867,10 @@ for disk access (.d64, .g64, .p00). See .plan/iec.md.*
 - [ ] Handle ATN/CLK/DATA handshaking signals via `IPortDevice` on CIA #2.
 - [ ] Stream bits from host-side .d64 or .prg files.
 
-### Phase 15.3: Disk Image Support
+### Phase 15.3: Disk Image Support (`src/plugins/cbm-loader/`)
+
+*CBM-specific disk image formats co-located with other Commodore format parsers
+in the `cbm-loader` plugin.*
 
 - [ ] `.d64` parser (sector/track mapping for 1541).
 - [ ] `.g64` parser (GCR-encoded pulses for copy-protected images).
@@ -859,12 +886,15 @@ for disk access (.d64, .g64, .p00). See .plan/iec.md.*
 
 *Goal: Implement the Atari Serial I/O (SIO) bus and disk image support (.atr, .xfd).*
 
-### Phase 15.5.1: Atari Disk Image Parsers (`src/libcore/main/atari_disk_loader.h/cpp`)
+### Phase 15.5.1: Atari Disk Image Parsers (`src/plugins/atari-loader/`)
 
-- [ ] **ATR Parser**: Implement a parser for Atari .atr disk images (16-byte 
+*Atari-specific disk image formats co-located with other Atari format parsers
+in the `atari-loader` plugin.*
+
+- [ ] **ATR Parser**: Implement a parser for Atari `.atr` disk images (16-byte
       header followed by raw sectors).
-- [ ] **XFD Loader**: Support for headerless raw sector images (.xfd).
-- [ ] **Sector Translation**: Map 128-byte (SD) and 256-byte (DD) sectors 
+- [ ] **XFD Loader**: Support for headerless raw sector images (`.xfd`).
+- [ ] **Sector Translation**: Map 128-byte (SD) and 256-byte (DD) sectors
       to Atari-specific track layouts.
 
 ### Phase 15.5.2: SIO HLE (Level 1)

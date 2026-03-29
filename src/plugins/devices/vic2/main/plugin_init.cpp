@@ -11,7 +11,7 @@ static DevicePluginInfo s_devices[] = {
 
 static SimPluginManifest s_manifest = {
     MMEMU_PLUGIN_API_VERSION,
-    "mmemu-plugin-vic2",
+    "vic2",
     nullptr,        // displayName
     "1.0.0",
     nullptr,        // deps

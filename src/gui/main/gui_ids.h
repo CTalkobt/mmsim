@@ -1,0 +1,20 @@
+#pragma once
+#include <wx/wx.h>
+
+enum {
+    ID_LOAD_MACHINE = wxID_HIGHEST + 1,
+    ID_STEP,
+    ID_RUN,
+    ID_PAUSE,
+    ID_RESET,
+    ID_FILL_MEM,
+    ID_COPY_MEM,
+    ID_ASSEMBLE,
+    ID_GOTO_ADDR,
+    ID_SEARCH_MEM,
+    ID_LOAD_IMAGE,
+    ID_ATTACH_CART,
+    ID_EJECT_CART,
+    ID_KBD_FOCUS,
+    ID_GUI_TIMER
+};

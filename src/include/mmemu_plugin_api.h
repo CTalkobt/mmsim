@@ -19,12 +19,16 @@ class ICore;
 class IDisassembler;
 class IAssembler;
 class IOHandler;
+class IImageLoader;
+class ICartridgeHandler;
 struct MachineDescriptor;
 #else
 typedef struct ICore ICore;
 typedef struct IDisassembler IDisassembler;
 typedef struct IAssembler IAssembler;
 typedef struct IOHandler IOHandler;
+typedef struct IImageLoader IImageLoader;
+typedef struct ICartridgeHandler ICartridgeHandler;
 typedef struct MachineDescriptor MachineDescriptor;
 #endif
 
@@ -72,15 +76,17 @@ struct SimPluginHostAPI {
     void (*log)(int level, const char* msg);
     
 #ifdef __cplusplus
-    class CoreRegistry*      coreRegistry;
-    class MachineRegistry*   machineRegistry;
-    class DeviceRegistry*    deviceRegistry;
-    class ToolchainRegistry* toolchainRegistry;
+    class CoreRegistry*        coreRegistry;
+    class MachineRegistry*     machineRegistry;
+    class DeviceRegistry*      deviceRegistry;
+    class ToolchainRegistry*   toolchainRegistry;
+    class ImageLoaderRegistry* imageLoaderRegistry;
 #else
     void* coreRegistry;
     void* machineRegistry;
     void* deviceRegistry;
     void* toolchainRegistry;
+    void* imageLoaderRegistry;
 #endif
 
     // Extension points
@@ -125,6 +131,21 @@ struct MachinePluginInfo {
 };
 
 /**
+ * Descriptor for an image loader provided by a plugin.
+ */
+struct ImageLoaderPluginInfo {
+    IImageLoader* (*create)(void);
+};
+
+/**
+ * Descriptor for a cartridge handler factory provided by a plugin.
+ */
+struct CartridgePluginInfo {
+    const char* extension;      // e.g. "crt", "car"
+    ICartridgeHandler* (*create)(const char* path);
+};
+
+/**
  * Top-level manifest returned by the plugin entry point.
  */
 struct SimPluginManifest {
@@ -147,7 +168,14 @@ struct SimPluginManifest {
 
     int machineCount;
     struct MachinePluginInfo* machines;
+
+    int loaderCount;
+    struct ImageLoaderPluginInfo* loaders;
+
+    int cartridgeCount;
+    struct CartridgePluginInfo* cartridges;
 };
+
 
 /**
  * Every plugin .so must export:

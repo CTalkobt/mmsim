@@ -12,7 +12,7 @@ static DevicePluginInfo s_devices[] = {
 
 static SimPluginManifest s_manifest = {
     MMEMU_PLUGIN_API_VERSION,
-    "mmemu-plugin-via6522",
+    "via6522",
     nullptr,        // displayName
     "1.0.0",
     nullptr,        // deps

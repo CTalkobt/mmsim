@@ -4,10 +4,12 @@
 #include <map>
 #include <sstream>
 #include <iomanip>
+#include <fstream>
 
 #include "minijson.h"
 #include "libcore/main/machine_desc.h"
 #include "libcore/main/machines/machine_registry.h"
+#include "libcore/main/image_loader.h"
 #include "plugin_loader/main/plugin_loader.h"
 #include "libmem/main/memory_bus.h"
 #include "libcore/main/icore.h"
@@ -175,6 +177,43 @@ Json handleToolsList() {
     kSchema.oVal["required"] = kReq;
 
     addTool("press_key", "Inject a keystroke", kSchema);
+
+    Json liSchema(Json::OBJ);
+    liSchema.oVal["type"] = Json("object");
+    Json liProps(Json::OBJ);
+    liProps.oVal["machine_id"] = midProp;
+    Json pathProp(Json::OBJ); pathProp.oVal["type"] = Json("string");
+    liProps.oVal["path"] = pathProp;
+    liProps.oVal["addr"] = addrProp;
+    Json autoProp(Json::OBJ); autoProp.oVal["type"] = Json("boolean");
+    liProps.oVal["auto_start"] = autoProp;
+    liSchema.oVal["properties"] = liProps;
+    Json liReq(Json::ARR); liReq.push_back(Json("machine_id")); liReq.push_back(Json("path"));
+    liSchema.oVal["required"] = liReq;
+
+    addTool("load_image", "Load program/binary into memory", liSchema);
+
+    Json acSchema(Json::OBJ);
+    acSchema.oVal["type"] = Json("object");
+    Json acProps(Json::OBJ);
+    acProps.oVal["machine_id"] = midProp;
+    acProps.oVal["path"] = pathProp;
+    acProps.oVal["reset"] = ishProp;
+    acSchema.oVal["properties"] = acProps;
+    Json acReq(Json::ARR); acReq.push_back(Json("machine_id")); acReq.push_back(Json("path"));
+    acSchema.oVal["required"] = acReq;
+
+    addTool("attach_cartridge", "Attach a cartridge image", acSchema);
+
+    Json ecSchema(Json::OBJ);
+    ecSchema.oVal["type"] = Json("object");
+    Json ecProps(Json::OBJ);
+    ecProps.oVal["machine_id"] = midProp;
+    ecSchema.oVal["properties"] = ecProps;
+    Json ecReq(Json::ARR); ecReq.push_back(Json("machine_id"));
+    ecSchema.oVal["required"] = ecReq;
+
+    addTool("eject_cartridge", "Eject currently attached cartridge", ecSchema);
 
     std::vector<std::string> pluginTools;
     PluginToolRegistry::instance().listTools(pluginTools);
@@ -368,6 +407,83 @@ Json handleToolsCall(const Json& params) {
             } else {
                 textItem.oVal["text"] = Json("Error: Unknown key " + key);
                 textItem.oVal["isError"] = Json(true);
+            }
+        }
+    } else if (name == "load_image") {
+        std::string mid = args["machine_id"].sVal;
+        std::string path = args["path"].sVal;
+        uint32_t addr = args.contains("addr") ? (uint32_t)args["addr"].nVal : 0;
+        bool autoStart = args.contains("auto_start") ? args["auto_start"].bVal : false;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            auto* loader = ImageLoaderRegistry::instance().findLoader(path);
+            if (loader) {
+                if (loader->load(path, ms->bus, ms->machine, addr)) {
+                    uint32_t startAddr = addr;
+                    if (startAddr == 0 && std::string(loader->name()).find("PRG") != std::string::npos) {
+                        std::ifstream f(path, std::ios::binary);
+                        uint8_t h[2];
+                        f.read((char*)h, 2);
+                        startAddr = h[0] | (h[1] << 8);
+                    }
+                    if (autoStart) {
+                        ms->cpu->setPc(startAddr);
+                    }
+                    std::stringstream ss;
+                    ss << "Loaded '" << path << "' at $" << std::hex << startAddr;
+                    textItem.oVal["text"] = Json(ss.str());
+                } else {
+                    textItem.oVal["text"] = Json("Error: Failed to load image");
+                    textItem.oVal["isError"] = Json(true);
+                }
+            } else {
+                textItem.oVal["text"] = Json("Error: No loader found for file type");
+                textItem.oVal["isError"] = Json(true);
+            }
+        }
+    } else if (name == "attach_cartridge") {
+        std::string mid = args["machine_id"].sVal;
+        std::string path = args["path"].sVal;
+        bool doReset = args.contains("reset") ? args["reset"].bVal : true;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            auto handler = ImageLoaderRegistry::instance().createCartridgeHandler(path);
+            if (handler) {
+                if (handler->attach(ms->bus, ms->machine)) {
+                    auto md = handler->metadata();
+                    ImageLoaderRegistry::instance().setActiveCartridge(ms->bus, std::move(handler));
+                    if (doReset && ms->machine->onReset) ms->machine->onReset(*ms->machine);
+                    textItem.oVal["text"] = Json("Attached cartridge: " + md.displayName + " (" + md.type + ")");
+                } else {
+                    textItem.oVal["text"] = Json("Error: Failed to attach cartridge");
+                    textItem.oVal["isError"] = Json(true);
+                }
+            } else {
+                textItem.oVal["text"] = Json("Error: Unsupported cartridge format");
+                textItem.oVal["isError"] = Json(true);
+            }
+        }
+    } else if (name == "eject_cartridge") {
+        std::string mid = args["machine_id"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            auto* cart = ImageLoaderRegistry::instance().getActiveCartridge(ms->bus);
+            if (cart) {
+                cart->eject(ms->bus);
+                ImageLoaderRegistry::instance().setActiveCartridge(ms->bus, nullptr);
+                if (ms->machine->onReset) ms->machine->onReset(*ms->machine);
+                textItem.oVal["text"] = Json("Cartridge ejected.");
+            } else {
+                textItem.oVal["text"] = Json("No cartridge attached.");
             }
         }
     } else {

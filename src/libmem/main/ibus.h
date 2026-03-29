@@ -59,6 +59,14 @@ public:
     virtual void reset() {}
 
     /**
+     * ROM overlay management for cartridge attachment.
+     * Default implementations are no-ops; bus types that support overlays
+     * (e.g. FlatMemoryBus) override these.
+     */
+    virtual void addRomOverlay   (uint32_t /*base*/, uint32_t /*size*/, const uint8_t* /*data*/) {}
+    virtual void removeRomOverlay(uint32_t /*base*/) {}
+
+    /**
      * Snapshot support.
      */
     virtual size_t stateSize()             const { return 0; }

@@ -53,9 +53,15 @@ public:
     void clearWriteLog() override { m_writeLog.clear(); }
 
     /**
-     * Add a ROM overlay to the bus.
+     * Add a ROM overlay to the bus (internal, low-level).
      */
     void addOverlay(uint32_t base, uint32_t size, const uint8_t* data, bool writable = false);
+
+    /**
+     * IBus ROM overlay API — used by ICartridgeHandler implementations.
+     */
+    void addRomOverlay   (uint32_t base, uint32_t size, const uint8_t* data) override;
+    void removeRomOverlay(uint32_t base) override;
 
     /**
      * Direct pointer to the underlying flat RAM array (bypasses overlays and IO

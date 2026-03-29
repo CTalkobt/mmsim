@@ -10,6 +10,7 @@ struct SystemSnapshot {
     std::string label;
     std::vector<uint8_t> cpuState;
     std::vector<uint8_t> busState;
+    std::string cartridgePath;
 };
 
 class DebugContext : public ExecutionObserver {

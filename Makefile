@@ -45,7 +45,8 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-vic2.so \
           $(LIBDIR)/mmemu-plugin-sid6581.so \
           $(LIBDIR)/mmemu-plugin-c64.so \
-          $(LIBDIR)/mmemu-plugin-pia6520.so
+          $(LIBDIR)/mmemu-plugin-pia6520.so \
+          $(LIBDIR)/mmemu-plugin-cbm-loader.so
 
 CC       ?= gcc
 CFLAGS   ?= -std=c11 -Wall -Wextra -Wpedantic -O2 -fPIC
@@ -78,7 +79,9 @@ TEST_BIN = $(BINDIR)/mmemu-tests
 CLI_SRCS = src/cli/main/main.cpp src/cli/main/cli_interpreter.cpp src/cli/main/plugin_command_registry.cpp
 GUI_SRCS = src/gui/main/main.cpp src/gui/main/machine_selector.cpp src/gui/main/register_pane.cpp \
            src/gui/main/memory_pane.cpp src/gui/main/disasm_pane.cpp src/gui/main/console_pane.cpp \
+           src/gui/main/cartridge_pane.cpp \
            src/gui/main/dialogs/memory_dialogs.cpp src/gui/main/dialogs/assemble_dialog.cpp \
+           src/gui/main/dialogs/image_dialogs.cpp \
            src/cli/main/cli_interpreter.cpp src/gui/main/plugin_pane_manager.cpp \
            src/cli/main/plugin_command_registry.cpp src/gui/main/audio_output.cpp
 MCP_SRCS = src/mcp/main/main.cpp src/mcp/main/plugin_tool_registry.cpp
@@ -98,12 +101,14 @@ TEST_SRCS = tests/test_main.cpp src/libcore/test/test_libcore.cpp \
             tests/test_vice_importer.cpp \
             src/plugins/machines/vic20/test/test_vic20_integration.cpp \
             src/plugins/machines/c64/test/test_c64_integration.cpp \
-            src/plugins/devices/pia6520/test/test_pia6520.cpp
+            src/plugins/devices/pia6520/test/test_pia6520.cpp \
+            src/plugins/cbm-loader/test/test_cbm_loader.cpp
 
 # Library Sources
 LIBMEM_SRCS       = src/libmem/main/ibus.cpp src/libmem/main/memory_bus.cpp src/libmem/main/libmem.cpp
 LIBCORE_SRCS      = src/libcore/main/icore.cpp src/libcore/main/rom_loader.cpp src/libcore/main/core_registry.cpp \
-                    src/libcore/main/machines/machine_registry.cpp src/libcore/main/libcore.cpp
+                    src/libcore/main/machines/machine_registry.cpp src/libcore/main/libcore.cpp \
+                    src/libcore/main/image_loader.cpp
 LIBDEVICES_SRCS   = src/libdevices/main/libdevices.cpp src/libdevices/main/io_registry.cpp \
                     src/libdevices/main/device_registry.cpp src/libdevices/main/joystick.cpp
 LIBTOOLCHAIN_SRCS = src/libtoolchain/main/symbol_table.cpp src/libtoolchain/main/source_map.cpp \
@@ -167,6 +172,12 @@ PLUGIN_C64_CORE_SRCS = src/plugins/machines/c64/main/machine_c64.cpp
 PLUGIN_C64_GUI_SRCS  = src/plugins/machines/c64/main/plugin_init.cpp
 PLUGIN_C64_SRCS      = $(PLUGIN_C64_CORE_SRCS) $(PLUGIN_C64_GUI_SRCS)
 
+# Plugin CBM Loader Sources
+PLUGIN_CBMLOADER_SRCS = src/plugins/cbm-loader/main/prg_loader.cpp \
+                        src/plugins/cbm-loader/main/crt_parser.cpp \
+                        src/plugins/cbm-loader/main/cbm_cart_handler.cpp \
+                        src/plugins/cbm-loader/main/plugin_init.cpp
+
 # Objects
 LIBMEM_OBJS       = $(LIBMEM_SRCS:.cpp=.o)
 LIBCORE_OBJS      = $(LIBCORE_SRCS:.cpp=.o)
@@ -190,11 +201,12 @@ PLUGIN_C64_CORE_OBJS = $(PLUGIN_C64_CORE_SRCS:.cpp=.o)
 PLUGIN_C64_GUI_OBJS  = $(PLUGIN_C64_GUI_SRCS:.cpp=.o)
 PLUGIN_C64_OBJS      = $(PLUGIN_C64_CORE_OBJS) $(PLUGIN_C64_GUI_OBJS)
 PLUGIN_PIA6520_OBJS  = $(PLUGIN_PIA6520_SRCS:.cpp=.o)
+PLUGIN_CBMLOADER_OBJS = $(PLUGIN_CBMLOADER_SRCS:.cpp=.o)
 
 ALL_LIB_OBJS = $(LIBMEM_OBJS) $(LIBCORE_OBJS) $(LIBDEVICES_OBJS) \
                $(LIBTOOLCHAIN_OBJS) $(LIBDEBUG_OBJS) $(LIBPLUGINS_OBJS) \
                $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) $(PLUGIN_KBDVIC20_OBJS) \
-               $(PLUGIN_VIC20_OBJS)
+               $(PLUGIN_VIC20_OBJS) $(PLUGIN_CBMLOADER_OBJS)
 
 # ---------------------------------------------------------------------------
 # Ensure clean and build targets run sequentially even with -j
@@ -252,41 +264,44 @@ $(ILIBDIR)/libplugins.a: $(LIBPLUGINS_OBJS) | $(ILIBDIR)
 # ---------------------------------------------------------------------------
 
 $(LIBDIR)/mmemu-plugin-6502.so: $(PLUGIN_6502_OBJS) | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_6502_OBJS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_6502_OBJS) $(WXLIBS)
 
 $(LIBDIR)/mmemu-plugin-via6522.so: $(PLUGIN_VIA6522_OBJS) | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIA6522_OBJS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIA6522_OBJS) $(WXLIBS)
 
 $(LIBDIR)/mmemu-plugin-vic6560.so: $(PLUGIN_VIC6560_OBJS) | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIC6560_OBJS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIC6560_OBJS) $(WXLIBS)
 
 $(LIBDIR)/mmemu-plugin-kbd-vic20.so: $(PLUGIN_KBDVIC20_OBJS) | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_KBDVIC20_OBJS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_KBDVIC20_OBJS) $(WXLIBS)
 
 $(LIBDIR)/mmemu-plugin-vic20.so: $(PLUGIN_VIC20_OBJS) | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIC20_OBJS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIC20_OBJS) $(WXLIBS)
 
 # vice-importer pane uses wxWidgets headers; wx symbols are resolved from the host binary at runtime
 $(LIBDIR)/mmemu-plugin-vice-importer.so: $(PLUGIN_VICEIMPORTER_OBJS) | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VICEIMPORTER_OBJS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VICEIMPORTER_OBJS) $(WXLIBS)
 
 $(LIBDIR)/mmemu-plugin-c64-pla.so: $(PLUGIN_C64PLA_OBJS) | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_C64PLA_OBJS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_C64PLA_OBJS) $(WXLIBS)
 
 $(LIBDIR)/mmemu-plugin-cia6526.so: $(PLUGIN_CIA6526_OBJS) | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_CIA6526_OBJS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_CIA6526_OBJS) $(WXLIBS)
 
 $(LIBDIR)/mmemu-plugin-vic2.so: $(PLUGIN_VIC2_OBJS) | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIC2_OBJS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_VIC2_OBJS) $(WXLIBS)
 
 $(LIBDIR)/mmemu-plugin-sid6581.so: $(PLUGIN_SID6581_OBJS) | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_SID6581_OBJS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_SID6581_OBJS) $(WXLIBS)
 
 $(LIBDIR)/mmemu-plugin-c64.so: $(PLUGIN_C64_OBJS) | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_C64_OBJS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_C64_OBJS) $(WXLIBS)
 
 $(LIBDIR)/mmemu-plugin-pia6520.so: $(PLUGIN_PIA6520_OBJS) | $(LIBDIR)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_PIA6520_OBJS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_PIA6520_OBJS) $(WXLIBS)
+
+$(LIBDIR)/mmemu-plugin-cbm-loader.so: $(PLUGIN_CBMLOADER_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_CBMLOADER_OBJS) $(WXLIBS)
 
 # ---------------------------------------------------------------------------
 # Binary rules
@@ -313,7 +328,10 @@ DEVICE_TEST_OBJS = src/plugins/devices/via6522/main/via6522.o \
                    src/plugins/devices/vic2/main/vic2.o \
                    src/plugins/devices/sid6581/main/sid6581.o \
                    src/plugins/machines/c64/main/machine_c64.o \
-                   src/plugins/devices/pia6520/main/pia6520.o
+                   src/plugins/devices/pia6520/main/pia6520.o \
+                   src/plugins/cbm-loader/main/prg_loader.o \
+                   src/plugins/cbm-loader/main/crt_parser.o \
+                   src/plugins/cbm-loader/main/cbm_cart_handler.o
 
 $(TEST_BIN): $(TEST_SRCS) $(LIBS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -Itests -rdynamic -o $@ $(TEST_SRCS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) $(BASE_LIBS) $(WXLIBS)
@@ -332,19 +350,23 @@ PLUGIN_INCLUDES = -Isrc -Isrc/include \
                   -Isrc/plugins/devices/cia6526/main \
                   -Isrc/plugins/devices/vic2/main \
                   -Isrc/plugins/devices/sid6581/main \
-                  -Isrc/plugins/devices/pia6520/main
+                  -Isrc/plugins/devices/pia6520/main \
+                  -Isrc/plugins/cbm-loader/main
 
-# viceImporter pane sources also need wxWidgets headers
-PLUGIN_VICEIMPORTER_INCLUDES = $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
 
-$(PLUGIN_6502_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) \
-$(PLUGIN_KBDVIC20_OBJS) $(PLUGIN_VIC20_CORE_OBJS) \
-$(PLUGIN_C64PLA_OBJS) $(PLUGIN_CIA6526_OBJS) $(PLUGIN_VIC2_OBJS) \
-$(PLUGIN_SID6581_OBJS) $(PLUGIN_C64_CORE_OBJS) $(PLUGIN_PIA6520_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
+                  # viceImporter pane sources also need wxWidgets headers
+                  PLUGIN_VICEIMPORTER_INCLUDES = $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
 
-$(PLUGIN_VIC20_GUI_OBJS) $(PLUGIN_C64_GUI_OBJS): INCLUDES := $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
+                  $(PLUGIN_6502_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) \
+                  $(PLUGIN_KBDVIC20_OBJS) $(PLUGIN_VIC20_CORE_OBJS) \
+                  $(PLUGIN_C64PLA_OBJS) $(PLUGIN_CIA6526_OBJS) $(PLUGIN_VIC2_OBJS) \
+                  $(PLUGIN_SID6581_OBJS) $(PLUGIN_C64_CORE_OBJS) $(PLUGIN_PIA6520_OBJS) \
+                  $(PLUGIN_CBMLOADER_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
 
-$(PLUGIN_VICEIMPORTER_OBJS): INCLUDES := $(PLUGIN_VICEIMPORTER_INCLUDES)
+                  $(PLUGIN_VIC20_GUI_OBJS) $(PLUGIN_C64_GUI_OBJS): INCLUDES := $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
+
+                  $(PLUGIN_VICEIMPORTER_OBJS): INCLUDES := $(PLUGIN_VICEIMPORTER_INCLUDES)
+
 
 # ---------------------------------------------------------------------------
 # Generic object rule

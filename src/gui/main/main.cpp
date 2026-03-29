@@ -2,22 +2,28 @@
 #include <wx/splitter.h>
 #include <wx/notebook.h>
 #include <wx/artprov.h>
+#include <wx/dnd.h>
 #include "machine_selector.h"
 #include "register_pane.h"
 #include "memory_pane.h"
 #include "disasm_pane.h"
 #include "console_pane.h"
+#include "cartridge_pane.h"
 #include "dialogs/memory_dialogs.h"
 #include "dialogs/assemble_dialog.h"
+#include "dialogs/image_dialogs.h"
 #include "plugin_loader/main/plugin_loader.h"
 #include "plugin_pane_manager.h"
 #include "ikeyboard_capture_pane.h"
 #include "audio_output.h"
 #include "libcore/main/machine_desc.h"
 #include "libcore/main/machines/machine_registry.h"
+#include "libcore/main/image_loader.h"
 #include "libdevices/main/iaudio_output.h"
 #include "libdevices/main/io_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
+#include "gui_ids.h"
+#include <fstream>
 
 // mmemu - Multi Machine Emulator
 
@@ -64,21 +70,6 @@ static std::string wxKeyToVic20Name(int code) {
     }
 }
 
-enum {
-    ID_LOAD_MACHINE = wxID_HIGHEST + 1,
-    ID_STEP,
-    ID_RUN,
-    ID_PAUSE,
-    ID_RESET,
-    ID_FILL_MEM,
-    ID_COPY_MEM,
-    ID_ASSEMBLE,
-    ID_GOTO_ADDR,
-    ID_SEARCH_MEM,
-    ID_KBD_FOCUS,
-    ID_GUI_TIMER
-};
-
 class MmemuFrame : public wxFrame {
 public:
     MmemuFrame();
@@ -98,6 +89,9 @@ private:
     void OnAssemble(wxCommandEvent& event);
     void OnGotoAddr(wxCommandEvent& event);
     void OnSearchMem(wxCommandEvent& event);
+    void OnLoadImage(wxCommandEvent& event);
+    void OnAttachCart(wxCommandEvent& event);
+    void OnEjectCart(wxCommandEvent& event);
     void OnKbdFocus(wxCommandEvent& event);
     void OnTimer(wxTimerEvent& event);
     void OnCtrlShiftK(wxKeyEvent& event);
@@ -112,6 +106,7 @@ private:
     MemoryPane* m_memPane;
     DisasmPane* m_disasmPane;
     ConsolePane* m_consolePane;
+    CartridgePane* m_cartPane;
     wxAuiNotebook*   m_notebook = nullptr;
 
     wxTimer m_timer;
@@ -151,6 +146,41 @@ public:
     }
 
     std::function<bool(const std::string&, bool)> m_handler;
+};
+
+class MmemuDropTarget : public wxFileDropTarget {
+public:
+    MmemuDropTarget(MmemuFrame* frame) : m_frame(frame) {}
+    
+    bool OnDropFiles(wxCoord x, wxCoord y, const wxArrayString& filenames) override {
+        if (filenames.IsEmpty()) return false;
+        std::string path = filenames[0].ToStdString();
+        
+        // Auto-detect type
+        auto* loader = ImageLoaderRegistry::instance().findLoader(path);
+        if (loader) {
+            // It's a program/bin
+            wxCommandEvent evt(wxEVT_MENU, ID_LOAD_IMAGE);
+            evt.SetString(path);
+            m_frame->GetEventHandler()->AddPendingEvent(evt);
+            return true;
+        }
+        
+        auto cart = ImageLoaderRegistry::instance().createCartridgeHandler(path);
+        if (cart) {
+            // It's a cartridge
+            wxCommandEvent evt(wxEVT_MENU, ID_ATTACH_CART);
+            evt.SetString(path);
+            m_frame->GetEventHandler()->AddPendingEvent(evt);
+            return true;
+        }
+        
+        wxMessageBox("Unsupported file format.", "Error", wxICON_ERROR);
+        return false;
+    }
+
+private:
+    MmemuFrame* m_frame;
 };
 
 class MmemuApp : public wxApp {
@@ -193,6 +223,10 @@ MmemuFrame::MmemuFrame()
     menuControl->Append(ID_PAUSE, "Pause\tF6");
     menuControl->AppendSeparator();
     menuControl->Append(ID_RESET, "Reset\tCtrl-R");
+    menuControl->AppendSeparator();
+    menuControl->Append(ID_LOAD_IMAGE, "Load Image...\tCtrl-I");
+    menuControl->Append(ID_ATTACH_CART, "Attach Cartridge...");
+    menuControl->Append(ID_EJECT_CART, "Eject Cartridge");
 
     auto* menuDebug = new wxMenu;
     menuDebug->Append(ID_ASSEMBLE, "Assemble...\tCtrl-A");
@@ -239,6 +273,9 @@ MmemuFrame::MmemuFrame()
     notebookSplitter->SplitHorizontally(m_disasmPane, m_memPane, 300);
     
     m_notebook = new wxAuiNotebook(centerSplitter, wxID_ANY);
+    m_cartPane = new CartridgePane(m_notebook);
+    m_notebook->AddPage(m_cartPane, "Cartridge");
+    
     centerSplitter->SplitVertically(notebookSplitter, m_notebook, 600);
     
     m_consolePane = new ConsolePane(leftSplitter);
@@ -249,6 +286,8 @@ MmemuFrame::MmemuFrame()
     
     mainSplitter->SplitVertically(leftSplitter, m_regPane, 750);
     mainSplitter->SetMinimumPaneSize(200);
+    
+    SetDropTarget(new MmemuDropTarget(this));
     
     // Bind events
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { Close(true); }, wxID_EXIT);
@@ -267,6 +306,9 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_MENU, &MmemuFrame::OnGotoAddr, this, ID_GOTO_ADDR);
     Bind(wxEVT_TOOL, &MmemuFrame::OnGotoAddr, this, ID_GOTO_ADDR);
     Bind(wxEVT_MENU, &MmemuFrame::OnSearchMem, this, ID_SEARCH_MEM);
+    Bind(wxEVT_MENU, &MmemuFrame::OnLoadImage, this, ID_LOAD_IMAGE);
+    Bind(wxEVT_MENU, &MmemuFrame::OnAttachCart, this, ID_ATTACH_CART);
+    Bind(wxEVT_MENU, &MmemuFrame::OnEjectCart, this, ID_EJECT_CART);
     Bind(wxEVT_MENU, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
     Bind(wxEVT_TOOL, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
     Bind(wxEVT_TIMER, &MmemuFrame::OnTimer, this, ID_GUI_TIMER);
@@ -293,6 +335,7 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             m_disasmPane->SetBus(m_bus);
             m_disasmPane->SetDisassembler(m_disasm);
             m_consolePane->SetContext(m_cpu, m_bus);
+            m_cartPane->SetBus(m_bus);
             
             if (m_machine->onReset) m_machine->onReset(*m_machine);
 
@@ -484,6 +527,86 @@ void MmemuFrame::OnSearchMem(wxCommandEvent& event) {
         } else {
             wxMessageBox("Pattern not found", "Search", wxOK | wxICON_INFORMATION);
         }
+    }
+}
+
+void MmemuFrame::OnLoadImage(wxCommandEvent& event) {
+    if (!m_bus) return;
+    std::string path = event.GetString().ToStdString();
+    LoadImageDialog dialog(this, path);
+    if (dialog.ShowModal() == wxID_OK) {
+        path = dialog.GetPath();
+        uint32_t addr = dialog.GetAddress();
+        auto* loader = ImageLoaderRegistry::instance().findLoader(path);
+        if (loader) {
+            if (loader->load(path, m_bus, m_machine, addr)) {
+                SetStatusText("Loaded " + path);
+                if (dialog.GetAutoStart()) {
+                    uint32_t startAddr = addr;
+                    if (startAddr == 0 && std::string(loader->name()).find("PRG") != std::string::npos) {
+                        std::ifstream f(path, std::ios::binary);
+                        uint8_t h[2];
+                        f.read((char*)h, 2);
+                        startAddr = h[0] | (h[1] << 8);
+                    }
+                    m_cpu->setPc(startAddr);
+                    m_running = true;
+                    m_regPane->RefreshValues();
+                    m_disasmPane->RefreshValues(m_cpu->pc());
+                }
+                m_memPane->RefreshValues();
+            } else {
+                wxMessageBox("Failed to load image.", "Error", wxICON_ERROR);
+            }
+        }
+    }
+}
+
+void MmemuFrame::OnAttachCart(wxCommandEvent& event) {
+    if (!m_bus) return;
+    std::string path = event.GetString().ToStdString();
+    if (path.empty()) {
+        wxFileDialog openFileDialog(this, "Attach Cartridge", "", "",
+                           "Cartridge files (*.crt;*.car)|*.crt;*.car", 
+                           wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+        if (openFileDialog.ShowModal() == wxID_OK) {
+            path = openFileDialog.GetPath().ToStdString();
+        } else {
+            return;
+        }
+    }
+    
+    auto handler = ImageLoaderRegistry::instance().createCartridgeHandler(path);
+    if (handler) {
+        if (handler->attach(m_bus, m_machine)) {
+            ImageLoaderRegistry::instance().setActiveCartridge(m_bus, std::move(handler));
+            m_cartPane->RefreshMetadata();
+            // Reset machine
+            if (m_machine->onReset) m_machine->onReset(*m_machine);
+            m_regPane->RefreshValues();
+            m_disasmPane->RefreshValues(m_cpu->pc());
+            m_memPane->RefreshValues();
+            SetStatusText("Attached cartridge " + path);
+        } else {
+            wxMessageBox("Failed to attach cartridge.", "Error", wxICON_ERROR);
+        }
+    } else {
+        wxMessageBox("Unsupported cartridge format.", "Error", wxICON_ERROR);
+    }
+}
+
+void MmemuFrame::OnEjectCart(wxCommandEvent&) {
+    if (!m_bus) return;
+    auto* cart = ImageLoaderRegistry::instance().getActiveCartridge(m_bus);
+    if (cart) {
+        cart->eject(m_bus);
+        ImageLoaderRegistry::instance().setActiveCartridge(m_bus, nullptr);
+        m_cartPane->RefreshMetadata();
+        if (m_machine->onReset) m_machine->onReset(*m_machine);
+        m_regPane->RefreshValues();
+        m_disasmPane->RefreshValues(m_cpu->pc());
+        m_memPane->RefreshValues();
+        SetStatusText("Cartridge ejected.");
     }
 }
 

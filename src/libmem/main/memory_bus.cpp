@@ -118,6 +118,17 @@ void FlatMemoryBus::addOverlay(uint32_t base, uint32_t size, const uint8_t* data
     m_overlays.push_back({base, size, data, writable});
 }
 
+void FlatMemoryBus::addRomOverlay(uint32_t base, uint32_t size, const uint8_t* data) {
+    addOverlay(base, size, data, false);
+}
+
+void FlatMemoryBus::removeRomOverlay(uint32_t base) {
+    auto it = std::remove_if(m_overlays.begin(), m_overlays.end(), [base](const RomOverlay& o) {
+        return o.base == base;
+    });
+    m_overlays.erase(it, m_overlays.end());
+}
+
 void FlatMemoryBus::setIoHooks(std::function<bool(uint32_t, uint8_t*)> readFn,
                                 std::function<bool(uint32_t, uint8_t)>  writeFn) {
     m_ioRead  = std::move(readFn);

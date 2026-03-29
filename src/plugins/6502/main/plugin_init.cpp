@@ -68,7 +68,7 @@ static MachinePluginInfo s_machines[] = {
 
 static SimPluginManifest s_manifest = {
     MMEMU_PLUGIN_API_VERSION,
-    "mmemu-plugin-6502",
+    "6502",
     nullptr,        // displayName
     "1.0.0",
     nullptr,        // deps

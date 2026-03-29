@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 ## [0.2.0-dev] - 2026-03-28
 
 ### Added
+- **Core Loader Infrastructure (Phase 13.1)**:
+    - Defined `IImageLoader` and `ICartridgeHandler` interfaces in `src/libcore/main/image_loader.h`.
+    - Implemented `ImageLoaderRegistry` singleton for managing loaders and cartridge factories.
+    - Implemented `BinLoader` for raw binary images (.bin) at user-specified addresses.
+    - Extended `SimPluginHostAPI` and `SimPluginManifest` to support plugin-provided loaders and cartridges.
+    - Updated `PluginLoader` to handle automatic registration of plugin image loaders.
+- **CBM Loader Plugin (Phase 13.2)**:
+    - Implemented `PrgLoader` for Commodore `.prg` files with automatic load address detection.
+    - Implemented `CrtParser` for the OpenC64Cart `.crt` format, supporting standard 64-byte headers and CHIP packets.
+    - Implemented `CbmCartridgeHandler` for mapping standard 8 KB and 16 KB C64 cartridges into the bus.
+    - Registered loaders into the host via `lib/mmemu-plugin-cbm-loader.so`.
+- **Snapshot Integration for Cartridges**:
+    - Integrated active cartridge tracking into the system snapshot system.
+    - Extended `SystemSnapshot` to include the `cartridgePath`.
+    - `DebugContext` now automatically reattaches the correct cartridge image upon snapshot restoration.
+- **Bus Overlay API Enhancements**:
+    - Added `addRomOverlay` and `removeRomOverlay` to the `IBus` interface.
+    - Implemented these methods in `FlatMemoryBus` to support dynamic cartridge attachment and ejection.
 - **Tape (Datasette) Support (Phase 14)**:
     - Added a roadmap for .tap pulse-encoded archive support across VIC-20, C64, and PET.
     - Planned core timing-exact decoder and machine-specific signal wiring.

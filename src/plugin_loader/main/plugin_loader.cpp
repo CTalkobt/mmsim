@@ -7,6 +7,7 @@
 #include "libcore/main/machines/machine_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
 #include "libdevices/main/device_registry.h"
+#include "libcore/main/image_loader.h"
 
 namespace fs = std::filesystem;
 
@@ -29,10 +30,12 @@ static SimPluginHostAPI s_hostAPI = {
     &MachineRegistry::instance(),
     &DeviceRegistry::instance(),
     &ToolchainRegistry::instance(),
+    &ImageLoaderRegistry::instance(),
     stubRegisterPane,
     stubRegisterCommand,
     stubRegisterMcpTool
 };
+
 
 void PluginLoader::setPaneRegisterFn(void (*fn)(const PluginPaneInfo*)) {
     s_hostAPI.registerPane = fn ? fn : stubRegisterPane;
@@ -47,7 +50,7 @@ void PluginLoader::setMcpToolRegisterFn(void (*fn)(const PluginMcpToolInfo*)) {
 }
 
 bool PluginLoader::load(const std::string& path) {
-    void* handle = dlopen(path.c_str(), RTLD_NOW | RTLD_GLOBAL);
+    void* handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_GLOBAL);
     if (!handle) {
         std::cerr << "Failed to load plugin: " << dlerror() << std::endl;
         return false;
@@ -137,4 +140,19 @@ void PluginLoader::registerPluginItems(SimPluginManifest* manifest) {
         auto& d = manifest->devices[i];
         DeviceRegistry::instance().registerDevice(d.name, d.create);
     }
+
+    // Loaders
+    for (int i = 0; i < manifest->loaderCount; ++i) {
+        auto& l = manifest->loaders[i];
+        ImageLoaderRegistry::instance().registerLoader(std::unique_ptr<IImageLoader>(l.create()));
+    }
+
+    // Cartridges
+    for (int i = 0; i < manifest->cartridgeCount; ++i) {
+        auto& c = manifest->cartridges[i];
+        ImageLoaderRegistry::instance().registerCartridgeHandler(c.extension, [create = c.create](const std::string& path) {
+            return std::unique_ptr<ICartridgeHandler>(create(path.c_str()));
+        });
+    }
 }
+

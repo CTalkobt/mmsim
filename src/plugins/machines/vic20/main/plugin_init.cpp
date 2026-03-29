@@ -63,12 +63,14 @@ static PluginPaneInfo s_vicScreenPane = {
 
 // ---------------------------------------------------------------------------
 
+static const char* s_vic20Deps[] = { "6502", "via6522", "vic6560", "kbd-vic20", "cbm-loader", nullptr };
+
 static SimPluginManifest s_manifest = {
     MMEMU_PLUGIN_API_VERSION,
-    "mmemu-plugin-vic20",
+    "vic20",
     nullptr,        // displayName
     "1.0.0",
-    nullptr,        // deps
+    s_vic20Deps,    // deps
     nullptr,        // supportedMachineIds
     0, nullptr,
     0, nullptr,

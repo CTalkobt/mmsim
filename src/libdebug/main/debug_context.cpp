@@ -1,4 +1,5 @@
 #include "debug_context.h"
+#include "libcore/main/image_loader.h"
 #include <iostream>
 
 DebugContext::DebugContext(ICore* cpu, IBus* bus)
@@ -43,6 +44,11 @@ int DebugContext::saveSnapshot(const std::string& label) {
     
     snap.busState.resize(m_bus->stateSize());
     m_bus->saveState(snap.busState.data());
+
+    auto* cart = ImageLoaderRegistry::instance().getActiveCartridge(m_bus);
+    if (cart) {
+        snap.cartridgePath = cart->metadata().imagePath;
+    }
     
     m_snapshots.push_back(std::move(snap));
     return (int)m_snapshots.size() - 1;
@@ -54,6 +60,25 @@ bool DebugContext::restoreSnapshot(int index) {
     const auto& snap = m_snapshots[index];
     m_cpu->loadState(snap.cpuState.data());
     m_bus->loadState(snap.busState.data());
+
+    // Restore cartridge if path is set and different from current
+    auto* currentCart = ImageLoaderRegistry::instance().getActiveCartridge(m_bus);
+    std::string currentPath = currentCart ? currentCart->metadata().imagePath : "";
+    
+    if (snap.cartridgePath != currentPath) {
+        if (currentCart) {
+            currentCart->eject(m_bus);
+            ImageLoaderRegistry::instance().setActiveCartridge(m_bus, nullptr);
+        }
+        if (!snap.cartridgePath.empty()) {
+            auto newCart = ImageLoaderRegistry::instance().createCartridgeHandler(snap.cartridgePath);
+            if (newCart) {
+                if (newCart->attach(m_bus, nullptr)) {
+                    ImageLoaderRegistry::instance().setActiveCartridge(m_bus, std::move(newCart));
+                }
+            }
+        }
+    }
     
     return true;
 }

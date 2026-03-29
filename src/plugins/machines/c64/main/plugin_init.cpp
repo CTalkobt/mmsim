@@ -55,12 +55,14 @@ static PluginPaneInfo s_c64ScreenPane = {
 
 // ---------------------------------------------------------------------------
 
+static const char* s_c64Deps[] = { "6502", "c64-pla", "cia6526", "vic2", "sid6581", "cbm-loader", nullptr };
+
 static SimPluginManifest s_manifest = {
     MMEMU_PLUGIN_API_VERSION,
-    "mmemu-plugin-c64",
+    "c64",
     nullptr,        // displayName
     "1.0.0",
-    nullptr,        // deps
+    s_c64Deps,      // deps
     nullptr,        // supportedMachineIds
     0, nullptr,
     0, nullptr,
