@@ -657,12 +657,12 @@ the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 
 ### Phase 12.1: MOS 6520 PIA (`src/plugins/devices/pia6520/`)
 
-- [ ] Implement `PIA6520 : public IOHandler`.
-- [ ] Dual 8-bit ports (Port A and Port B) with data direction registers.
-- [ ] Control registers (CRA, CRB) for interrupt control and DDR/Port selection.
-- [ ] CA1/CA2 and CB1/CB2 line handling for handshaking (used by IEEE-488).
-- [ ] `reset()` clears all registers and de-asserts interrupt lines.
-- [ ] Snapshot support for registers and line states.
+- [x] Implement `PIA6520 : public IOHandler`.
+- [x] Dual 8-bit ports (Port A and Port B) with data direction registers.
+- [x] Control registers (CRA, CRB) for interrupt control and DDR/Port selection.
+- [x] CA1/CA2 and CB1/CB2 line handling for handshaking (used by IEEE-488).
+- [x] `reset()` clears all registers and de-asserts interrupt lines.
+- [x] Snapshot support for registers and line states.
 
 ### Phase 12.2: MOS 6545/6845 CRTC (`src/plugins/devices/crtc6545/`)
 
@@ -721,26 +721,31 @@ cartridge images (.crt or raw) into a running machine via CLI, GUI, and MCP.*
 
 ### Phase 13.1: Core Image Loading Logic (`src/libcore/main/image_loader.h/cpp`)
 
-- [ ] **PRG Loader**: Implement a parser for Commodore .prg files (2-byte header 
-      for load address, followed by data); inject data into the active machine's 
-      `IBus`.
+- [ ] **CBM PRG Loader**: Implement a parser for Commodore .prg files (2-byte 
+      header for load address, followed by data); inject data into the active 
+      machine's `IBus`.
+- [ ] **Atari XEX Loader**: Implement a multi-segment parser for Atari .xex 
+      files (optional $FFFF header, segment start/end addresses). Support 
+      patching system RUNAD ($02E0) and INITAD ($02E2) vectors.
 - [ ] **BIN Loader**: Implement raw binary data loading at a user-specified 
       physical or virtual address.
-- [ ] **Cartridge Support**: Implement basic 8KB/16KB Commodore cartridge mapping 
-      using the `IBus` overlay system. For C64, this includes driving the 
-      EXROM/GAME signal lines.
-- [ ] **CRT Parser**: Support for the OpenC64Cart (.crt) file format, including 
-      reading headers for cartridge type, hardware IDs, and bank counts.
+- [ ] **CBM Cartridge Support**: Implement basic 8KB/16KB Commodore cartridge 
+      mapping using the `IBus` overlay system. For C64, this includes driving 
+      the EXROM/GAME signal lines.
+- [ ] **CBM CRT Parser**: Support for the OpenC64Cart (.crt) file format, 
+      including reading headers for cartridge type, hardware IDs, and bank counts.
+- [ ] **Atari CAR Parser**: Support for the Atari .car file format, including 
+      reading the 16-byte header for cartridge type and banking metadata.
 - [ ] **Snapshot Integration**: Ensure current cartridge and image state is 
       included in machine snapshots.
 
 ### Phase 13.2: CLI Interface Extensions
 
-- [ ] `load <filename> [address]`: Loads a `.prg` (using header) or `.bin` 
-      (requiring manual address) into memory.
+- [ ] `load <filename> [address]`: Loads a `.prg` / `.xex` (using header) or 
+      `.bin` (requiring manual address) into memory.
 - [ ] `cart <filename>`: Attaches a cartridge image and triggers a machine 
       reset if necessary.
-- [ ] `run`: Sets the PC to the start address of the last loaded `.prg` and 
+- [ ] `run`: Sets the PC to the start address of the last loaded image and 
       resumes execution.
 - [ ] `eject`: Removes the active cartridge and restores the machine's default 
       memory mapping.
@@ -751,8 +756,8 @@ cartridge images (.crt or raw) into a running machine via CLI, GUI, and MCP.*
       specify a load address and a "Run after load" checkbox.
 - [ ] **Cartridge Pane**: Implement a dedicated pane to display currently 
       attached cartridge details (type, bank count, memory range).
-- [ ] **Drag-and-Drop**: Enable dragging `.prg` or `.crt` files into the machine 
-      display window to trigger immediate loading or attachment.
+- [ ] **Drag-and-Drop**: Enable dragging `.prg`/`.xex` or `.crt`/`.car` files 
+      into the machine display window to trigger immediate loading or attachment.
 - [ ] **File History**: Maintain a list of recently loaded images for quick 
       reattachment.
 
@@ -766,12 +771,16 @@ cartridge images (.crt or raw) into a running machine via CLI, GUI, and MCP.*
 
 ### Phase 13.5: Integration Tests
 
-- [ ] **PRG Test**: Load a .prg and verify the first two bytes of data end up at 
-      the address specified in the header.
+- [ ] **CBM PRG Test**: Load a .prg and verify the first two bytes of data end 
+      up at the address specified in the header.
+- [ ] **Atari XEX Test**: Load a multi-segment .xex; verify each segment is 
+      written to its respective range and `RUNAD` is patched correctly.
 - [ ] **BIN Test**: Load a raw binary to a specific address and verify memory 
       content via `IBus::peek8()`.
-- [ ] **Cartridge Overlay Test**: Attach a cartridge and verify that reading 
-      the $8000–$9FFF range returns data from the cartridge rather than RAM.
+- [ ] **CBM Cartridge Overlay Test**: Attach a .crt cartridge and verify that 
+      reading the $8000–$9FFF range returns data from the cartridge.
+- [ ] **Atari Cartridge Overlay Test**: Attach a .car cartridge; verify 
+      the 16-byte header is parsed and the correct banking logic is active.
 - [ ] **Eject Test**: Detach a cartridge and verify RAM is visible again at 
       the previous cartridge range.
 
@@ -845,6 +854,32 @@ for disk access (.d64, .g64, .p00). See .plan/iec.md.*
 - [ ] **CLI**: `disk mount <unit> <file>`, `disk eject <unit>`.
 - [ ] **GUI**: "Drive Status" pane showing active track/sector and activity LED.
 - [ ] **MCP**: `mount_disk`, `eject_disk` tools.
+
+## Phase 15.5: Atari SIO and Disk Image Support
+
+*Goal: Implement the Atari Serial I/O (SIO) bus and disk image support (.atr, .xfd).*
+
+### Phase 15.5.1: Atari Disk Image Parsers (`src/libcore/main/atari_disk_loader.h/cpp`)
+
+- [ ] **ATR Parser**: Implement a parser for Atari .atr disk images (16-byte 
+      header followed by raw sectors).
+- [ ] **XFD Loader**: Support for headerless raw sector images (.xfd).
+- [ ] **Sector Translation**: Map 128-byte (SD) and 256-byte (DD) sectors 
+      to Atari-specific track layouts.
+
+### Phase 15.5.2: SIO HLE (Level 1)
+
+- [ ] Implement `SioTrap` ExecutionObserver to monitor OS ROM for SIO entry 
+      points ($E459).
+- [ ] **Fast Disk Access**: Trap sector read/write requests and satisfy them 
+      directly from host-side disk images, bypassing the serial protocol.
+
+### Phase 15.5.3: Virtual SIO Device (Level 2)
+
+- [ ] Implement `VirtualSIOBus` state machine.
+- [ ] Handle DATA, COMMAND, PROCEED, and INTERRUPT lines via POKEY/PIA 
+      emulation.
+- [ ] Stream bits from host-side images into the POKEY serial registers.
 
 ## Phase 16: Commodore 128 Machine
 

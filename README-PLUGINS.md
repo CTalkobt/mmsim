@@ -25,6 +25,7 @@ Plugins that implement the `IOHandler` interface for memory-mapped hardware.
 | `lib/mmemu-plugin-cia6526.so` | MOS 6526 CIA: timers, TOD clock, I/O ports, IRQ. | [README-6526.md](README-6526.md) |
 | `lib/mmemu-plugin-vic2.so` | MOS 6567/6569 VIC-II video chip with sprite engine. | [README-VIC2.md](README-VIC2.md) |
 | `lib/mmemu-plugin-sid6581.so` | MOS 6581 SID sound chip: 3 voices + SVF filter. | [README-SID.md](README-SID.md) |
+| `lib/mmemu-plugin-pia6520.so` | MOS 6520 PIA: dual 8-bit I/O ports, CRA/CRB, CA1/CA2/CB1/CB2 handshake lines, dual IRQ outputs. | [README-6520.md](README-6520.md) |
 
 ---
 

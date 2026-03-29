@@ -15,7 +15,8 @@ INCLUDES  = -Isrc -Isrc/include \
             -Isrc/plugins/viceImporter/main \
             -Isrc/plugins/devices/c64_pla/main -Isrc/plugins/devices/cia6526/main \
             -Isrc/plugins/devices/vic2/main -Isrc/plugins/devices/sid6581/main \
-            -Isrc/plugins/machines/c64/main
+            -Isrc/plugins/machines/c64/main \
+            -Isrc/plugins/devices/pia6520/main
 AR        = ar
 ARFLAGS   = rcs
 
@@ -43,7 +44,8 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-cia6526.so \
           $(LIBDIR)/mmemu-plugin-vic2.so \
           $(LIBDIR)/mmemu-plugin-sid6581.so \
-          $(LIBDIR)/mmemu-plugin-c64.so
+          $(LIBDIR)/mmemu-plugin-c64.so \
+          $(LIBDIR)/mmemu-plugin-pia6520.so
 
 CC       ?= gcc
 CFLAGS   ?= -std=c11 -Wall -Wextra -Wpedantic -O2 -fPIC
@@ -95,7 +97,8 @@ TEST_SRCS = tests/test_main.cpp src/libcore/test/test_libcore.cpp \
             src/plugins/viceImporter/main/rom_importer.cpp \
             tests/test_vice_importer.cpp \
             src/plugins/machines/vic20/test/test_vic20_integration.cpp \
-            src/plugins/machines/c64/test/test_c64_integration.cpp
+            src/plugins/machines/c64/test/test_c64_integration.cpp \
+            src/plugins/devices/pia6520/test/test_pia6520.cpp
 
 # Library Sources
 LIBMEM_SRCS       = src/libmem/main/ibus.cpp src/libmem/main/memory_bus.cpp src/libmem/main/libmem.cpp
@@ -155,6 +158,10 @@ PLUGIN_VIC2_SRCS = src/plugins/devices/vic2/main/vic2.cpp \
 PLUGIN_SID6581_SRCS = src/plugins/devices/sid6581/main/sid6581.cpp \
                       src/plugins/devices/sid6581/main/plugin_init.cpp
 
+# Plugin PIA 6520 Sources
+PLUGIN_PIA6520_SRCS = src/plugins/devices/pia6520/main/pia6520.cpp \
+                      src/plugins/devices/pia6520/main/plugin_init.cpp
+
 # Plugin C64 Machine Sources — split so the wx pane gets wx compile flags
 PLUGIN_C64_CORE_SRCS = src/plugins/machines/c64/main/machine_c64.cpp
 PLUGIN_C64_GUI_SRCS  = src/plugins/machines/c64/main/plugin_init.cpp
@@ -182,6 +189,7 @@ PLUGIN_SID6581_OBJS  = $(PLUGIN_SID6581_SRCS:.cpp=.o)
 PLUGIN_C64_CORE_OBJS = $(PLUGIN_C64_CORE_SRCS:.cpp=.o)
 PLUGIN_C64_GUI_OBJS  = $(PLUGIN_C64_GUI_SRCS:.cpp=.o)
 PLUGIN_C64_OBJS      = $(PLUGIN_C64_CORE_OBJS) $(PLUGIN_C64_GUI_OBJS)
+PLUGIN_PIA6520_OBJS  = $(PLUGIN_PIA6520_SRCS:.cpp=.o)
 
 ALL_LIB_OBJS = $(LIBMEM_OBJS) $(LIBCORE_OBJS) $(LIBDEVICES_OBJS) \
                $(LIBTOOLCHAIN_OBJS) $(LIBDEBUG_OBJS) $(LIBPLUGINS_OBJS) \
@@ -277,6 +285,9 @@ $(LIBDIR)/mmemu-plugin-sid6581.so: $(PLUGIN_SID6581_OBJS) | $(LIBDIR)
 $(LIBDIR)/mmemu-plugin-c64.so: $(PLUGIN_C64_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_C64_OBJS)
 
+$(LIBDIR)/mmemu-plugin-pia6520.so: $(PLUGIN_PIA6520_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_PIA6520_OBJS)
+
 # ---------------------------------------------------------------------------
 # Binary rules
 # ---------------------------------------------------------------------------
@@ -301,7 +312,8 @@ DEVICE_TEST_OBJS = src/plugins/devices/via6522/main/via6522.o \
                    src/plugins/devices/cia6526/main/cia6526.o \
                    src/plugins/devices/vic2/main/vic2.o \
                    src/plugins/devices/sid6581/main/sid6581.o \
-                   src/plugins/machines/c64/main/machine_c64.o
+                   src/plugins/machines/c64/main/machine_c64.o \
+                   src/plugins/devices/pia6520/main/pia6520.o
 
 $(TEST_BIN): $(TEST_SRCS) $(LIBS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -Itests -rdynamic -o $@ $(TEST_SRCS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) $(BASE_LIBS) $(WXLIBS)
@@ -319,7 +331,8 @@ PLUGIN_INCLUDES = -Isrc -Isrc/include \
                   -Isrc/plugins/devices/c64_pla/main \
                   -Isrc/plugins/devices/cia6526/main \
                   -Isrc/plugins/devices/vic2/main \
-                  -Isrc/plugins/devices/sid6581/main
+                  -Isrc/plugins/devices/sid6581/main \
+                  -Isrc/plugins/devices/pia6520/main
 
 # viceImporter pane sources also need wxWidgets headers
 PLUGIN_VICEIMPORTER_INCLUDES = $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
@@ -327,7 +340,7 @@ PLUGIN_VICEIMPORTER_INCLUDES = $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
 $(PLUGIN_6502_OBJS) $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) \
 $(PLUGIN_KBDVIC20_OBJS) $(PLUGIN_VIC20_CORE_OBJS) \
 $(PLUGIN_C64PLA_OBJS) $(PLUGIN_CIA6526_OBJS) $(PLUGIN_VIC2_OBJS) \
-$(PLUGIN_SID6581_OBJS) $(PLUGIN_C64_CORE_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
+$(PLUGIN_SID6581_OBJS) $(PLUGIN_C64_CORE_OBJS) $(PLUGIN_PIA6520_OBJS): INCLUDES := $(PLUGIN_INCLUDES)
 
 $(PLUGIN_VIC20_GUI_OBJS) $(PLUGIN_C64_GUI_OBJS): INCLUDES := $(PLUGIN_INCLUDES) $(WXCXXFLAGS)
 
@@ -356,4 +369,5 @@ clean:
 	rm -rf $(BINDIR) $(LIBDIR) $(ALL_LIB_OBJS) $(PLUGIN_6502_OBJS) $(PLUGIN_VICEIMPORTER_OBJS) \
 	       $(PLUGIN_C64PLA_OBJS) $(PLUGIN_CIA6526_OBJS) $(PLUGIN_VIC2_OBJS) \
 	       $(PLUGIN_SID6581_OBJS) $(PLUGIN_C64_CORE_OBJS) \
-	       src/plugins/machines/c64/main/plugin_init.o
+	       src/plugins/machines/c64/main/plugin_init.o \
+	       $(PLUGIN_PIA6520_OBJS)
