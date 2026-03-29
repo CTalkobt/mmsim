@@ -84,16 +84,25 @@ bool PluginLoader::load(const std::string& path) {
 
 void PluginLoader::loadFromDir(const std::string& dir) {
     if (!fs::exists(dir)) return;
-    std::vector<std::string> deferred;
+    std::vector<std::string> pending;
     for (const auto& entry : fs::directory_iterator(dir)) {
         if (entry.is_regular_file() && entry.path().extension() == ".so") {
-            if (!load(entry.path().string()))
-                deferred.push_back(entry.path().string());
+            pending.push_back(entry.path().string());
         }
     }
-    // Retry plugins that failed on first pass — their dependencies may now be loaded.
-    for (const auto& path : deferred) {
-        load(path);
+    // Retry failed plugins in successive passes until no more progress is made.
+    // This resolves arbitrary dependency ordering between plugins.
+    bool progress = true;
+    while (progress && !pending.empty()) {
+        progress = false;
+        std::vector<std::string> failed;
+        for (const auto& path : pending) {
+            if (load(path))
+                progress = true;
+            else
+                failed.push_back(path);
+        }
+        pending = std::move(failed);
     }
 }
 

@@ -322,7 +322,10 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             PluginPaneManager::instance().onMachineSwitch(id, this, m_notebook, m_machine);
 
             // Wire the screen pane's Capture button (if present) to setKeyCapture().
-            wxWindow* screenWin = PluginPaneManager::instance().getPaneWindow("vic20.screen");
+            // The pane ID is "<machineFamily>.screen" where the family is the
+            // machine ID with any variant suffix (after '+') stripped off.
+            std::string family = id.substr(0, id.find('+'));
+            wxWindow* screenWin = PluginPaneManager::instance().getPaneWindow(family + ".screen");
             if (screenWin) {
                 m_capturePane = dynamic_cast<IKeyboardCapturePane*>(screenWin);
                 if (m_capturePane)

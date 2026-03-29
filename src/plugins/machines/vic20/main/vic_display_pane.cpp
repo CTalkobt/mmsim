@@ -2,6 +2,7 @@
 #include <wx/dcbuffer.h>
 #include <wx/settings.h>
 #include <algorithm>
+#include <cstdlib>
 
 VicDisplayPane::VicDisplayPane(wxWindow* parent)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize,
@@ -79,7 +80,7 @@ void VicDisplayPane::OnPaint(wxPaintEvent&) {
     int srcW = dim.width;
     int srcH = dim.height;
 
-    auto* rgb = new unsigned char[srcW * srcH * 3];
+    auto* rgb = static_cast<unsigned char*>(malloc((size_t)srcW * srcH * 3));
     for (int i = 0; i < srcW * srcH; ++i) {
         uint32_t px  = m_pixelBuf[i];
         rgb[i*3]     = (px >> 16) & 0xFF;  // R

@@ -58,6 +58,13 @@ public:
     void addOverlay(uint32_t base, uint32_t size, const uint8_t* data, bool writable = false);
 
     /**
+     * Direct pointer to the underlying flat RAM array (bypasses overlays and IO
+     * hooks).  Use for banking controllers that need to return underlying RAM
+     * content when ROM is banked out.  Size is always 2^addrBits bytes.
+     */
+    const uint8_t* rawData() const { return m_data; }
+
+    /**
      * Register IO dispatch hooks.  The read hook returns true and fills *val if
      * it owns the address; the write hook returns true if it owns the address.
      * Called before overlay / RAM on every read8 / write8.

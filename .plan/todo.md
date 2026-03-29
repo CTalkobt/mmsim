@@ -661,44 +661,45 @@ the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 - [ ] Dual 8-bit ports (Port A and Port B) with data direction registers.
 - [ ] Control registers (CRA, CRB) for interrupt control and DDR/Port selection.
 - [ ] CA1/CA2 and CB1/CB2 line handling for handshaking (used by IEEE-488).
+- [ ] `reset()` clears all registers and de-asserts interrupt lines.
 - [ ] Snapshot support for registers and line states.
 
 ### Phase 12.2: MOS 6545/6845 CRTC (`src/libdevices/devices/crtc6545.h/cpp`)
 
 - [ ] Implement `CRTC6545 : public IOHandler`.
-- [ ] Register-based interface ($D000/$D001 or $E880/$E881 depending on model).
+- [ ] Register-based interface: Address Register ($E880) and Data Register ($E881).
 - [ ] 18 internal registers for screen timing (H-sync, V-sync, Interlace, etc.).
 - [ ] Address generation for character memory and row/column counting.
-- [ ] Support for both 40-column and 80-column PET models.
+- [ ] Support for both 40-column and 80-column PET models via register configuration.
+- [ ] `tick(cycles)`: internal counters for horizontal and vertical sync pulses.
 
 ### Phase 12.3: PET Video Subsystem (`src/plugins/devices/pet_video/`)
 
 - [ ] Implement `PetVideo` inheriting from `IVideoOutput`.
-- [ ] **Discrete logic model (2001)**: Simulate basic timing if no CRTC.
+- [ ] **Discrete logic model (2001)**: Simulate basic timing logic used before the CRTC was introduced.
 - [ ] **CRTC model (4000/8000)**: Interface with `CRTC6545` for address generation.
 - [ ] Character ROM mapping: Support for Graphics (lower/upper) and Business 
       (lower/upper) character sets.
+- [ ] **Video RAM Overlay**: Map $8000–$87FF (2 KB) using `FlatMemoryBus::addOverlay`.
 - [ ] `renderFrame()`: produces RGBA buffer from PET character memory and 
-      attributes.
+      attributes. Supports "Green" or "Amber" phosphor simulation.
 
-### Phase 12.4: IEEE-488 Bus Stub (`src/libdevices/ieee488.h/cpp`)
+### Phase 12.4: IEEE-488 Bus Implementation (`src/libdevices/ieee488.h/cpp`)
 
-- [ ] Implement base `IEEE488` interface for communication with disk drives 
+- [ ] Implement `IEEE488Bus` interface for communication with disk drives 
       and printers.
 - [ ] Wire PIA signals (ATN, DAV, NRFD, NDAC, EOI, SRQ, IFC, REN) to the bus.
-- [ ] Stub implementation of Device 8 (Disk Drive) to respond to basic LOAD 
-      commands.
+- [ ] **HLE Disk Drive (Unit 8)**: Trap IEEE-488 sequences to provide fast host-file access.
+- [ ] Support for PET "disk commands" (e.g., `LOAD "$",8`).
 
 ### Phase 12.5: PET Machine Factory and Memory Map
 
-- [ ] `MachineDescriptor` for `"pet2001"`, `"pet4032"`, and `"pet8032"`:
-    - CPU: `MOS6502`.
-    - Bus: `FlatMemoryBus` (32 KB RAM).
-    - ROMs: BASIC 1.0/2.0/4.0, Editor, KERNAL, and Character ROM.
-    - I/O: Two 6520 PIAs, one 6522 VIA, and optional 6545 CRTC.
-- [ ] Memory mapping: PET I/O window at $E800–$EFFF.
-- [ ] Keyboard: Implement both Graphics (2001/4000) and Business (8000) 
-      keyboard matrices.
+- [ ] `MachineDescriptor` for `"pet2001"`, `"pet4032"`, and `"pet8032"`.
+- [ ] **Banking Logic**: Support for BASIC 1.0/2.0/4.0, Editor, KERNAL, and Character ROM.
+- [ ] **I/O Window**: PET I/O window at $E800–$EFFF containing PIAs, VIAs, and CRTC.
+- [ ] **Keyboard Matrix**: Implement both Graphics (2001/4000) and Business (8000) 
+      keyboard matrices wired to PIA #1.
+- [ ] `onReset`: Load appropriate ROMs for the selected model and reset all chips.
 
 ### Phase 12.6: PET Integration Tests
 
@@ -707,7 +708,9 @@ the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 - [ ] **Video Buffer**: Write to $8000 (video RAM) and verify `renderFrame` 
       detects the change.
 - [ ] **CRTC Configuration**: Change registers in 6545 and verify screen 
-      geometry updates.
+      geometry (columns/rows) updates.
+- [ ] **IEEE-488 Smoke Test**: Perform a mock `LISTEN/DATA/UNLISTEN` sequence 
+      and verify PIA flags.
 
 ---
 
@@ -808,7 +811,7 @@ pulse-encoded format for VIC-20, C64, and PET.*
 
 - [ ] **CLI**: `tape mount <file>`, `tape play`, `tape stop`, `tape rewind`.
 - [ ] **GUI**: "Tape Control" pane with tape counter, play/stop/rewind buttons, 
-      and status LED.
+      signal and status LED.
 - [ ] **MCP**: `mount_tape`, `control_tape` tools.
 
 ---
@@ -851,66 +854,82 @@ complex MMU for 128KB banking, and the 80-column VDC.*
 ### Phase 16.1: MOS 8502 CPU (`src/plugins/6502/main/cpu8502.h/cpp`)
 
 - [ ] Subclass `MOS6510`.
-- [ ] Implement Fast Mode (2 MHz) support: when the CPU detects the 2 MHz 
-      bit in the MMU configuration, it doubles the internal clock cycle 
-      counting logic.
-- [ ] I/O port at $00/$01: identical to 6510 but ensures 2 MHz timing 
-      compatibility for the port pins.
+- [ ] Implement **Fast Mode (2 MHz)**:
+    - Add `m_isFast` internal state.
+    - When bit 0 of the MMU configuration is set (via `ISignalLine`), double the 
+      internal cycle count logic.
+    - `step()` returns 1x or 2x cycles based on the fast mode state.
+- [ ] **I/O port at $00/$01**:
+    - Same as 6510, but ensure 2 MHz timing compatibility.
+    - Wire `sigLoram`, `sigHiram`, `sigCharen` to the C128 MMU.
+- [ ] Snapshot includes `m_isFast`, `m_ioDdr`, and `m_ioData`.
 
 ### Phase 16.2: Z80 CPU Core (`src/libcore/cpu_z80.h/cpp`)
 
 - [ ] Implement `Z80` class inheriting from `ICore`.
-- [ ] Complete Z80 register set: A, F, B, C, D, E, H, L, SP, PC, IX, IY, I, R, 
-      plus shadow registers (A', F', B', C', D', E', H', L').
-- [ ] Instruction decoder for all official Z80 opcodes and documented prefixes.
-- [ ] `step()` returns cycle count for one instruction.
-- [ ] Disassembler: `disassembleOne()` and `disassembleEntry()` for Z80.
-- [ ] Snapshot support: full register state in POD blob.
+- [ ] **Registers**: A, F, B, C, D, E, H, L, SP, PC, IX, IY, I, R, plus shadow 
+      sets (A', F', etc.).
+- [ ] **Instruction Decoder**: Complete table for official Z80 opcodes and 
+      prefixes (CB, DD, ED, FD).
+- [ ] **Disassembler**: Implement `disassembleOne` and `disassembleEntry` 
+      specifically for Z80 syntax.
+- [ ] `setDataBus`/`setIoBus`: Support Z80's separate IO address space 
+      (though C128 maps IO to the memory bus).
+- [ ] `step()`: Fetch-decode-execute one Z80 instruction.
 
 ### Phase 16.3: C128 MMU (8722) (`src/plugins/devices/c128_mmu/main/c128_mmu.h/cpp`)
 
-- [ ] Implement `C128MMU` as an `IOHandler` at $D500–$D50B.
-- [ ] **Configuration Register (CR)**: controls RAM banking (Bank 0 vs Bank 1), 
-      ROM banking (BASIC/Editor/KERNAL visibility), and I/O window enable.
-- [ ] **Page 0/1 Relocation**: registers to move Page 0 and Page 1 to any 
-      location in Bank 0 or Bank 1.
-- [ ] **RAM Configuration Register (RCR)**: controls shared RAM at top or 
-      bottom of memory ($0000–$03FF or top 1/4/8/16 KB).
-- [ ] **Mode Configuration**: handle C128/C64 mode switching and Z80/8502 
-      CPU selection. MMU drives the `HALT` lines of the two CPUs.
+- [ ] Implement `C128MMU : public IOHandler` at $D500–$D50B.
+- [ ] **Configuration Register (CR)**:
+    - Bank selection (Bank 0 / Bank 1) for CPU accesses.
+    - ROM banking: BASIC, Editor, KERNAL visibility.
+    - I/O window enable ($D000–$DFFF).
+- [ ] **Page 0/1 Relocation**:
+    - 8-bit registers for Page 0 and Page 1 high-byte pointers.
+    - CPU reads/writes to $00xx/$01xx are redirected to the mapped page.
+- [ ] **RAM Configuration (RCR)**:
+    - Shared RAM settings (0, 1, 4, 16 KB at top/bottom).
+- [ ] **Mode Configuration**:
+    - Handle C128/C64 mode switch.
+    - Handle CPU selection: drive Z80/8502 `HALT` lines.
+- [ ] `reset()` defaults to Z80 active, Bank 0, ROMs enabled.
 
 ### Phase 16.4: MOS 8563 VDC (80-column) (`src/plugins/devices/vdc8563/main/vdc.h/cpp`)
 
-- [ ] Implement `VDC8563` as an `IOHandler` at $D600–$D601.
-- [ ] Register-based interface: Address ($D600) and Data ($D601) registers 
-      controlling 37 internal registers.
-- [ ] VDC RAM: allocate 16 KB (default) or 64 KB of dedicated video memory.
-- [ ] Text mode: 80x25 character rendering with attributes (colour, blink, 
-      underline).
-- [ ] Graphic mode: 640x200 bitmap rendering (if 64 KB VDC RAM present).
+- [ ] Implement `VDC8563 : public IOHandler` at $D600–$D601.
+- [ ] **Register Interface**: Address Register ($D600) and Data Register ($D601).
+- [ ] **VDC RAM**: Allocate 16 KB or 64 KB of dedicated video memory (not in 
+      CPU bus).
+- [ ] **VDC DMA**: Support for copying blocks between CPU RAM and VDC RAM.
+- [ ] **Text Mode**: 80x25 character rendering with attributes (blink, 
+      underline, reverse, color).
 - [ ] `renderFrame()`: produces an RGBA buffer for the 80-column display.
 
 ### Phase 16.5: C128 Machine Factory and Memory Map
 
-- [ ] `MachineDescriptor` for `"c128"`:
-    - CPU Slots: `MOS8502` and `Z80`.
-    - Bus Slot: `FlatMemoryBus` (128 KB, via two 64 KB overlays).
-    - `onInit`: load C128 Editor ($C000), BASIC ($4000), KERNAL ($E000), 
-      and Z80 BIOS ROMs.
-    - `onReset`: start in Z80 mode; MMU maps Z80 BIOS to $0000.
-- [ ] Register `c128` in `MachineRegistry`.
-- [ ] Keyboard: extend C64 matrix with extra C128 keys (numeric keypad, ESC, 
-      TAB, ALT, etc.).
+- [ ] `MachineDescriptor` for `"c128"`.
+- [ ] **Bus Configuration**: `FlatMemoryBus` with two 64 KB RAM overlays 
+      (Bank 0, Bank 1).
+- [ ] **ROM Loading**:
+    - C128 KERNAL ($E000), Editor ($C000), BASIC ($4000).
+    - Z80 BIOS (mapped to $0000 at reset).
+- [ ] **Peripheral Wiring**:
+    - VIC-II ($D000), SID ($D400), CIA1 ($DC00), CIA2 ($DD00).
+    - C128 Keyboard: Extend C64 matrix with extra keys (Numeric, ESC, TAB, etc.).
+- [ ] `onReset`: Start Z80, load ROMs, set MMU to default.
 
 ### Phase 16.6: C128 Integration Tests
 
-- [ ] **CPU Swap**: verify Z80 can hand over control to 8502 via MMU register 
-      write.
-- [ ] **RAM Banking**: write to $2000 in Bank 0, switch to Bank 1, verify $2000 
+- [ ] **CPU Handover**: Write to MMU register to swap from Z80 to 8502; verify 
+      execution continues on 8502.
+- [ ] **RAM Banking**: Write to $2000 in Bank 0, switch to Bank 1, verify $2000 
       reads different data.
-- [ ] **VDC Access**: write/read internal VDC registers; verify VDC RAM copy.
-- [ ] **Page 0 Move**: relocate Page 0 to $1000 and verify ZP instructions 
-      hit $1000.
+- [ ] **Page 0 Move**: Relocate Page 0 to $1000; verify `STA $00` hits physical 
+      $1000.
+- [ ] **VDC Block Copy**: Use VDC registers to copy data to VDC RAM and verify 
+      via VDC read-back.
+- [ ] **Fast Mode Timing**: Verify `cycles()` increments twice as fast when 
+      FAST bit is set.
 
 ## Phase 17: MOS 65CE02 CPU
 
@@ -1522,6 +1541,488 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
 - [ ] `importRoms()` copies file to temp dir; validates size and header signature.
 - [ ] `importRoms()` with deliberate size mismatch rolls back and returns error.
 - [ ] `importRoms()` does not overwrite existing file unless `overwrite=true`.
+
+---
+
+## Phase 25: Commodore Plus/4 and C16 (TED-based)
+
+*Goal: Implement the TED-based Commodore machines (C16, C116, Plus/4).*
+
+### Phase 25.1: MOS 7360 / 8360 TED (`src/libdevices/devices/ted7360.h/cpp`)
+
+- [ ] Implement `TED7360 : public IOHandler`.
+- [ ] **Register File**: 64 registers ($FF00–$FF3F) controlling video, sound, 
+      timers, and memory banking.
+- [ ] **Internal Timers**:
+    - Three 16-bit interval timers (Timer 1, 2, 3).
+    - Timer 3 also drives the cursor blink and system clock.
+- [ ] **Banking Logic**:
+    - Integrated ROM/RAM banking control (BASIC, KERNAL, Function ROMs).
+    - `ISignalLine` outputs for LORAM/HIRAM equivalents.
+- [ ] **Sound**:
+    - Two square wave channels (10-bit frequency).
+    - Channel 2 can be switched to digital noise.
+    - Master volume control.
+- [ ] **I/O**:
+    - Keyboard matrix scanning (shared with video registers).
+    - Joystick port reading.
+
+### Phase 25.2: TED Video and Palette (`src/plugins/devices/ted_video/`)
+
+- [ ] Implement `TedVideo` inheriting from `IVideoOutput`.
+- [ ] **121-Color Palette**:
+    - 15 hues (plus black) and 8 luminance levels.
+    - Implement the luminance scaling logic in the RGBA renderer.
+- [ ] **Video Modes**:
+    - Standard 40-column text.
+    - Multicolor text.
+    - Multicolor bitmap.
+    - Extended background color.
+- [ ] **Raster Pipeline**:
+    - Raster counter and compare (triggering IRQ).
+    - Horizontal and vertical smooth scrolling.
+- [ ] `renderFrame()`: produces RGBA buffer using TED registers and memory.
+
+### Phase 25.3: MOS 6551 ACIA (`src/libdevices/devices/acia6551.h/cpp`)
+
+- [ ] Implement `ACIA6551 : public IOHandler` at $FD00.
+- [ ] **Registers**: Control, Command, Status, and Data.
+- [ ] **Baud Rate Generator**: Support for standard rates (50 to 19200 baud).
+- [ ] **Interrupts**: IRQ on transmit buffer empty or receive buffer full.
+
+### Phase 25.4: Plus/4 Machine Factory and Memory Map
+
+- [ ] `MachineDescriptor` for `"plus4"` and `"c16"`.
+- [ ] **Memory Map**:
+    - C16: 16 KB RAM ($0000–$3FFF).
+    - Plus/4: 64 KB RAM ($0000–$FDFF).
+    - ROMs: BASIC ($8000), KERNAL ($E000).
+- [ ] **Keyboard**: Implement the 8x8 matrix scanned via TED registers.
+- [ ] `onReset`: Load ROMs, reset TED and ACIA.
+
+### Phase 25.5: Plus/4 Integration Tests
+
+- [ ] **TED Color Test**: Cycle through all 121 colors and verify RGBA output.
+- [ ] **TED Timer Test**: Program Timer 1 for IRQ and verify `sigIrq` pulses.
+- [ ] **TED Banking Test**: Switch between RAM and ROM at $8000 via TED 
+      registers; verify data change.
+- [ ] **ACIA Loopback Test**: Connect TX to RX and verify data round-trip.
+
+---
+
+## Phase 26: Atari 8-bit Family (400/800/XL/XE)
+
+*Goal: Cycle-accurate emulation of the ANTIC, GTIA, and POKEY trio.*
+
+### Phase 26.1: ANTIC DMA Engine (`src/libdevices/devices/antic.h/cpp`)
+
+- [ ] Implement `ANTIC : public IOHandler`.
+- [ ] **Display List Interpreter**:
+    - Fetch-decode-execute display list instructions.
+    - Support for all ANTIC modes (Text 0-F, Graphics 0-F).
+    - Handle `DLI` (Display List Interrupt) bit in instructions.
+    - Handle `HSCROL` and `VSCROL` smooth scrolling.
+- [ ] **DMA Timing**:
+    - "Steal" cycles from the CPU for playfield, sprite, and display list fetches.
+    - Implement the `HALT` signal line back to `ICore`.
+- [ ] **NMI Generation**: Vertical Blank Interrupt (VBI) and Display List 
+      Interrupt (DLI).
+
+### Phase 26.2: GTIA Color and PMG (`src/libdevices/devices/gtia.h/cpp`)
+
+- [ ] Implement `GTIA : public IOHandler`.
+- [ ] **Color Palette**:
+    - 256 colors (16 hues x 16 luminances).
+    - Map GTIA color registers ($D012–$D01A) to RGBA.
+- [ ] **Player-Missile Graphics (PMG)**:
+    - 4 Players and 4 Missiles (acting as a 5th player).
+    - Priority logic: Players vs. Playfield vs. Missiles.
+    - Collision detection registers ($D000–$D00F).
+- [ ] **Console Switches**: Read Start, Select, Option buttons via $D01F.
+
+### Phase 26.3: POKEY Audio and IO (`src/libdevices/devices/pokey.h/cpp`)
+
+- [ ] Implement `POKEY : public IOHandler`.
+- [ ] **Audio Subsystem**:
+    - 4 independent square-wave channels.
+    - Polynomial-counter noise generators (4, 5, 9, 17-bit).
+    - Frequency division and 16-bit channel linking.
+- [ ] **Timers**: 3 interval timers with IRQ support.
+- [ ] **Keyboard**:
+    - Serial scan matrix for the Atari keyboard.
+    - Handle BREAK and Control keys.
+- [ ] **Serial Port (SIO)**: Support for SIO bus interrupts and basic data transfer.
+
+### Phase 26.4: Atari Machine Factory and Memory Map
+
+- [ ] `MachineDescriptor` for `"atari800"`, `"atari800xl"`, and `"atari65xe"`.
+- [ ] **PIA 6520**:
+    - Port A: Joystick ports (4 for Atari 800, 2 for XL/XE).
+    - Port B: XL/XE memory banking (OS ROM, BASIC ROM, RAM expansion).
+- [ ] **Memory Map**:
+    - ROMs: OS ($C000–$FFFF), BASIC ($A000–$BFFF).
+    - I/O: ANTIC ($D400), GTIA ($D000), POKEY ($D200), PIA ($D300).
+- [ ] **Video Renderer**: `IVideoOutput` combining ANTIC playfield and GTIA PMG 
+      with priority and collisions.
+
+### Phase 26.5: Atari Integration Tests
+
+- [ ] **Display List Test**: Load a simple display list and verify ANTIC 
+      addresses generated via `IBus` log.
+- [ ] **PMG Priority Test**: Place a Player over a Playfield and verify RGBA 
+      pixel priority matches GTIA settings.
+- [ ] **POKEY Audio Test**: Program a channel and verify `pullSamples` returns 
+      the expected waveform.
+- [ ] **XL/XE Banking Test**: Toggle PIA Port B bit 0 and verify OS ROM 
+      visibility at $C000.
+
+---
+
+## Phase 27: Atari 2600 (VCS)
+
+*Goal: Ultra-lean scanline-based architecture requiring perfect timing.*
+
+### Phase 27.1: TIA Video and Audio (`src/libdevices/devices/tia.h/cpp`)
+
+- [ ] Implement `TIA : public IOHandler`.
+- [ ] **Scanline Engine**:
+    - No frame buffer; logic must render a single scanline pixel-by-pixel.
+    - `WSYNC` logic: halt CPU until the end of the current scanline.
+    - **Sprites**: Player 0, Player 1, Missile 0, Missile 1, Ball.
+    - **Playfield**: 20-bit register-based playfield (mirrored or repeated).
+    - Collision registers: Hardware-level pixel collision bit-latches.
+- [ ] **Audio Subsystem**:
+    - 2 independent channels (square/noise).
+    - 5-bit frequency, 4-bit volume, 4-bit waveform.
+- [ ] **Input**: Paddle and joystick button latching.
+
+### Phase 27.2: RIOT 6532 (`src/libdevices/devices/riot6532.h/cpp`)
+
+- [ ] Implement `RIOT6532 : public IOHandler`.
+- [ ] **RAM**: 128 bytes of built-in RAM.
+- [ ] **I/O Ports**: Dual 8-bit ports for joysticks and console switches.
+- [ ] **Interval Timer**:
+    - 8-bit counter with 1, 8, 64, or 1024 clock pulse intervals.
+    - Interrupt support on underflow.
+
+### Phase 27.3: Atari 2600 Machine Factory and Memory Map
+
+- [ ] `MachineDescriptor` for `"vcs"`.
+- [ ] **Memory Map**:
+    - TIA: $00–$7F.
+    - RIOT RAM: $80–$FF.
+    - RIOT I/O/Timer: $280–$29F.
+    - Cartridge: $F000–$FFFF (typical).
+- [ ] **Banking**: Support for standard Atari bank-switching (F8, F6, etc.) 
+      via `IBus` overlay.
+- [ ] **Timing Model**: Cycle-exact `step()` loop; TIA must be updated every 
+      3 CPU clock cycles (the 2600 has a 3:1 ratio).
+
+### Phase 27.4: Atari 2600 Integration Tests
+
+- [ ] **WSYNC Test**: Write to `WSYNC` and verify `cycles()` jump to next 
+      scanline boundary.
+- [ ] **Collision Test**: Set Player 0 and Player 1 at the same X-coord and 
+      verify the P0-P1 collision bit is set.
+- [ ] **RIOT Timer Test**: Set timer to 1024-count and verify it decrements 
+      at the correct rate.
+- [ ] **Playfield Render Test**: Program the playfield and verify the RGBA 
+      buffer contains the expected pattern on a single scanline.
+
+---
+
+## Phase 28: Apple II Family
+
+*Goal: Implementation of the classic Apple architecture and its unique Disk II.*
+
+### Phase 28.1: Apple II Soft-Switches and Video (`src/plugins/devices/apple2_video/`)
+
+- [ ] Implement `Apple2Video : public IVideoOutput, public IOHandler`.
+- [ ] **Soft-Switches ($C000–$C0FF)**:
+    - Many hardware functions are toggled via reads/writes to this range.
+    - Video modes: Text, Lo-Res, Hi-Res.
+    - Page 1/Page 2 display.
+    - **Language Card**: ROM/RAM switch for $D000–$FFFF.
+- [ ] **Keyboard**: Implement the latch at $C000 and strobe-clear at $C010.
+- [ ] **Speaker**: Simple toggle at $C030; generate audible click via `IAudioOutput`.
+- [ ] **Video Renderer**:
+    - Apple II colors (NTSC artifacting model for Hi-Res).
+    - Support for 40/80-column and Double-Hi-Res on IIe/IIc models.
+
+### Phase 28.2: Disk II Controller (`src/libdevices/devices/disk2.h/cpp`)
+
+- [ ] Implement `Disk2Controller : public IOHandler` at $C0E0–$C0EF.
+- [ ] **State Machine**: Implement the 8-state stepper motor phases.
+- [ ] **Drive Control**: SELECT, DRIVE, MOTOR ON, R/W.
+- [ ] **Data Stream**:
+    - Raw GCR-encoded bits from a virtual disk image (.dsk or .nib).
+    - Shift-register emulation for read/write.
+- [ ] **Disk Image Support**: Implement a simple `.dsk` to GCR converter.
+
+### Phase 28.3: Apple IIe/IIc MMU (`src/libdevices/devices/apple2e_mmu.h/cpp`)
+
+- [ ] Implement `Apple2eMMU : public IOHandler`.
+- [ ] **Auxiliary RAM Banking**: Map a 64 KB auxiliary bank for 128 KB systems.
+- [ ] Support for main/aux bank switches (80STORE, RAMRD, RAMWRT).
+- [ ] **Alternative Character Set**: Support for the IIe/IIc character sets.
+
+### Phase 28.4: Apple IIgs (16-bit) (`src/plugins/machines/apple2gs/`)
+
+- [ ] `MachineDescriptor` for `"apple2gs"`.
+- [ ] **CPU Slot**: `MOS65816` in native mode.
+- [ ] **Ensoniq ES5503 DOC**:
+    - 32 independent wavetable voices.
+    - Dedicated audio RAM ($E10000–$E1003F).
+- [ ] **Video Generation Chip (VGC)**:
+    - Super Hi-Res 320x200 and 640x200.
+    - Per-scanline palettes (16 colors per scanline).
+- [ ] **Mega II**: Compatibility layer to provide the exact timing of a 
+      IIe within the IIgs architecture.
+
+### Phase 28.5: Apple II Integration Tests
+
+- [ ] **Soft-Switch Test**: Toggle Hi-Res via $C057 and verify `IVideoOutput` 
+      mode change.
+- [ ] **Disk II Stepper Test**: Pulse the stepper phases and verify the 
+      head position increments.
+- [ ] **Language Card Test**: Switch $D000–$FFFF to RAM; write/read back; 
+      switch back to ROM and verify data.
+- [ ] **Speaker Click Test**: Rapidly toggle $C030 and verify `IAudioOutput` 
+      samples.
+
+---
+
+## Phase 29: BBC Micro / Acorn Electron
+
+*Goal: Fast, modular architecture with the unique Tube second-processor bus.*
+
+### Phase 29.1: BBC Video Subsystem (`src/plugins/devices/bbc_video/`)
+
+- [ ] Implement `BBCVideo : public IVideoOutput, public IOHandler`.
+- [ ] **MC6845 CRTC**: Register-based timing generator at $FE00–$FE01.
+- [ ] **Video ULA**:
+    - Palette control (8 colors, including Mode 7 flashing).
+    - Mode switching (Modes 0–6: 2/4/16-color tile/bitmap).
+    - Clock speed switching for various modes.
+- [ ] **SAA5050 Teletext**:
+    - Implement the hardware character generator for Mode 7.
+    - Support for Teletext attributes (double height, flash, alphanumeric/graphic).
+- [ ] **Video RAM**: Dynamic mapping depending on mode (e.g., Mode 0–2 uses 20KB).
+
+### Phase 29.2: System and User VIAs (`src/libdevices/devices/bbc_vias.h/cpp`)
+
+- [ ] Instantiate two `MOS6522` objects (Phase 10.1).
+- [ ] **System VIA ($FE40)**:
+    - Keyboard scanning (via Port A/B).
+    - Sound latch control (SN76489).
+    - Vertical sync interrupt.
+- [ ] **User VIA ($FE60)**:
+    - User port I/O.
+    - Printer port.
+    - ADC control.
+- [ ] **SN76489 PSG**: 3-channel square wave + noise sound chip.
+
+### Phase 29.3: The Tube Interface (`src/libdevices/devices/bbc_tube.h/cpp`)
+
+- [ ] Implement `BBCTube : public IOHandler` at $FEE0–$FEE7.
+- [ ] **Communication Protocol**: Implement the 8-bit bidirectional data 
+      and status registers.
+- [ ] **Second Processor Support**:
+    - Connect a second `CpuSlot` (e.g., Z80, 6502, ARM) to the system via the Tube.
+    - Handle bus synchronization and interrupts.
+
+### Phase 29.4: BBC Machine Factory and Memory Map
+
+- [ ] `MachineDescriptor` for `"bbcb"`, `"bbca"`, `"electron"`.
+- [ ] **Paged ROM Mapping**:
+    - 4-bit latch at $FE30 selects one of 16 ROM banks ($8000–$BFFF).
+    - Implement `PagedMemoryBus` for this range.
+- [ ] **Memory Map**:
+    - RAM: $0000–$7FFF.
+    - ROM/RAM Paged: $8000–$BFFF.
+    - OS ROM: $C000–$FFFF.
+    - I/O: $FC00–$FEFF.
+- [ ] `onReset`: Load OS and Paged ROMs; reset VIAs and CRTC.
+
+### Phase 29.5: BBC Integration Tests
+
+- [ ] **Mode 7 Test**: Write Teletext codes to $7C00 and verify `renderFrame` 
+      produces the correct SAA5050 glyphs.
+- [ ] **VIA Latch Test**: Write to System VIA and verify SN76489 registers 
+      are updated.
+- [ ] **Paged ROM Test**: Toggle $FE30 and verify different ROM data 
+      appears at $8000.
+- [ ] **Tube Transfer Test**: Perform a simple status check/data write 
+      to the Tube registers.
+
+---
+
+## Phase 30: NES / Famicom
+
+*Goal: Tile-based rendering and the classic 5-channel sound.*
+
+### Phase 30.1: Ricoh 2C02 PPU (`src/libdevices/devices/ppu2c02.h/cpp`)
+
+- [ ] Implement `PPU2C02 : public IOHandler`.
+- [ ] **Register Interface**: $2000–$2007 (Ctrl, Mask, Status, OAMAddr, 
+      OAMData, Scroll, PPUAddr, PPUData).
+- [ ] **Tile Pipeline**:
+    - Background: Nametables, Attribute tables, Pattern tables.
+    - Sprites: OAM (64 sprites, 8 per scanline limit).
+    - Palette: 32 entries (BG/Sprite).
+- [ ] **Scrolling**:
+    - Implement "Loopy's" X/Y scroll latch and address logic.
+    - Handle vertical and horizontal mirroring.
+- [ ] **Interrupts**: VBlank NMI.
+
+### Phase 30.2: Ricoh 2A03 APU (`src/libdevices/devices/apu2a03.h/cpp`)
+
+- [ ] Implement `APU2A03 : public IOHandler`.
+- [ ] **Sound Channels**:
+    - 2 Pulse waves (4 duty cycles).
+    - Triangle wave.
+    - Noise generator.
+    - **DMC (Delta Modulation Channel)**: Sample-based sound with DMA from RAM.
+- [ ] **Frame Counter**: Internal 240Hz/192Hz clock for APU interrupts.
+
+### Phase 30.3: NES Mappers (`src/libcore/nes_mappers.h/cpp`)
+
+- [ ] Implement common mappers:
+    - **NROM (0)**: Basic 16KB/32KB PRG, 8KB CHR.
+    - **MMC1 (1)**: Serial bank switching for PRG and CHR.
+    - **MMC3 (4)**: Scanline counter (via PPU A12 line) and fine banking.
+- [ ] `NESMapper` base class with virtual `read/write` hooks for `IBus`.
+
+### Phase 30.4: NES Machine Factory and Memory Map
+
+- [ ] `MachineDescriptor` for `"nes"`, `"famicom"`.
+- [ ] **Memory Map**:
+    - RAM: $0000–$07FF.
+    - PPU Registers: $2000–$2007.
+    - APU/IO: $4000–$4017.
+    - PRG ROM: $8000–$FFFF (mapped by Mapper).
+- [ ] **Input**: Shift-register read for 8-button controllers.
+- [ ] `onReset`: Reset CPU, PPU, APU, Mapper.
+
+### Phase 30.5: NES Integration Tests
+
+- [ ] **VBlank Test**: Run until VBlank and verify NMI fires.
+- [ ] **PPU Register Test**: Write to `PPUADDR` and verify subsequent 
+      `PPUDATA` read returns the correct memory byte.
+- [ ] **Mapper MMC1 Test**: Perform the serial-write sequence to swap 
+      PRG banks; verify data at $8000.
+- [ ] **APU Tone Test**: Program a pulse channel and verify square wave 
+      period in `pullSamples`.
+
+---
+
+## Phase 31: SNES / Super Famicom
+
+*Goal: 16-bit 65816 core with complex tile modes and HDMA.*
+
+### Phase 31.1: Ricoh 5A22 CPU (65816) (`src/libcore/cpu65816.h/cpp`)
+
+- [ ] Implement `MOS65816 : public ICore`.
+- [ ] **Native/Emulation Modes**:
+    - Emulation: 6502-compatible ($0100–$01FF stack, 8-bit registers).
+    - Native: 16-bit Accumulator (A/B), 16-bit X, Y, and SP.
+- [ ] **24-bit Addressing**: Support for Bank ($K) and Direct ($D) registers.
+- [ ] **Math Unit**: Support for hardware multiply/divide via $4200–$421F.
+- [ ] **DMA/HDMA**:
+    - 8 DMA channels for block transfers.
+    - Horizontal-blank DMA (HDMA) for per-scanline register updates.
+
+### Phase 31.2: SNES PPU1 and PPU2 (`src/libdevices/devices/snes_ppus.h/cpp`)
+
+- [ ] Implement `SNES_PPUs : public IVideoOutput, public IOHandler`.
+- [ ] **Tile Modes (0-7)**:
+    - Mode 7: Affine transformations (matrix scaling, rotation, shearing).
+    - Mosaic and Windowing effects.
+- [ ] **Layering**: Up to 4 background layers with priority and transparency.
+- [ ] **Color Math**: Master Brightness and color addition/subtraction.
+- [ ] **Sprites (OBJ)**: 128 sprites, sizes from 8x8 up to 64x64.
+
+### Phase 31.3: SNES APU (SPC700 + DSP) (`src/libdevices/devices/snes_apu.h/cpp`)
+
+- [ ] Implement `SPC700` class inheriting from `ICore`.
+- [ ] **Sony DSP**:
+    - 8-channel ADPCM sample decoding.
+    - Gaussian interpolation and Echo effects.
+- [ ] **APU RAM**: 64 KB dedicated sound RAM.
+- [ ] **Communication Ports ($2140–$2143)**: Four 8-bit ports for CPU-APU comms.
+
+### Phase 31.4: SNES Machine Factory and Memory Map
+
+- [ ] `MachineDescriptor` for `"snes"`.
+- [ ] **Memory Map**:
+    - WRAM: $7E0000–$7FFFFF (128 KB).
+    - Registers: $2100–$43FF.
+    - ROM (LoROM/HiROM): Banks $00–$3F and $80–$BF.
+- [ ] **Input**: Support for SNES joypads (16-bit serial read).
+- [ ] `onReset`: Reset 65816, PPU, APU.
+
+### Phase 31.5: SNES Integration Tests
+
+- [ ] **Native Mode Transition**: Execute `CLC; XCE` and verify 16-bit register 
+      writes.
+- [ ] **DMA Transfer Test**: Configure a DMA channel to copy from ROM to 
+      WRAM; verify data.
+- [ ] **PPU Mode 7 Test**: Enable Mode 7 and verify `renderFrame` applies 
+      matrix transforms to background tiles.
+- [ ] **APU Port Test**: Write to $2140 and verify `SPC700` reads the byte 
+      from its local register view.
+
+---
+
+## Phase 32: Commander X16
+
+*Goal: Modern 65C02-based machine with VERA graphics and YM2151 sound.*
+
+### Phase 32.1: VERA (Video Embedded Retro Adapter) (`src/plugins/devices/vera/`)
+
+- [ ] Implement `VERA : public IVideoOutput, public IOHandler`.
+- [ ] **Register Interface**: $9F20–$9F2F.
+- [ ] **Dual-Port VRAM**: 128 KB of internal video RAM accessible via 
+      auto-incrementing data ports.
+- [ ] **Video Layers**:
+    - Two independent layers supporting tile, bitmap, and character modes.
+    - 128 hardware sprites (up to 64x64, 4/8-bpp).
+- [ ] **Palette**: 256 entries (12-bit RGB).
+- [ ] **Audio Subsystem**:
+    - PCM playback: 16-bit mono/stereo samples from VRAM.
+    - PSG: 16 channels of programmable waveforms (pulse, sawtooth, noise).
+- [ ] **SPI Controller**: Interaction with SD card via VERA registers.
+
+### Phase 32.2: YM2151 OPM Sound (`src/libdevices/devices/ym2151.h/cpp`)
+
+- [ ] Implement `YM2151 : public IOHandler` at $9F40.
+- [ ] **FM Synthesis**:
+    - 8 independent voices.
+    - 4 operators per voice with various algorithms.
+    - Precise envelope and LFO modulation.
+- [ ] **Audio Output**: 2 channels (Stereo).
+
+### Phase 32.3: X16 Machine Factory and Memory Map
+
+- [ ] `MachineDescriptor` for `"x16"`.
+- [ ] **CPU Slot**: `W65C02` (8-bit CMOS version).
+- [ ] **Banking**:
+    - Banked RAM: $A000–$BFFF (512 KB to 2 MB).
+    - Banked ROM: $C000–$FFFF (512 KB).
+    - Controlled by registers at $0000/$0001 (VIA1-based mapping).
+- [ ] **Input**: PS/2 keyboard and mouse via VIA1/VIA2.
+- [ ] `onReset`: Load KERNAL and BASIC ROMs; reset VERA and YM2151.
+
+### Phase 32.4: X16 Integration Tests
+
+- [ ] **VERA VRAM Test**: Write to VRAM via `DATA0` and verify address 
+      auto-increment logic.
+- [ ] **Banked RAM Test**: Switch between RAM banks 0 and 1; verify data 
+      isolation at $A000.
+- [ ] **YM2151 Write Test**: Write to an FM register and verify `pullSamples` 
+      contains FM-modulated output.
+- [ ] **VERA Sprite Test**: Enable a sprite and verify `renderFrame` RGBA 
+      buffer includes the sprite data.
 
 ---
 

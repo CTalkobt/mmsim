@@ -157,8 +157,7 @@ PLUGIN_SID6581_SRCS = src/plugins/devices/sid6581/main/sid6581.cpp \
 
 # Plugin C64 Machine Sources — split so the wx pane gets wx compile flags
 PLUGIN_C64_CORE_SRCS = src/plugins/machines/c64/main/machine_c64.cpp
-PLUGIN_C64_GUI_SRCS  = src/plugins/machines/c64/main/plugin_init.cpp \
-                       src/plugins/machines/vic20/main/vic_display_pane.cpp
+PLUGIN_C64_GUI_SRCS  = src/plugins/machines/c64/main/plugin_init.cpp
 PLUGIN_C64_SRCS      = $(PLUGIN_C64_CORE_SRCS) $(PLUGIN_C64_GUI_SRCS)
 
 # Objects

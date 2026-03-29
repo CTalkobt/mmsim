@@ -54,6 +54,11 @@ public:
     void setKernalRom(const uint8_t* data, uint32_t size) { m_kernalRom = data; m_kernalSize = size; }
     void setCharRom  (const uint8_t* data, uint32_t size) { m_charRom   = data; m_charSize   = size; }
 
+    /** Pointer to the flat system RAM (64 KB).  When set, the PLA always claims
+     *  its banking regions and returns flat RAM content when ROM is banked out,
+     *  preventing bus overlays from serving stale ROM data through peek8(). */
+    void setRamData(const uint8_t* ram) { m_ram = ram; }
+
     // -----------------------------------------------------------------------
     // IOHandler interface
     // -----------------------------------------------------------------------
@@ -75,6 +80,7 @@ private:
     const uint8_t* m_basicRom  = nullptr;  uint32_t m_basicSize  = 0;
     const uint8_t* m_kernalRom = nullptr;  uint32_t m_kernalSize = 0;
     const uint8_t* m_charRom   = nullptr;  uint32_t m_charSize   = 0;
+    const uint8_t* m_ram       = nullptr;
 
     bool hiram()  const { return m_hiram  ? m_hiram->get()  : true; }
     bool loram()  const { return m_loram  ? m_loram->get()  : true; }

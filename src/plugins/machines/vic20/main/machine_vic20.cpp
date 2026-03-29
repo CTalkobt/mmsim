@@ -13,6 +13,8 @@
 #include <iostream>
 #include <cstring>
 
+namespace {
+
 // Signal line that forwards level changes to the CPU IRQ pin.
 class CpuIrqLine : public ISignalLine {
 public:
@@ -88,6 +90,8 @@ public:
 private:
     uint8_t* m_ram;
 };
+
+} // namespace
 
 /**
  * VIC-20 Machine Descriptor Factory — shared implementation.

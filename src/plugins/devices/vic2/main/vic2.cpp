@@ -233,15 +233,9 @@ void VIC2::renderBackground(uint32_t* buf) {
     uint32_t bg2 = palette(m_regs[BGCOL2] & 0x0F);
     uint32_t bg3 = palette(m_regs[BGCOL3] & 0x0F);
 
-    // Color RAM is always at $D800–$DBFF in CPU space; we read it via dmaPeek
-    // if the bank base places it there, otherwise via a direct offset.
-    // In the C64, color RAM is a separate physical 4-bit RAM always at $D800
-    // and is not banked.  For this implementation the machine factory is
-    // expected to make it accessible via the DMA bus at the appropriate offset,
-    // or to supply it directly.  We read it from system bus addr $D800 via
-    // the DMA bus peek (which bypasses the PLA banking).
-    // NOTE: If the machine doesn't wire color RAM into the DMA bus, colors
-    // will read as $FF (all-high nibble = 15 = light gray).
+    // Color RAM is a separate 4-bit RAM on real C64 hardware, accessed via a
+    // dedicated connection to the VIC-II (not through the DMA bus).  The
+    // machine factory calls setColorRam() to supply the pointer directly.
 
     for (int row = 0; row < 25; ++row) {
         for (int col = 0; col < 40; ++col) {
@@ -280,8 +274,8 @@ void VIC2::renderBackground(uint32_t* buf) {
                     uint8_t c00 = m_regs[BGCOL0] & 0x0F;
                     uint8_t c01 = (colorByte >> 4) & 0x0F;
                     uint8_t c10 = colorByte & 0x0F;
-                    // Color RAM holds 4th color (accessed via DMA bus at $D800+cell)
-                    uint8_t c11 = (uint8_t)(m_dmaBus ? m_dmaBus->peek8(0xD800 + cellIdx) & 0x0F : 0);
+                    // Color RAM: direct 4-bit connection.
+                    uint8_t c11 = m_colorRam ? (m_colorRam[cellIdx & 0x3FF] & 0x0F) : 0;
 
                     uint32_t mc[4] = { palette(c00), palette(c01), palette(c10), palette(c11) };
 
@@ -319,8 +313,8 @@ void VIC2::renderBackground(uint32_t* buf) {
                     bgPx = bg0;
                 }
 
-                // Color RAM ($D800): provides foreground color nibble
-                uint8_t colorNibble = (uint8_t)(m_dmaBus ? m_dmaBus->peek8(0xD800 + cellIdx) & 0x0F : 0x0F);
+                // Color RAM: direct 4-bit connection, not via DMA bus.
+                uint8_t colorNibble = m_colorRam ? (m_colorRam[cellIdx & 0x3FF] & 0x0F) : 0x0F;
 
                 uint32_t glyphOffset = cbBase + charCode * 8;
 

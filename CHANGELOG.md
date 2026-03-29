@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 ## [0.2.0-dev] - 2026-03-28
 
 ### Added
+- **Tape (Datasette) Support (Phase 14)**:
+    - Added a roadmap for .tap pulse-encoded archive support across VIC-20, C64, and PET.
+    - Planned core timing-exact decoder and machine-specific signal wiring.
+- **IEC Serial Bus and Disk Drive Support (Phase 15)**:
+    - Added a roadmap for IEC serial bus emulation and disk image support (.d64, .g64).
+    - Planned High-Level Emulation (HLE) via KERNAL trapping and Level 2 virtual bus simulation.
+- **Runtime Image and Cartridge Loading (Phase 13)**:
+    - Added a roadmap for dynamic loading of `.prg`, `.bin`, and `.crt` images.
+    - Planned CLI, GUI, and MCP interfaces for runtime memory injection and cartridge attachment.
+- **Commodore 128 Implementation Plan (Phase 16)**:
+    - Inserted a comprehensive roadmap for the C128, including the 8502 and Z80 CPUs, the 8722 MMU, and the 8563 VDC.
+- **Commodore PET/CBM Implementation Plan (Phase 12)**:
+    - Inserted a roadmap for the PET series, including the 6520 PIA, 6545 CRTC, and PET-specific video and memory configurations.
 - **MOS 6510 CPU (Phase 11.1)**:
     - Implemented `MOS6510 : public MOS6502` in `src/plugins/6502/main/cpu6510.h/cpp`.
     - Built-in 6-bit I/O port at $0000 (DDR) and $0001 (DATA) using a `PortBus` proxy, since `MOS6502::read/write` are private non-virtual.

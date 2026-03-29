@@ -5,12 +5,16 @@ bool C64PLA::ioRead(IBus* /*bus*/, uint32_t addr, uint8_t* val) {
     // KERNAL ROM: $E000–$FFFF  active when HIRAM=1
     // -----------------------------------------------------------------------
     if (addr >= 0xE000 && addr <= 0xFFFF) {
-        if (hiram() && m_kernalRom) {
-            uint32_t off = addr - 0xE000;
-            *val = (off < m_kernalSize) ? m_kernalRom[off] : 0xFF;
-            return true;
+        if (m_ram || m_kernalRom) {
+            if (hiram() && m_kernalRom) {
+                uint32_t off = addr - 0xE000;
+                *val = (off < m_kernalSize) ? m_kernalRom[off] : 0xFF;
+            } else {
+                *val = m_ram ? m_ram[addr & 0xFFFF] : 0x00;
+            }
+            return true;  // always claim — prevents overlay serving ROM when banked out
         }
-        return false; // flat RAM
+        return false;
     }
 
     // -----------------------------------------------------------------------
@@ -25,8 +29,17 @@ bool C64PLA::ioRead(IBus* /*bus*/, uint32_t addr, uint8_t* val) {
                 *val = m_charRom[off];
                 return true;
             }
+            if (!charen() && m_ram) {
+                // Char ROM banked out but no char data — serve flat RAM.
+                *val = m_ram[addr & 0xFFFF];
+                return true;
+            }
             // I/O mode (CHAREN=1): return false so the IORegistry dispatches
             // to the VIC-II / SID / CIA / color-RAM handlers next.
+        } else if (m_ram) {
+            // HIRAM=0: flat RAM visible here.
+            *val = m_ram[addr & 0xFFFF];
+            return true;
         }
         return false;
     }
@@ -35,12 +48,16 @@ bool C64PLA::ioRead(IBus* /*bus*/, uint32_t addr, uint8_t* val) {
     // BASIC ROM: $A000–$BFFF  active when HIRAM=1 && LORAM=1
     // -----------------------------------------------------------------------
     if (addr >= 0xA000 && addr <= 0xBFFF) {
-        if (hiram() && loram() && m_basicRom) {
-            uint32_t off = addr - 0xA000;
-            *val = (off < m_basicSize) ? m_basicRom[off] : 0xFF;
-            return true;
+        if (m_ram || m_basicRom) {
+            if (hiram() && loram() && m_basicRom) {
+                uint32_t off = addr - 0xA000;
+                *val = (off < m_basicSize) ? m_basicRom[off] : 0xFF;
+            } else {
+                *val = m_ram ? m_ram[addr & 0xFFFF] : 0x00;
+            }
+            return true;  // always claim — prevents overlay serving ROM when banked out
         }
-        return false; // flat RAM
+        return false;
     }
 
     return false;

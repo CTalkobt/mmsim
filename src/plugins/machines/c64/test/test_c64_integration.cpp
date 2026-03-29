@@ -207,12 +207,12 @@ TEST_CASE(c64_pla_kernal_routing) {
     bus->write8(0x0001, 0x37); // DATA — LORAM=1, HIRAM=1, CHAREN=1
 
     // The PLA should now intercept reads from $E000 and return from kernalRom[].
-    // Without ROM files the buffer is zero; dispatchRead should return true
-    // (the PLA handler claims the address).
+    // The byte value depends on whether real ROM files are present; just verify
+    // the PLA handler claimed the address (returned true).
     uint8_t val = 0xAB; // sentinel — will be overwritten if PLA responds
     bool claimed = desc->ioRegistry->dispatchRead(bus, 0xE000, &val);
     ASSERT(claimed);        // PLA must have handled the read
-    ASSERT(val == 0x00);    // ROM buffer is zero (no ROM file in test env)
+    ASSERT(val != 0xAB);    // val must have been written by the PLA handler
     destroyDesc(desc);
 }
 
@@ -240,5 +240,84 @@ TEST_CASE(c64_vic2_raster_advance) {
     bool ok = desc->ioRegistry->dispatchRead(bus, 0xD012, &raster);
     ASSERT(ok);
     ASSERT(raster >= 1); // at least one raster line completed
+    destroyDesc(desc);
+}
+
+// ---------------------------------------------------------------------------
+// Test 8: Color RAM — write and read back; upper nibble reads as 0xF, lower
+//         4 bits hold the stored value.
+// ---------------------------------------------------------------------------
+
+TEST_CASE(c64_color_ram) {
+    ensureRegistriesReady();
+    auto* desc = createMachineC64();
+    ASSERT(desc != nullptr);
+    auto* bus = getBus(desc);
+    desc->onReset(*desc);
+
+    // Color RAM is at $D800–$DBFF (1 KB, 4-bit cells).
+    // Write a sentinel value; the handler stores only the lower nibble.
+    bool wok = desc->ioRegistry->dispatchWrite(bus, 0xD800, 0xA5); // store 0x05
+    ASSERT(wok);
+
+    uint8_t val = 0;
+    bool rok = desc->ioRegistry->dispatchRead(bus, 0xD800, &val);
+    ASSERT(rok);
+    ASSERT((val & 0x0F) == 0x05);  // lower nibble preserved
+    ASSERT((val & 0xF0) == 0xF0);  // upper nibble always reads 1s
+
+    // Verify last cell of color RAM is also accessible.
+    bool wok2 = desc->ioRegistry->dispatchWrite(bus, 0xDBFF, 0x3C); // store 0x0C
+    ASSERT(wok2);
+
+    uint8_t val2 = 0;
+    bool rok2 = desc->ioRegistry->dispatchRead(bus, 0xDBFF, &val2);
+    ASSERT(rok2);
+    ASSERT((val2 & 0x0F) == 0x0C);
+    ASSERT((val2 & 0xF0) == 0xF0);
+
+    destroyDesc(desc);
+}
+
+// ---------------------------------------------------------------------------
+// Test 9: Keyboard matrix — press and scan via CIA1 Port A/B.
+//         The C64 KERNAL scans by driving PA (column) low and reading PB (rows).
+// ---------------------------------------------------------------------------
+
+TEST_CASE(c64_keyboard_scan) {
+    ensureRegistriesReady();
+    auto* desc = createMachineC64();
+    ASSERT(desc != nullptr);
+    auto* bus = getBus(desc);
+    desc->onReset(*desc);
+    ASSERT(desc->onKey != nullptr);
+
+    // Press "a" — PA1 column (PB2 row): pair {pb=2, pa=1}.
+    bool found = desc->onKey("a", true);
+    ASSERT(found);
+
+    // Simulate KERNAL scan: set DDRA=0xFF (all outputs), write col-select to PA.
+    desc->ioRegistry->dispatchWrite(bus, 0xDC02, 0xFF); // DDRA = all outputs
+    desc->ioRegistry->dispatchWrite(bus, 0xDC00, ~0x02 & 0xFF); // select PA1 low
+
+    // Read PB ($DC01): PB2 (bit 2) must be low (key pressed).
+    uint8_t pb = 0xFF;
+    bool ok = desc->ioRegistry->dispatchRead(bus, 0xDC01, &pb);
+    ASSERT(ok);
+    ASSERT(!(pb & 0x04)); // PB2 = bit 2 must be 0 (pressed)
+
+    // All other columns: select a column where "a" is NOT present → all rows high.
+    desc->ioRegistry->dispatchWrite(bus, 0xDC00, ~0x01 & 0xFF); // select PA0
+    uint8_t pb0 = 0;
+    desc->ioRegistry->dispatchRead(bus, 0xDC01, &pb0);
+    ASSERT(pb0 == 0xFF); // no key in PA0 column pressed
+
+    // Release "a" and verify row returns high.
+    desc->onKey("a", false);
+    desc->ioRegistry->dispatchWrite(bus, 0xDC00, ~0x02 & 0xFF); // select PA1 again
+    uint8_t pb_rel = 0;
+    desc->ioRegistry->dispatchRead(bus, 0xDC01, &pb_rel);
+    ASSERT(pb_rel == 0xFF); // no keys pressed → all rows high
+
     destroyDesc(desc);
 }
