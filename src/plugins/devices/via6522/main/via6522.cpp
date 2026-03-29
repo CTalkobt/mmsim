@@ -14,7 +14,13 @@ void VIA6522::reset() {
     m_t1Active = false;
     m_t2Counter = 0;
     m_t2Active = false;
+    m_ca1Prev = true;
+    m_ca2Prev = true;
+    m_cb1Prev = true;
+    m_cb2Prev = true;
     if (m_irqLine) m_irqLine->set(false);
+    driveCA2(true);
+    driveCB2(true);
 }
 
 bool VIA6522::ioRead(IBus* bus, uint32_t addr, uint8_t* val) {
@@ -30,8 +36,17 @@ bool VIA6522::ioRead(IBus* bus, uint32_t addr, uint8_t* val) {
                 uint8_t pins = m_portADevice->readPort();
                 *val = (m_regs[ORA] & m_regs[DDRA]) | (pins & ~m_regs[DDRA]);
             }
-            // Handshake normally clears CA1 if ORA is read, but IORA2 doesn't.
-            if (reg == ORA) m_regs[IFR] &= ~0x02; // Placeholder for CA1
+            if (reg == ORA) {
+                m_regs[IFR] &= ~0x02; // Clear CA1 flag
+                // Clear CA2 flag if CA2 is input in non-independent mode (PCR[3]=0, PCR[1]=0)
+                if (!(m_regs[PCR] & 0x08) && !(m_regs[PCR] & 0x02))
+                    m_regs[IFR] &= ~0x01;
+                // Drive CA2 for handshake/pulse output modes
+                uint8_t ca2mode = (m_regs[PCR] >> 1) & 0x07;
+                if      (ca2mode == 0x04) driveCA2(false);                     // handshake: assert
+                else if (ca2mode == 0x05) { driveCA2(false); driveCA2(true); } // pulse
+                updateIrq();
+            }
             break;
 
         case ORB:
@@ -40,7 +55,16 @@ bool VIA6522::ioRead(IBus* bus, uint32_t addr, uint8_t* val) {
                 uint8_t pins = m_portBDevice->readPort();
                 *val = (m_regs[ORB] & m_regs[DDRB]) | (pins & ~m_regs[DDRB]);
             }
-            m_regs[IFR] &= ~0x10; // Placeholder for CB1
+            m_regs[IFR] &= ~0x10; // Clear CB1 flag
+            // Clear CB2 flag if CB2 is input in non-independent mode (PCR[7]=0, PCR[5]=0)
+            if (!(m_regs[PCR] & 0x80) && !(m_regs[PCR] & 0x20))
+                m_regs[IFR] &= ~0x08;
+            {
+                uint8_t cb2mode = (m_regs[PCR] >> 5) & 0x07;
+                if      (cb2mode == 0x04) driveCB2(false);
+                else if (cb2mode == 0x05) { driveCB2(false); driveCB2(true); }
+            }
+            updateIrq();
             break;
 
         case T1CL:
@@ -84,13 +108,29 @@ bool VIA6522::ioWrite(IBus* bus, uint32_t addr, uint8_t val) {
         case IORA2:
             m_regs[ORA] = val;
             if (m_portADevice) m_portADevice->writePort(val);
-            if (reg == ORA) m_regs[IFR] &= ~0x02; // Placeholder for CA1
+            if (reg == ORA) {
+                m_regs[IFR] &= ~0x02; // Clear CA1 flag
+                if (!(m_regs[PCR] & 0x08) && !(m_regs[PCR] & 0x02))
+                    m_regs[IFR] &= ~0x01;
+                uint8_t ca2mode = (m_regs[PCR] >> 1) & 0x07;
+                if      (ca2mode == 0x04) driveCA2(false);
+                else if (ca2mode == 0x05) { driveCA2(false); driveCA2(true); }
+                updateIrq();
+            }
             break;
 
         case ORB:
             m_regs[ORB] = val;
             if (m_portBDevice) m_portBDevice->writePort(val);
-            m_regs[IFR] &= ~0x10; // Placeholder for CB1
+            m_regs[IFR] &= ~0x10; // Clear CB1 flag
+            if (!(m_regs[PCR] & 0x80) && !(m_regs[PCR] & 0x20))
+                m_regs[IFR] &= ~0x08;
+            {
+                uint8_t cb2mode = (m_regs[PCR] >> 5) & 0x07;
+                if      (cb2mode == 0x04) driveCB2(false);
+                else if (cb2mode == 0x05) { driveCB2(false); driveCB2(true); }
+            }
+            updateIrq();
             break;
 
         case DDRA:
@@ -148,6 +188,19 @@ bool VIA6522::ioWrite(IBus* bus, uint32_t addr, uint8_t val) {
             updateIrq();
             break;
 
+        case PCR:
+            m_regs[PCR] = val;
+            // For manual output modes, drive the line immediately.
+            {
+                uint8_t ca2mode = (val >> 1) & 0x07;
+                if      (ca2mode == 0x06) driveCA2(false); // manual low
+                else if (ca2mode == 0x07) driveCA2(true);  // manual high
+                uint8_t cb2mode = (val >> 5) & 0x07;
+                if      (cb2mode == 0x06) driveCB2(false);
+                else if (cb2mode == 0x07) driveCB2(true);
+            }
+            break;
+
         default:
             m_regs[reg] = val;
             break;
@@ -155,7 +208,65 @@ bool VIA6522::ioWrite(IBus* bus, uint32_t addr, uint8_t val) {
     return true;
 }
 
+void VIA6522::driveCA2(bool level) {
+    if (m_ca2Line) m_ca2Line->set(level);
+}
+
+void VIA6522::driveCB2(bool level) {
+    if (m_cb2Line) m_cb2Line->set(level);
+}
+
 void VIA6522::tick(uint64_t cycles) {
+    // CA1 input edge detection → IFR bit 1; in CA2 handshake mode, active CA1 releases CA2
+    if (m_ca1Line) {
+        bool lvl = m_ca1Line->get();
+        bool activeEdge = (m_regs[PCR] & 0x01) ? (!m_ca1Prev && lvl)  // positive edge
+                                                : (m_ca1Prev && !lvl); // negative edge
+        if (activeEdge) {
+            m_regs[IFR] |= 0x02;
+            if ((m_regs[PCR] & 0x0E) == 0x08) driveCA2(true); // handshake: release
+            updateIrq();
+        }
+        m_ca1Prev = lvl;
+    }
+
+    // CA2 input edge detection → IFR bit 0 (only when CA2 is configured as input)
+    if (m_ca2Line && !(m_regs[PCR] & 0x08)) {
+        bool lvl = m_ca2Line->get();
+        bool activeEdge = (m_regs[PCR] & 0x04) ? (!m_ca2Prev && lvl)
+                                                : (m_ca2Prev && !lvl);
+        if (activeEdge) {
+            m_regs[IFR] |= 0x01;
+            updateIrq();
+        }
+        m_ca2Prev = lvl;
+    }
+
+    // CB1 input edge detection → IFR bit 4; in CB2 handshake mode, active CB1 releases CB2
+    if (m_cb1Line) {
+        bool lvl = m_cb1Line->get();
+        bool activeEdge = (m_regs[PCR] & 0x10) ? (!m_cb1Prev && lvl)
+                                                : (m_cb1Prev && !lvl);
+        if (activeEdge) {
+            m_regs[IFR] |= 0x10;
+            if ((m_regs[PCR] & 0xE0) == 0x80) driveCB2(true); // handshake: release
+            updateIrq();
+        }
+        m_cb1Prev = lvl;
+    }
+
+    // CB2 input edge detection → IFR bit 3 (only when CB2 is configured as input)
+    if (m_cb2Line && !(m_regs[PCR] & 0x80)) {
+        bool lvl = m_cb2Line->get();
+        bool activeEdge = (m_regs[PCR] & 0x40) ? (!m_cb2Prev && lvl)
+                                                : (m_cb2Prev && !lvl);
+        if (activeEdge) {
+            m_regs[IFR] |= 0x08;
+            updateIrq();
+        }
+        m_cb2Prev = lvl;
+    }
+
     // Tick Timer 1
     if (m_t1Active) {
         uint16_t prev = m_t1Counter;

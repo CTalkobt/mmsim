@@ -33,6 +33,10 @@ public:
     void setPortADevice(IPortDevice* device) { m_portADevice = device; }
     void setPortBDevice(IPortDevice* device) { m_portBDevice = device; }
     void setIrqLine(ISignalLine* line) { m_irqLine = line; }
+    void setCA1Line(ISignalLine* line)  { m_ca1Line = line; }
+    void setCA2Line(ISignalLine* line)  { m_ca2Line = line; }
+    void setCB1Line(ISignalLine* line)  { m_cb1Line = line; }
+    void setCB2Line(ISignalLine* line)  { m_cb2Line = line; }
 
     // Register constants
     enum Reg {
@@ -56,12 +60,14 @@ public:
 
 private:
     void updateIrq();
+    void driveCA2(bool level);
+    void driveCB2(bool level);
 
     std::string m_name;
     uint32_t    m_baseAddr;
 
     uint8_t m_regs[16];
-    
+
     // Latches for Timer 1
     uint16_t m_t1Latch = 0;
     uint16_t m_t1Counter = 0;
@@ -73,5 +79,14 @@ private:
 
     IPortDevice* m_portADevice = nullptr;
     IPortDevice* m_portBDevice = nullptr;
-    ISignalLine* m_irqLine = nullptr;
+    ISignalLine* m_irqLine  = nullptr;
+    ISignalLine* m_ca1Line  = nullptr;  // CA1 input
+    ISignalLine* m_ca2Line  = nullptr;  // CA2 input/output (depends on PCR)
+    ISignalLine* m_cb1Line  = nullptr;  // CB1 input
+    ISignalLine* m_cb2Line  = nullptr;  // CB2 input/output (depends on PCR)
+
+    bool m_ca1Prev = true;  // last sampled CA1 level
+    bool m_ca2Prev = true;
+    bool m_cb1Prev = true;
+    bool m_cb2Prev = true;
 };

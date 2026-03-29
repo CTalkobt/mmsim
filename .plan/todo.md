@@ -309,7 +309,7 @@ The VIC-20 has two VIA chips. One implementation services both.
 - [x] Timer 1: continuous / one-shot mode; underflow sets IFR bit 6; triggers IRQ via `ISignalLine`.
 - [x] Timer 2: one-shot pulse count; underflow sets IFR bit 5.
 - [x] Port A / Port B: reads consult an injected `IPortDevice*`; DDR masks applied correctly. Unconnected pins read as 1.
-- [ ] CB2 / CA2 handshake lines via `ISignalLine`.
+- [x] CB2 / CA2 handshake lines via `ISignalLine`.
 - [x] `tick(cycles)` updates timer counters and fires interrupts.
 - [x] `reset()` clears all registers to power-on state.
 - [x] `IOHandler` interface: responds to 16-byte window, mirrored across the VIA's aliased address range.
