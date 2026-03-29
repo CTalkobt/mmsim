@@ -666,22 +666,22 @@ the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 
 ### Phase 12.2: MOS 6545/6845 CRTC (`src/plugins/devices/crtc6545/`)
 
-- [ ] Implement `CRTC6545 : public IOHandler`.
-- [ ] Register-based interface: Address Register ($E880) and Data Register ($E881).
-- [ ] 18 internal registers for screen timing (H-sync, V-sync, Interlace, etc.).
-- [ ] Address generation for character memory and row/column counting.
-- [ ] Support for both 40-column and 80-column PET models via register configuration.
-- [ ] `tick(cycles)`: internal counters for horizontal and vertical sync pulses.
+- [x] Implement `CRTC6545 : public IOHandler`.
+- [x] Register-based interface: Address Register ($E880) and Data Register ($E881).
+- [x] 18 internal registers for screen timing (H-sync, V-sync, Interlace, etc.).
+- [x] Address generation for character memory and row/column counting.
+- [x] Support for both 40-column and 80-column PET models via register configuration.
+- [x] `tick(cycles)`: internal counters for horizontal and vertical sync pulses.
 
 ### Phase 12.3: PET Video Subsystem (`src/plugins/devices/pet_video/`)
 
-- [ ] Implement `PetVideo` inheriting from `IVideoOutput`.
-- [ ] **Discrete logic model (2001)**: Simulate basic timing logic used before the CRTC was introduced.
-- [ ] **CRTC model (4000/8000)**: Interface with `CRTC6545` for address generation.
-- [ ] Character ROM mapping: Support for Graphics (lower/upper) and Business 
+- [x] Implement `PetVideo` inheriting from `IVideoOutput`.
+- [x] **Discrete logic model (2001)**: Simulate basic timing logic used before the CRTC was introduced.
+- [x] **CRTC model (4000/8000)**: Interface with `CRTC6545` for address generation.
+- [x] Character ROM mapping: Support for Graphics (lower/upper) and Business 
       (lower/upper) character sets.
-- [ ] **Video RAM Overlay**: Map $8000–$87FF (2 KB) using `FlatMemoryBus::addOverlay`.
-- [ ] `renderFrame()`: produces RGBA buffer from PET character memory and 
+- [x] **Video RAM Overlay**: Map $8000–$87FF (2 KB) using `FlatMemoryBus::addOverlay`.
+- [x] `renderFrame()`: produces RGBA buffer from PET character memory and 
       attributes. Supports "Green" or "Amber" phosphor simulation.
 
 ### Phase 12.4: IEEE-488 Bus Implementation (`src/libdevices/ieee488.h/cpp`)

@@ -23,6 +23,10 @@ All notable changes to this project will be documented in this file.
 - **Bus Overlay API Enhancements**:
     - Added `addRomOverlay` and `removeRomOverlay` to the `IBus` interface.
     - Implemented these methods in `FlatMemoryBus` to support dynamic cartridge attachment and ejection.
+- **Commodore PET Video (Phases 12.2, 12.3)**:
+    - Implemented MOS 6545 / 6845 CRTC emulation with full timing counters and address generation.
+    - Implemented PET Video Subsystem supporting PET 2001, 4000, and 8000 series.
+    - Added support for character ROM glyph rendering, inverse video, and phosphor simulation.
 - **Tape (Datasette) Support (Phase 14)**:
     - Added a roadmap for .tap pulse-encoded archive support across VIC-20, C64, and PET.
     - Planned core timing-exact decoder and machine-specific signal wiring.

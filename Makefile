@@ -46,7 +46,9 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-sid6581.so \
           $(LIBDIR)/mmemu-plugin-c64.so \
           $(LIBDIR)/mmemu-plugin-pia6520.so \
-          $(LIBDIR)/mmemu-plugin-cbm-loader.so
+          $(LIBDIR)/mmemu-plugin-cbm-loader.so \
+          $(LIBDIR)/mmemu-plugin-crtc6545.so \
+          $(LIBDIR)/mmemu-plugin-pet-video.so
 
 CC       ?= gcc
 CFLAGS   ?= -std=c11 -Wall -Wextra -Wpedantic -O2 -fPIC
@@ -102,7 +104,8 @@ TEST_SRCS = tests/test_main.cpp src/libcore/test/test_libcore.cpp \
             src/plugins/machines/vic20/test/test_vic20_integration.cpp \
             src/plugins/machines/c64/test/test_c64_integration.cpp \
             src/plugins/devices/pia6520/test/test_pia6520.cpp \
-            src/plugins/cbm-loader/test/test_cbm_loader.cpp
+            src/plugins/cbm-loader/test/test_cbm_loader.cpp \
+            src/plugins/devices/pet_video/test/test_pet_video.cpp
 
 # Library Sources
 LIBMEM_SRCS       = src/libmem/main/ibus.cpp src/libmem/main/memory_bus.cpp src/libmem/main/libmem.cpp
@@ -178,6 +181,14 @@ PLUGIN_CBMLOADER_SRCS = src/plugins/cbm-loader/main/prg_loader.cpp \
                         src/plugins/cbm-loader/main/cbm_cart_handler.cpp \
                         src/plugins/cbm-loader/main/plugin_init.cpp
 
+# Plugin CRTC 6545 Sources
+PLUGIN_CRTC6545_SRCS = src/plugins/devices/crtc6545/main/crtc6545.cpp \
+                       src/plugins/devices/crtc6545/main/plugin_init.cpp
+
+# Plugin PET Video Sources
+PLUGIN_PETVIDEO_SRCS = src/plugins/devices/pet_video/main/pet_video.cpp \
+                       src/plugins/devices/pet_video/main/plugin_init.cpp
+
 # Objects
 LIBMEM_OBJS       = $(LIBMEM_SRCS:.cpp=.o)
 LIBCORE_OBJS      = $(LIBCORE_SRCS:.cpp=.o)
@@ -202,11 +213,14 @@ PLUGIN_C64_GUI_OBJS  = $(PLUGIN_C64_GUI_SRCS:.cpp=.o)
 PLUGIN_C64_OBJS      = $(PLUGIN_C64_CORE_OBJS) $(PLUGIN_C64_GUI_OBJS)
 PLUGIN_PIA6520_OBJS  = $(PLUGIN_PIA6520_SRCS:.cpp=.o)
 PLUGIN_CBMLOADER_OBJS = $(PLUGIN_CBMLOADER_SRCS:.cpp=.o)
+PLUGIN_CRTC6545_OBJS = $(PLUGIN_CRTC6545_SRCS:.cpp=.o)
+PLUGIN_PETVIDEO_OBJS = $(PLUGIN_PETVIDEO_SRCS:.cpp=.o)
 
 ALL_LIB_OBJS = $(LIBMEM_OBJS) $(LIBCORE_OBJS) $(LIBDEVICES_OBJS) \
                $(LIBTOOLCHAIN_OBJS) $(LIBDEBUG_OBJS) $(LIBPLUGINS_OBJS) \
                $(PLUGIN_VIA6522_OBJS) $(PLUGIN_VIC6560_OBJS) $(PLUGIN_KBDVIC20_OBJS) \
-               $(PLUGIN_VIC20_OBJS) $(PLUGIN_CBMLOADER_OBJS)
+               $(PLUGIN_VIC20_OBJS) $(PLUGIN_CBMLOADER_OBJS) \
+               $(PLUGIN_CRTC6545_OBJS) $(PLUGIN_PETVIDEO_OBJS)
 
 # ---------------------------------------------------------------------------
 # Ensure clean and build targets run sequentially even with -j
@@ -303,6 +317,12 @@ $(LIBDIR)/mmemu-plugin-pia6520.so: $(PLUGIN_PIA6520_OBJS) | $(LIBDIR)
 $(LIBDIR)/mmemu-plugin-cbm-loader.so: $(PLUGIN_CBMLOADER_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_CBMLOADER_OBJS) $(WXLIBS)
 
+$(LIBDIR)/mmemu-plugin-crtc6545.so: $(PLUGIN_CRTC6545_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_CRTC6545_OBJS) $(WXLIBS)
+
+$(LIBDIR)/mmemu-plugin-pet-video.so: $(PLUGIN_PETVIDEO_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(PLUGIN_PETVIDEO_OBJS) $(WXLIBS)
+
 # ---------------------------------------------------------------------------
 # Binary rules
 # ---------------------------------------------------------------------------
@@ -331,7 +351,9 @@ DEVICE_TEST_OBJS = src/plugins/devices/via6522/main/via6522.o \
                    src/plugins/devices/pia6520/main/pia6520.o \
                    src/plugins/cbm-loader/main/prg_loader.o \
                    src/plugins/cbm-loader/main/crt_parser.o \
-                   src/plugins/cbm-loader/main/cbm_cart_handler.o
+                   src/plugins/cbm-loader/main/cbm_cart_handler.o \
+                   src/plugins/devices/crtc6545/main/crtc6545.o \
+                   src/plugins/devices/pet_video/main/pet_video.o
 
 $(TEST_BIN): $(TEST_SRCS) $(LIBS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -Itests -rdynamic -o $@ $(TEST_SRCS) $(PLUGIN_6502_OBJS) $(DEVICE_TEST_OBJS) $(BASE_LIBS) $(WXLIBS)
@@ -351,7 +373,9 @@ PLUGIN_INCLUDES = -Isrc -Isrc/include \
                   -Isrc/plugins/devices/vic2/main \
                   -Isrc/plugins/devices/sid6581/main \
                   -Isrc/plugins/devices/pia6520/main \
-                  -Isrc/plugins/cbm-loader/main
+                  -Isrc/plugins/cbm-loader/main \
+                  -Isrc/plugins/devices/crtc6545/main \
+                  -Isrc/plugins/devices/pet_video/main
 
 
                   # viceImporter pane sources also need wxWidgets headers
