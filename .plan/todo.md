@@ -301,7 +301,7 @@ devices. No concrete chips yet — those come in Phases 10 and 11.*
 *Goal: A fully bootable VIC-20 simulation. This is the first machine where all
 five libraries are exercised together.*
 
-### Phase 10.1 MOS 6522 VIA (`src/libdevices/devices/via6522.h/cpp`)
+### Phase 10.1 MOS 6522 VIA (`src/plugins/devices/via6522/`)
 
 The VIC-20 has two VIA chips. One implementation services both.
 
@@ -314,7 +314,7 @@ The VIC-20 has two VIA chips. One implementation services both.
 - [x] `reset()` clears all registers to power-on state.
 - [x] `IOHandler` interface: responds to 16-byte window, mirrored across the VIA's aliased address range.
 
-### Phase 10.2 MOS 6560/6561 VIC (`src/libdevices/devices/vic6560.h/cpp`)
+### Phase 10.2 MOS 6560/6561 VIC (`src/plugins/devices/vic6560/`)
 
 *The VIC-I chip used in the VIC-20 (6560 NTSC, 6561 PAL).*
 
@@ -355,7 +355,7 @@ $E000–$FFFF    8 KB   KERNAL ROM
 - [x] Colour RAM as a plain 512-byte array at $9400–$97FF; `FlatMemoryBus` overlay for read/write (4-bit mask on write).
 - [x] `MachineDescriptor` id `"vic20"`, single CPU slot (`MOS6502`), single bus slot (`"system"`).
 - [x] `onReset`: loads ROMs (if not already loaded), resets CPU and all devices.
-- [ ] Register factory with `MachineRegistry::registerMachine("vic20", ...)`.
+- [x] Register factory with `MachineRegistry::registerMachine("vic20", ...)` — all five variants registered via `s_machines[]` in `plugin_init.cpp`; `PluginLoader::registerPluginItems` handles this automatically at plugin load time.
 
 ### Phase 10.4 VIC-20 Peripheral Wiring
 
@@ -655,7 +655,7 @@ The PLA maps the 6510 port bits to ROM/IO visibility in the upper address space.
 *Goal: Implement the Commodore PET series (2001, 3000, 4000, 8000), including 
 the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 
-### Phase 12.1: MOS 6520 PIA (`src/libdevices/devices/pia6520.h/cpp`)
+### Phase 12.1: MOS 6520 PIA (`src/plugins/devices/pia6520/`)
 
 - [ ] Implement `PIA6520 : public IOHandler`.
 - [ ] Dual 8-bit ports (Port A and Port B) with data direction registers.
@@ -664,7 +664,7 @@ the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 - [ ] `reset()` clears all registers and de-asserts interrupt lines.
 - [ ] Snapshot support for registers and line states.
 
-### Phase 12.2: MOS 6545/6845 CRTC (`src/libdevices/devices/crtc6545.h/cpp`)
+### Phase 12.2: MOS 6545/6845 CRTC (`src/plugins/devices/crtc6545/`)
 
 - [ ] Implement `CRTC6545 : public IOHandler`.
 - [ ] Register-based interface: Address Register ($E880) and Data Register ($E881).
@@ -790,7 +790,7 @@ pulse-encoded format for VIC-20, C64, and PET.*
 - [ ] Decoder for pulse timings (converting .tap byte values to CPU cycles).
 - [ ] Support for both Version 0 and Version 1 .tap files.
 
-### Phase 14.2: Datasette Device (`src/libdevices/devices/datasette.h/cpp`)
+### Phase 14.2: Datasette Device (`src/plugins/devices/datasette/`)
 
 - [ ] Implement `Datasette : public ISignalLine` (for the tape pulse output).
 - [ ] Sense line (connected to CPU port bash1 bit 4 on C64): indicates if a button 
@@ -1150,7 +1150,7 @@ physical addresses. See arch.md §3.1 and the `SparseMemoryBus(28)` note.*
 - [ ] `reset()`: deallocates all dynamically allocated pages; pre-mapped regions
       (ROM buffers) remain mapped but intact.
 
-### Phase 19.2 MAP MMU IOHandler (`src/libdevices/devices/map_mmu.h/cpp`)
+### Phase 19.2 MAP MMU IOHandler (`src/plugins/devices/map_mmu/`)
 
 *The MAP MMU sits between the CPU's 16-bit address space and the 28-bit
 `SparseMemoryBus`. It intercepts every CPU read/write and translates.*
@@ -1203,7 +1203,7 @@ physical addresses. See arch.md §3.1 and the `SparseMemoryBus(28)` note.*
 *Goal: VIC-IV, dual SID, F018B DMA controller, and math acceleration registers
 as concrete `IOHandler` implementations.*
 
-### Phase 20.1 VIC-IV (`src/libdevices/devices/vic4.h/cpp`)
+### Phase 20.1 VIC-IV (`src/plugins/devices/vic4/`)
 
 *Extends VIC-II (Phase 11.4). The VIC-IV is backward-compatible at $D000–$D02E;
 new registers are unlocked by the I/O personality at $D030 and above.*
@@ -1255,7 +1255,7 @@ new registers are unlocked by the I/O personality at $D030 and above.*
 - [ ] `tick(cycles)`: drives raster counter; fires raster IRQ.
 - [ ] `ChipRegDescriptor` table: covers all $D000–$D07F registers and palette.
 
-### Phase 20.2 F018B DMA Controller (`src/libdevices/devices/dma_f018b.h/cpp`)
+### Phase 20.2 F018B DMA Controller (`src/plugins/devices/dma_f018b/`)
 
 *The MEGA65's DMA controller is an enhanced version of the C65 F018 chip. It
 supports 28-bit source/destination addresses, chained job lists, and four
@@ -1293,7 +1293,7 @@ operations: copy, fill, swap, and mix.*
 - [ ] `reset()`: clears list address and active flag.
 - [ ] `ChipRegDescriptor` table covering $D700–$D70F.
 
-### Phase 20.3 Math Acceleration Registers (`src/libdevices/devices/math_accel.h/cpp`)
+### Phase 20.3 Math Acceleration Registers (`src/plugins/devices/math_accel/`)
 
 *Hardware multiply and divide completing in a single CPU cycle. Exposed as an
 `IOHandler` at $D770–$D77F.*
@@ -1307,7 +1307,7 @@ operations: copy, fill, swap, and mix.*
 - [ ] `ioRead` / `ioWrite` implement the register semantics; no `tick()` logic
       required (combinatorial hardware model).
 
-### Phase 20.4 Dual SID (`src/libdevices/devices/sid_pair.h/cpp`)
+### Phase 20.4 Dual SID (`src/plugins/devices/sid_pair/`)
 
 - [ ] Thin wrapper that instantiates two `SID6581` objects (Phase 11.5) at
       $D400–$D41F (SID1) and $D420–$D43F (SID2).
@@ -1548,7 +1548,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
 
 *Goal: Implement the TED-based Commodore machines (C16, C116, Plus/4).*
 
-### Phase 25.1: MOS 7360 / 8360 TED (`src/libdevices/devices/ted7360.h/cpp`)
+### Phase 25.1: MOS 7360 / 8360 TED (`src/plugins/devices/ted7360/`)
 
 - [ ] Implement `TED7360 : public IOHandler`.
 - [ ] **Register File**: 64 registers ($FF00–$FF3F) controlling video, sound, 
@@ -1583,7 +1583,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
     - Horizontal and vertical smooth scrolling.
 - [ ] `renderFrame()`: produces RGBA buffer using TED registers and memory.
 
-### Phase 25.3: MOS 6551 ACIA (`src/libdevices/devices/acia6551.h/cpp`)
+### Phase 25.3: MOS 6551 ACIA (`src/plugins/devices/acia6551/`)
 
 - [ ] Implement `ACIA6551 : public IOHandler` at $FD00.
 - [ ] **Registers**: Control, Command, Status, and Data.
@@ -1614,7 +1614,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
 
 *Goal: Cycle-accurate emulation of the ANTIC, GTIA, and POKEY trio.*
 
-### Phase 26.1: ANTIC DMA Engine (`src/libdevices/devices/antic.h/cpp`)
+### Phase 26.1: ANTIC DMA Engine (`src/plugins/devices/antic/`)
 
 - [ ] Implement `ANTIC : public IOHandler`.
 - [ ] **Display List Interpreter**:
@@ -1628,7 +1628,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
 - [ ] **NMI Generation**: Vertical Blank Interrupt (VBI) and Display List 
       Interrupt (DLI).
 
-### Phase 26.2: GTIA Color and PMG (`src/libdevices/devices/gtia.h/cpp`)
+### Phase 26.2: GTIA Color and PMG (`src/plugins/devices/gtia/`)
 
 - [ ] Implement `GTIA : public IOHandler`.
 - [ ] **Color Palette**:
@@ -1640,7 +1640,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
     - Collision detection registers ($D000–$D00F).
 - [ ] **Console Switches**: Read Start, Select, Option buttons via $D01F.
 
-### Phase 26.3: POKEY Audio and IO (`src/libdevices/devices/pokey.h/cpp`)
+### Phase 26.3: POKEY Audio and IO (`src/plugins/devices/pokey/`)
 
 - [ ] Implement `POKEY : public IOHandler`.
 - [ ] **Audio Subsystem**:
@@ -1682,7 +1682,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
 
 *Goal: Ultra-lean scanline-based architecture requiring perfect timing.*
 
-### Phase 27.1: TIA Video and Audio (`src/libdevices/devices/tia.h/cpp`)
+### Phase 27.1: TIA Video and Audio (`src/plugins/devices/tia/`)
 
 - [ ] Implement `TIA : public IOHandler`.
 - [ ] **Scanline Engine**:
@@ -1696,7 +1696,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
     - 5-bit frequency, 4-bit volume, 4-bit waveform.
 - [ ] **Input**: Paddle and joystick button latching.
 
-### Phase 27.2: RIOT 6532 (`src/libdevices/devices/riot6532.h/cpp`)
+### Phase 27.2: RIOT 6532 (`src/plugins/devices/riot6532/`)
 
 - [ ] Implement `RIOT6532 : public IOHandler`.
 - [ ] **RAM**: 128 bytes of built-in RAM.
@@ -1749,7 +1749,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
     - Apple II colors (NTSC artifacting model for Hi-Res).
     - Support for 40/80-column and Double-Hi-Res on IIe/IIc models.
 
-### Phase 28.2: Disk II Controller (`src/libdevices/devices/disk2.h/cpp`)
+### Phase 28.2: Disk II Controller (`src/plugins/devices/disk2/`)
 
 - [ ] Implement `Disk2Controller : public IOHandler` at $C0E0–$C0EF.
 - [ ] **State Machine**: Implement the 8-state stepper motor phases.
@@ -1759,7 +1759,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
     - Shift-register emulation for read/write.
 - [ ] **Disk Image Support**: Implement a simple `.dsk` to GCR converter.
 
-### Phase 28.3: Apple IIe/IIc MMU (`src/libdevices/devices/apple2e_mmu.h/cpp`)
+### Phase 28.3: Apple IIe/IIc MMU (`src/plugins/devices/apple2e_mmu/`)
 
 - [ ] Implement `Apple2eMMU : public IOHandler`.
 - [ ] **Auxiliary RAM Banking**: Map a 64 KB auxiliary bank for 128 KB systems.
@@ -1809,7 +1809,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
     - Support for Teletext attributes (double height, flash, alphanumeric/graphic).
 - [ ] **Video RAM**: Dynamic mapping depending on mode (e.g., Mode 0–2 uses 20KB).
 
-### Phase 29.2: System and User VIAs (`src/libdevices/devices/bbc_vias.h/cpp`)
+### Phase 29.2: System and User VIAs (`src/plugins/machines/bbc/`)
 
 - [ ] Instantiate two `MOS6522` objects (Phase 10.1).
 - [ ] **System VIA ($FE40)**:
@@ -1822,7 +1822,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
     - ADC control.
 - [ ] **SN76489 PSG**: 3-channel square wave + noise sound chip.
 
-### Phase 29.3: The Tube Interface (`src/libdevices/devices/bbc_tube.h/cpp`)
+### Phase 29.3: The Tube Interface (`src/plugins/devices/bbc_tube/`)
 
 - [ ] Implement `BBCTube : public IOHandler` at $FEE0–$FEE7.
 - [ ] **Communication Protocol**: Implement the 8-bit bidirectional data 
@@ -1861,7 +1861,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
 
 *Goal: Tile-based rendering and the classic 5-channel sound.*
 
-### Phase 30.1: Ricoh 2C02 PPU (`src/libdevices/devices/ppu2c02.h/cpp`)
+### Phase 30.1: Ricoh 2C02 PPU (`src/plugins/devices/ppu2c02/`)
 
 - [ ] Implement `PPU2C02 : public IOHandler`.
 - [ ] **Register Interface**: $2000–$2007 (Ctrl, Mask, Status, OAMAddr, 
@@ -1875,7 +1875,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
     - Handle vertical and horizontal mirroring.
 - [ ] **Interrupts**: VBlank NMI.
 
-### Phase 30.2: Ricoh 2A03 APU (`src/libdevices/devices/apu2a03.h/cpp`)
+### Phase 30.2: Ricoh 2A03 APU (`src/plugins/devices/apu2a03/`)
 
 - [ ] Implement `APU2A03 : public IOHandler`.
 - [ ] **Sound Channels**:
@@ -1932,7 +1932,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
     - 8 DMA channels for block transfers.
     - Horizontal-blank DMA (HDMA) for per-scanline register updates.
 
-### Phase 31.2: SNES PPU1 and PPU2 (`src/libdevices/devices/snes_ppus.h/cpp`)
+### Phase 31.2: SNES PPU1 and PPU2 (`src/plugins/devices/snes_ppus/`)
 
 - [ ] Implement `SNES_PPUs : public IVideoOutput, public IOHandler`.
 - [ ] **Tile Modes (0-7)**:
@@ -1942,7 +1942,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
 - [ ] **Color Math**: Master Brightness and color addition/subtraction.
 - [ ] **Sprites (OBJ)**: 128 sprites, sizes from 8x8 up to 64x64.
 
-### Phase 31.3: SNES APU (SPC700 + DSP) (`src/libdevices/devices/snes_apu.h/cpp`)
+### Phase 31.3: SNES APU (SPC700 + DSP) (`src/plugins/devices/snes_apu/`)
 
 - [ ] Implement `SPC700` class inheriting from `ICore`.
 - [ ] **Sony DSP**:
@@ -1993,7 +1993,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
     - PSG: 16 channels of programmable waveforms (pulse, sawtooth, noise).
 - [ ] **SPI Controller**: Interaction with SD card via VERA registers.
 
-### Phase 32.2: YM2151 OPM Sound (`src/libdevices/devices/ym2151.h/cpp`)
+### Phase 32.2: YM2151 OPM Sound (`src/plugins/devices/ym2151/`)
 
 - [ ] Implement `YM2151 : public IOHandler` at $9F40.
 - [ ] **FM Synthesis**:

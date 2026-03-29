@@ -33,15 +33,14 @@ Plugins that implement `MachineDescriptor` factories to compose CPUs and Devices
 
 | Plugin File | Description | Documentation |
 |-------------|-------------|---------------|
-| `lib/mmemu-plugin-vic20.so` | Commodore VIC-20 Machine Configuration. | [README-VIC20.md](README-VIC20.md) |
-
-> **Note**: The Commodore 64 machine plugin (`mmemu-plugin-c64.so`) is planned for Phase 11.6.
+| `lib/mmemu-plugin-vic20.so` | Commodore VIC-20 (stock and +3K/+8K/+16K/+32K RAM expansions). | [README-VIC20.md](README-VIC20.md) |
+| `lib/mmemu-plugin-c64.so` | Commodore 64 — 6510, VIC-II, dual CIA, SID, PLA banking. | [README-C64.md](README-C64.md) |
 
 ---
 
 ## 4. Distribution Strategy
 The `lib/` directory is standardized to contain only the dynamic plugins (`.so` files) listed above. This allows for conditional distribution:
 - **Core Only**: Ship only the host binaries.
-- **VIC-20 Support**: Include the 6502, 6522, 6560, kbd-vic20, and vic20 plugins.
-- **C64 Support**: Include the 6502 (with 6510), c64-pla, cia6526, vic2, sid6581, and c64 plugins.
+- **VIC-20 Support**: Include the 6502, 6522, 6560, kbd-vic20, and vic20 plugins. Registers machine IDs `vic20`, `vic20+3k`, `vic20+8k`, `vic20+16k`, `vic20+32k`.
+- **C64 Support**: Include the 6502 (with 6510), c64-pla, cia6526, vic2, sid6581, and c64 plugins. Registers machine ID `c64`.
 - **Developer Tools**: All static libraries and debug symbols are kept in `lib/internal/` and are not required for standard distribution.
