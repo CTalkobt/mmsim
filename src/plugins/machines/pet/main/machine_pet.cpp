@@ -192,9 +192,11 @@ MachineDescriptor* createPetMachine(Model model) {
     pm->kbdSelector = new KbdRowSelector(pm->kbd);
 
     // PIA1 Wiring
-    pm->pia1->setPortADevice(pm->kbdReader);
+    // Port A bits 3:0 = keyboard row select (output to 74145 decoder, ROM writes F0-F9)
+    // Port B bits 7:0 = keyboard column data (input from matrix)
+    pm->pia1->setPortADevice(pm->kbdSelector);
     pm->pia1->setPortAWriteCallback([pm](uint8_t val) { pm->ieee->setData(~val); });
-    pm->pia1->setPortBDevice(pm->kbdSelector);
+    pm->pia1->setPortBDevice(pm->kbdReader);
 
     // PIA2 Wiring: IEEE Control Signals
     pm->pia2->setPortAWriteCallback([pm](uint8_t val) {

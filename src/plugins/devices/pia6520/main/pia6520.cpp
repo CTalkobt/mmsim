@@ -109,9 +109,13 @@ bool PIA6520::ioRead(IBus*, uint32_t addr, uint8_t* val) {
                 } else {
                     *val = m_ora;
                 }
+                if (m_logger && m_logNamed && *val != 0xFF) {
+                    char buf[40]; snprintf(buf, sizeof(buf), "ioRead ORA: %02X (orb=%02X)", *val, m_orb);
+                    m_logNamed(m_logger, SIM_LOG_DEBUG, buf);
+                }
                 // Handshake: read ORA drives CA2 low if in mode 100
                 if ((m_cra & 0x38) == 0x20) driveCA2(false);
-                
+
                 m_cra &= ~0x80;
                 if (!(m_cra & 0x20)) m_cra &= ~0x40;
                 updateIrq();
@@ -173,6 +177,10 @@ bool PIA6520::ioWrite(IBus*, uint32_t addr, uint8_t val) {
                 m_orb = val;
                 if (m_portBDevice) m_portBDevice->writePort(val);
                 if (m_portBWriteCb) m_portBWriteCb(val);
+                if (m_logger && m_logNamed) {
+                    char buf[32]; snprintf(buf, sizeof(buf), "ioWrite ORB: %02X", val);
+                    m_logNamed(m_logger, SIM_LOG_DEBUG, buf);
+                }
                 // Handshake: write ORB drives CB2 low if in mode 100
                 if ((m_crb & 0x38) == 0x20) driveCB2(false);
 

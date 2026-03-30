@@ -36,40 +36,59 @@
 // the key has no VIC-20 equivalent.  Handles both upper and lower case
 // letter codes since wxGTK may return either.
 // ---------------------------------------------------------------------------
+// Maps PC key code to emulated key name for unshifted keys.
+// Shift key is handled separately in KeyboardCaptureFilter.
 static std::string wxKeyToVic20Name(int code) {
     if (code >= 'A' && code <= 'Z') return std::string(1, (char)('a' + code - 'A'));
     if (code >= 'a' && code <= 'z') return std::string(1, (char)code);
     if (code >= '0' && code <= '9') return std::string(1, (char)code);
     switch (code) {
-        case WXK_SPACE:   return "space";
-        case WXK_RETURN:  return "return";
-        case WXK_CONTROL: return "control";
-        case WXK_SHIFT:   return "left_shift";
-        case WXK_UP:      return "up";
-        case WXK_DOWN:    return "down";
-        case WXK_LEFT:    return "left";
-        case WXK_RIGHT:   return "right";
-        case WXK_HOME:    return "home";
+        case WXK_SPACE:            return "space";
+        case WXK_RETURN:           return "return";
+        case WXK_CONTROL:          return "control";
+        case WXK_UP:               return "up";
+        case WXK_DOWN:             return "down";
+        case WXK_LEFT:             return "left";
+        case WXK_RIGHT:            return "right";
+        case WXK_HOME:             return "home";
         case WXK_DELETE:
-        case WXK_BACK:    return "delete";
-        case WXK_ESCAPE:  return "run_stop";
+        case WXK_BACK:             return "delete";
+        case WXK_ESCAPE:           return "run_stop";
+        case WXK_TAB:              return "tab";
         // PC F1/F3/F5/F7 map to VIC-20 physical function keys.
-        // Shift+F1 naturally generates left_shift+f1 → VIC-20 F2.
-        case WXK_F1:      return "f1";
-        case WXK_F3:      return "f3";
-        case WXK_F5:      return "f5";
-        case WXK_F7:      return "f7";
-        // Punctuation (ASCII values passed through by wxEVT_KEY_DOWN)
-        case ';':  return "semicolon";
-        case '=':  return "equal";
-        case '-':  return "minus";
-        case ',':  return "comma";
-        case '.':  return "period";
-        case '/':  return "slash";
-        case '@':  return "at";
-        case '[':  return "bracket_left";
-        case ']':  return "bracket_right";
-        default:   return {};
+        case WXK_F1:               return "f1";
+        case WXK_F3:               return "f3";
+        case WXK_F5:               return "f5";
+        case WXK_F7:               return "f7";
+        // Punctuation — unshifted only; shifted combos handled by shiftedPetKey()
+        case ';':                  return "semicolon";
+        case '=':                  return "kpeq";       // PET = key (row 9)
+        case '-':                  return "minus";
+        case ',':                  return "comma";
+        case '.':                  return "period";
+        case '/':                  return "slash";
+        case '@':                  return "at";
+        case '[':                  return "bracket_left";
+        case ']':                  return "bracket_right";
+        case '\'':                 return "squote";     // PET dedicated ' key
+        // Numpad — map to same matrix positions as main keys
+        case WXK_NUMPAD0:          return "0";
+        case WXK_NUMPAD1:          return "1";
+        case WXK_NUMPAD2:          return "2";
+        case WXK_NUMPAD3:          return "3";
+        case WXK_NUMPAD4:          return "4";
+        case WXK_NUMPAD5:          return "5";
+        case WXK_NUMPAD6:          return "6";
+        case WXK_NUMPAD7:          return "7";
+        case WXK_NUMPAD8:          return "8";
+        case WXK_NUMPAD9:          return "9";
+        case WXK_NUMPAD_ADD:       return "plus";
+        case WXK_NUMPAD_SUBTRACT:  return "minus";
+        case WXK_NUMPAD_MULTIPLY:  return "asterisk";
+        case WXK_NUMPAD_DIVIDE:    return "slash";
+        case WXK_NUMPAD_DECIMAL:   return "period";
+        case WXK_NUMPAD_ENTER:     return "return";
+        default:                   return {};
     }
 }
 
@@ -127,6 +146,11 @@ private:
  * We intercept wxEVT_CHAR_HOOK (the first keyboard event fired, before
  * accelerators) for key press, and wxEVT_KEY_UP for key release.
  * Ctrl+Shift+K is explicitly passed through so the frame toggle still works.
+ *
+ * Shift suppression: the PET has dedicated unshifted keys for many symbols that
+ * require Shift on a PC keyboard (e.g. PC Shift+1 = PET '!' key, no shift).
+ * We buffer the shift key and only forward it to the emulator if the next key
+ * press does NOT map to one of those dedicated PET keys.
  */
 class KeyboardCaptureFilter : public wxEventFilter {
 public:
@@ -134,28 +158,120 @@ public:
         if (!m_handler) return Event_Skip;
 
         const wxEventType t = event.GetEventType();
-        if (t == wxEVT_CHAR_HOOK || t == wxEVT_KEY_UP) {
-            auto& key = static_cast<wxKeyEvent&>(event);
-            // Always pass Ctrl+Shift+K through so OnCtrlShiftK can handle it.
-            if (key.GetKeyCode() == 'K' && key.ControlDown() && key.ShiftDown())
-                return Event_Skip;
-            std::string name = wxKeyToVic20Name(key.GetKeyCode());
-            if (!name.empty()) {
-                bool down = (t == wxEVT_CHAR_HOOK);
-                if (m_logger) {
-                    char buf[80];
-                    snprintf(buf, sizeof(buf), "key%s: %s", down ? "Down" : "Up", name.c_str());
-                    m_logger->debug(buf);
-                }
-                m_handler(name, down);
-                return Event_Processed;
+        if (t != wxEVT_CHAR_HOOK && t != wxEVT_KEY_UP)
+            return Event_Skip;
+
+        auto& key = static_cast<wxKeyEvent&>(event);
+        // Always pass Ctrl+Shift+K through so OnCtrlShiftK can handle it.
+        if (key.GetKeyCode() == 'K' && key.ControlDown() && key.ShiftDown())
+            return Event_Skip;
+
+        bool down = (t == wxEVT_CHAR_HOOK);
+        int  code = key.GetKeyCode();
+
+        // --- Shift key: buffer rather than forward immediately ---
+        if (code == WXK_SHIFT) {
+            if (down) {
+                m_shiftPending = true;
+            } else {
+                // On release: always clear pending flag and send shift-up
+                // (idempotent if shift was never forwarded).
+                m_shiftPending = false;
+                logKey("left_shift", false);
+                m_handler("left_shift", false);
             }
+            return Event_Processed;
         }
+
+        // --- Check if Shift+key maps to a PET dedicated (unshifted) key ---
+        std::string dedicated;
+        if (m_shiftPending || key.ShiftDown())
+            dedicated = shiftedPetKey(code);
+
+        if (!dedicated.empty()) {
+            // Consume the buffered shift — the PET dedicated key needs no shift.
+            m_shiftPending = false;
+            logKey(dedicated, down);
+            m_handler(dedicated, down);
+            return Event_Processed;
+        }
+
+        // --- Regular key: flush any pending shift first, then forward ---
+        std::string name = wxKeyToVic20Name(code);
+        if (!name.empty()) {
+            if (m_shiftPending && down) {
+                logKey("left_shift", true);
+                m_handler("left_shift", true);
+                m_shiftPending = false;
+            }
+            logKey(name, down);
+            m_handler(name, down);
+            return Event_Processed;
+        }
+
         return Event_Skip;
     }
 
     std::function<bool(const std::string&, bool)> m_handler;
     std::shared_ptr<spdlog::logger> m_logger;
+
+private:
+    bool m_shiftPending = false;
+
+    void logKey(const std::string& name, bool down) {
+        if (m_logger) {
+            char buf[80];
+            snprintf(buf, sizeof(buf), "key%s: %s", down ? "Down" : "Up", name.c_str());
+            m_logger->debug(buf);
+        }
+    }
+
+    // Returns the PET dedicated-key name for a PC Shift+code combo,
+    // or "" if the shift should be forwarded normally.
+    //
+    // GTK delivers the VIRTUAL key code (unshifted) for digit keys but may
+    // deliver the COMPOSED Unicode character for punctuation keys.  Both the
+    // base key codes (e.g. '\'' = 39) and the composed codes (e.g. '"' = 34)
+    // are listed so the mapping works regardless of GTK behaviour.
+    static std::string shiftedPetKey(int code) {
+        switch (code) {
+            // Base key codes (GTK delivers unshifted virtual key)
+            case '1':  return "exclaim";    // Shift+1  → !
+            case '2':  return "at";         // Shift+2  → @ (PET dedicated key)
+            case '3':  return "hash";       // Shift+3  → #
+            case '4':  return "dollar";     // Shift+4  → $
+            case '5':  return "percent";    // Shift+5  → %
+            case '6':  return "uparrow";    // Shift+6  → ^ (PET ↑ char)
+            case '7':  return "ampersand";  // Shift+7  → &
+            case '8':  return "asterisk";   // Shift+8  → *
+            case '9':  return "lparen";     // Shift+9  → (
+            case '0':  return "rparen";     // Shift+0  → )
+            case '=':  return "plus";       // Shift+=  → +
+            case '-':  return "leftarrow";  // Shift+-  → _ (PET ← char)
+            case '\'': return "dquote";     // Shift+'  → "
+            case ';':  return "colon";      // Shift+;  → :
+            case '/':  return "question";   // Shift+/  → ?
+            case ',':  return "less";       // Shift+,  → <
+            // Composed character codes (GTK may deliver the shifted character)
+            case '!':  return "exclaim";
+            case '@':  return "at";
+            case '#':  return "hash";
+            case '$':  return "dollar";
+            case '%':  return "percent";
+            case '^':  return "uparrow";
+            case '&':  return "ampersand";
+            case '*':  return "asterisk";
+            case '(':  return "lparen";
+            case ')':  return "rparen";
+            case '+':  return "plus";
+            case '_':  return "leftarrow";
+            case '"':  return "dquote";     // Shift+' delivered as " (34)
+            case ':':  return "colon";
+            case '?':  return "question";
+            case '<':  return "less";
+            default:   return {};
+        }
+    }
 };
 
 class MmemuDropTarget : public wxFileDropTarget {
