@@ -3,6 +3,7 @@
 #include "cli_interpreter.h"
 #include "plugin_loader/main/plugin_loader.h"
 #include "plugin_command_registry.h"
+#include "include/util/logging.h"
 
 int main(int argc, char *argv[]) {
     (void)argc; (void)argv;
@@ -10,6 +11,8 @@ int main(int argc, char *argv[]) {
     std::cout << "mmemu - Multi Machine Emulator (CLI)\n";
     std::cout << "Version 0.1.0-dev\n";
     
+    LogRegistry::instance().init();
+
     PluginLoader::instance().setCommandRegisterFn([](const PluginCommandInfo* info) {
         PluginCommandRegistry::instance().registerCommand(info);
     });

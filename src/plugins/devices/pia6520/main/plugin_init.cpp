@@ -1,8 +1,15 @@
 #include "mmemu_plugin_api.h"
 #include "pia6520.h"
+#include "libdevices/main/device_registry.h"
+
+static const SimPluginHostAPI* g_host = nullptr;
 
 static IOHandler* createPIA6520() {
-    return new PIA6520("6520", 0);
+    auto* pia = new PIA6520("6520", 0);
+    if (g_host && g_host->getLogger && g_host->logNamed) {
+        pia->setLogger(g_host->getLogger("6520"), g_host->logNamed);
+    }
+    return pia;
 }
 
 static DevicePluginInfo s_devices[] = {
@@ -19,12 +26,13 @@ static SimPluginManifest s_manifest = {
     0, nullptr,
     0, nullptr,
     1, s_devices,
+    0, nullptr,
+    0, nullptr,
     0, nullptr
 };
 
-#include "libdevices/main/device_registry.h"
-
 extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host) {
+    g_host = host;
     if (host->deviceRegistry) DeviceRegistry::setInstance(host->deviceRegistry);
     return &s_manifest;
 }

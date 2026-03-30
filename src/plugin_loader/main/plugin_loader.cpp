@@ -1,4 +1,5 @@
 #include "plugin_loader.h"
+#include "include/util/logging.h"
 #include <dlfcn.h>
 #include <iostream>
 #include <filesystem>
@@ -17,7 +18,19 @@ PluginLoader& PluginLoader::instance() {
 }
 
 static void hostLog(int level, const char* msg) {
-    std::cerr << "[Plugin Log " << level << "] " << msg << std::endl;
+    auto logger = LogRegistry::instance().getLogger("system");
+    logger->log(LogRegistry::mapLevel(level), msg);
+}
+
+static void* hostGetLogger(const char* name) {
+    auto logger = LogRegistry::instance().getLogger(name);
+    return (void*)logger.get();
+}
+
+static void hostLogNamed(void* loggerPtr, int level, const char* msg) {
+    if (!loggerPtr) return;
+    auto* logger = static_cast<spdlog::logger*>(loggerPtr);
+    logger->log(LogRegistry::mapLevel(level), msg);
 }
 
 static void stubRegisterPane(const PluginPaneInfo*) {}
@@ -26,6 +39,8 @@ static void stubRegisterMcpTool(const PluginMcpToolInfo*) {}
 
 static SimPluginHostAPI s_hostAPI = {
     hostLog,
+    hostGetLogger,
+    hostLogNamed,
     &CoreRegistry::instance(),
     &MachineRegistry::instance(),
     &DeviceRegistry::instance(),

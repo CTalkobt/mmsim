@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <cstdint>
+#include <functional>
 
 /**
  * PET Keyboard Matrix (8x8).
@@ -20,6 +21,11 @@ public:
     void keyDown(const std::string& keyName);
     void keyUp(const std::string& keyName);
 
+    void setLogger(void* handle, void (*logFn)(void*, int, const char*)) {
+        m_logger = handle;
+        m_logNamed = logFn;
+    }
+
     // IPortDevice implementation
     uint8_t readPort() override;
     void writePort(uint8_t val) override;
@@ -34,4 +40,7 @@ private:
     std::map<std::string, KeyPos> m_keyMap;
 
     void initKeyMap();
+
+    void* m_logger = nullptr;
+    void (*m_logNamed)(void*, int, const char*) = nullptr;
 };

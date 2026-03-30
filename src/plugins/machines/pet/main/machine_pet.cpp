@@ -12,9 +12,12 @@
 #include "plugins/devices/keyboard/main/keyboard_matrix_pet.h"
 #include "libdevices/main/ieee488.h"
 #include "machine_pet.h"
+#include "mmemu_plugin_api.h"
 #include <iostream>
 #include <map>
 #include <vector>
+
+extern const SimPluginHostAPI* g_petHost;
 
 namespace {
 
@@ -159,12 +162,16 @@ MachineDescriptor* createPetMachine(Model model) {
 
     // I/O Devices
     pm->pia1 = new PIA6520("PIA1", 0xE810);
+    if (g_petHost && g_petHost->getLogger && g_petHost->logNamed)
+        pm->pia1->setLogger(g_petHost->getLogger("pia1"), g_petHost->logNamed);
     pm->pia1->setIrqALine(pm->irqManager->createLine());
     pm->pia1->setIrqBLine(pm->irqManager->createLine());
     pm->pia1->setCA1Line(pm->videoLine);
     pm->pia1->setCB1Line(pm->videoLine);
-    
+
     pm->pia2 = new PIA6520("PIA2", 0xE820);
+    if (g_petHost && g_petHost->getLogger && g_petHost->logNamed)
+        pm->pia2->setLogger(g_petHost->getLogger("pia2"), g_petHost->logNamed);
     pm->pia2->setIrqALine(pm->irqManager->createLine());
     pm->pia2->setIrqBLine(pm->irqManager->createLine());
 
@@ -179,6 +186,8 @@ MachineDescriptor* createPetMachine(Model model) {
     PetKeyboardMatrix::Layout kLayout = (model == Model::PET_8032) ? 
                                         PetKeyboardMatrix::Layout::BUSINESS : PetKeyboardMatrix::Layout::GRAPHICS;
     pm->kbd = new PetKeyboardMatrix(kLayout);
+    if (g_petHost && g_petHost->getLogger && g_petHost->logNamed)
+        pm->kbd->setLogger(g_petHost->getLogger("pet.keyboard"), g_petHost->logNamed);
     pm->kbdReader = new KbdColumnReader(pm->kbd);
     pm->kbdSelector = new KbdRowSelector(pm->kbd);
 

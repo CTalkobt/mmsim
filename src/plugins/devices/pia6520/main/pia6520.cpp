@@ -1,6 +1,7 @@
 #include "pia6520.h"
 #include "libdevices/main/isignal_line.h"
-#include <iostream>
+#include "include/mmemu_plugin_api.h"
+#include <cstdio>
 
 PIA6520::PIA6520() : m_name("6520"), m_baseAddr(0xE810) {
     reset();
@@ -158,6 +159,10 @@ bool PIA6520::ioWrite(IBus*, uint32_t addr, uint8_t val) {
             }
             break;
         case 0x01:
+            if (m_logger && m_logNamed) {
+                char buf[32]; snprintf(buf, sizeof(buf), "ioWrite CRA: %02X", val);
+                m_logNamed(m_logger, SIM_LOG_DEBUG, buf);
+            }
             m_cra = (m_cra & 0xC0) | (val & 0x3F);
             if ((m_cra & 0x38) == 0x30) driveCA2(false);
             else if ((m_cra & 0x38) == 0x38) driveCA2(true);
@@ -180,6 +185,10 @@ bool PIA6520::ioWrite(IBus*, uint32_t addr, uint8_t val) {
             }
             break;
         case 0x03:
+            if (m_logger && m_logNamed) {
+                char buf[32]; snprintf(buf, sizeof(buf), "ioWrite CRB: %02X", val);
+                m_logNamed(m_logger, SIM_LOG_DEBUG, buf);
+            }
             m_crb = (m_crb & 0xC0) | (val & 0x3F);
             if ((m_crb & 0x38) == 0x30) driveCB2(false);
             else if ((m_crb & 0x38) == 0x38) driveCB2(true);

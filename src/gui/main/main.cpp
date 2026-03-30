@@ -24,7 +24,9 @@
 #include "libtoolchain/main/toolchain_registry.h"
 #include "gui_ids.h"
 #include "screen_pane.h"
+#include "include/util/logging.h"
 #include <fstream>
+#include <cstdio>
 
 // mmemu - Multi Machine Emulator
 
@@ -139,7 +141,13 @@ public:
                 return Event_Skip;
             std::string name = wxKeyToVic20Name(key.GetKeyCode());
             if (!name.empty()) {
-                m_handler(name, t == wxEVT_CHAR_HOOK);
+                bool down = (t == wxEVT_CHAR_HOOK);
+                if (m_logger) {
+                    char buf[80];
+                    snprintf(buf, sizeof(buf), "key%s: %s", down ? "Down" : "Up", name.c_str());
+                    m_logger->debug(buf);
+                }
+                m_handler(name, down);
                 return Event_Processed;
             }
         }
@@ -147,6 +155,7 @@ public:
     }
 
     std::function<bool(const std::string&, bool)> m_handler;
+    std::shared_ptr<spdlog::logger> m_logger;
 };
 
 class MmemuDropTarget : public wxFileDropTarget {
@@ -215,6 +224,8 @@ static PluginPaneInfo s_builtInScreenPane = {
 class MmemuApp : public wxApp {
 public:
     bool OnInit() override {
+        LogRegistry::instance().init();
+        m_keyFilter.m_logger = LogRegistry::instance().getLogger("gui.keyboard");
         wxEvtHandler::AddFilter(&m_keyFilter);
         PluginLoader::instance().setPaneRegisterFn([](const PluginPaneInfo* info) {
             PluginPaneManager::instance().registerPane(info);

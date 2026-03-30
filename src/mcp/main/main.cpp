@@ -14,6 +14,7 @@
 #include "libmem/main/memory_bus.h"
 #include "libcore/main/icore.h"
 #include "plugin_tool_registry.h"
+#include "include/util/logging.h"
 
 struct MachineState {
     MachineDescriptor* machine = nullptr;
@@ -225,6 +226,22 @@ Json handleToolsList() {
     rstSchema.oVal["required"] = rstReq;
 
     addTool("reset_machine", "Reset a machine to its power-on state", rstSchema);
+
+    Json emptySchema(Json::OBJ);
+    emptySchema.oVal["type"] = Json("object");
+    addTool("list_loggers", "List all registered loggers and their levels", emptySchema);
+
+    Json sllSchema(Json::OBJ);
+    sllSchema.oVal["type"] = Json("object");
+    Json sllProps(Json::OBJ);
+    Json sllTarget(Json::OBJ); sllTarget.oVal["type"] = Json("string");
+    Json sllLevel(Json::OBJ); sllLevel.oVal["type"] = Json("string");
+    sllProps.oVal["target"] = sllTarget;
+    sllProps.oVal["level"] = sllLevel;
+    sllSchema.oVal["properties"] = sllProps;
+    Json sllReq(Json::ARR); sllReq.push_back(Json("target")); sllReq.push_back(Json("level"));
+    sllSchema.oVal["required"] = sllReq;
+    addTool("set_log_level", "Set log level for a logger or 'all'", sllSchema);
 
     std::vector<std::string> pluginTools;
     PluginToolRegistry::instance().listTools(pluginTools);
@@ -507,6 +524,28 @@ Json handleToolsCall(const Json& params) {
             if (ms->machine->onReset) ms->machine->onReset(*ms->machine);
             textItem.oVal["text"] = Json("Machine " + mid + " reset.");
         }
+    } else if (name == "list_loggers") {
+        auto names = LogRegistry::instance().getLoggerNames();
+        std::stringstream ss;
+        ss << "Registered loggers:\n";
+        for (const auto& n : names) {
+            auto l = LogRegistry::instance().getLogger(n);
+            std::string lvl = spdlog::level::to_string_view(l->level()).data();
+            ss << "  " << n << " [" << lvl << "]\n";
+        }
+        textItem.oVal["text"] = Json(ss.str());
+    } else if (name == "set_log_level") {
+        std::string target = args["target"].sVal;
+        std::string levelStr = args["level"].sVal;
+        spdlog::level::level_enum lvl = spdlog::level::from_str(levelStr);
+        if (target == "all") {
+            LogRegistry::instance().setGlobalLevel(lvl);
+            textItem.oVal["text"] = Json("Set all loggers to " + levelStr);
+        } else {
+            auto l = LogRegistry::instance().getLogger(target);
+            l->set_level(lvl);
+            textItem.oVal["text"] = Json("Set logger '" + target + "' to " + levelStr);
+        }
     } else {
         std::string resultJson;
         if (PluginToolRegistry::instance().dispatch(name, args.stringify(), resultJson)) {
@@ -526,6 +565,8 @@ Json handleToolsCall(const Json& params) {
 
 int main(int argc, char *argv[]) {
     (void)argc; (void)argv;
+
+    LogRegistry::instance().init();
 
     PluginLoader::instance().setMcpToolRegisterFn([](const PluginMcpToolInfo* info) {
         PluginToolRegistry::instance().registerTool(info);

@@ -70,10 +70,26 @@ struct PluginMcpToolInfo {
 };
 
 /**
+ * Log levels.
+ */
+typedef enum {
+    SIM_LOG_TRACE = 0,
+    SIM_LOG_DEBUG = 1,
+    SIM_LOG_INFO  = 2,
+    SIM_LOG_WARN  = 3,
+    SIM_LOG_ERROR = 4,
+    SIM_LOG_CRITICAL = 5,
+    SIM_LOG_OFF = 6
+} SimLogLevel;
+
+/**
  * Host services provided to plugins.
  */
 struct SimPluginHostAPI {
     void (*log)(int level, const char* msg);
+    /** Get or create a named logger. Handle should be used with logNamed. */
+    void* (*getLogger)(const char* name);
+    void (*logNamed)(void* logger, int level, const char* msg);
     
 #ifdef __cplusplus
     class CoreRegistry*        coreRegistry;

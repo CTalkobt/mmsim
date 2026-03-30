@@ -6,6 +6,9 @@
 #include "libtoolchain/main/toolchain_registry.h"
 #include <vector>
 
+// Shared host API pointer — used by machine factory to wire device loggers
+const SimPluginHostAPI* g_petHost = nullptr;
+
 // Factory functions from machine_pet.cpp
 MachineDescriptor* createPet2001();
 MachineDescriptor* createPet4032();
@@ -35,6 +38,7 @@ static SimPluginManifest s_manifest = {
 };
 
 extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host) {
+    g_petHost = host;
     if (host->coreRegistry) CoreRegistry::setInstance(host->coreRegistry);
     if (host->machineRegistry) MachineRegistry::setInstance(host->machineRegistry);
     if (host->deviceRegistry) DeviceRegistry::setInstance(host->deviceRegistry);

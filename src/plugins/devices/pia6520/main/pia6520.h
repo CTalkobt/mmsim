@@ -55,6 +55,11 @@ public:
     Snapshot getSnapshot() const;
     void restoreSnapshot(const Snapshot& s);
 
+    void setLogger(void* handle, void (*logFn)(void*, int, const char*)) {
+        m_logger = handle;
+        m_logNamed = logFn;
+    }
+
 private:
     void updateIrq();
     void driveCA2(bool level);
@@ -62,6 +67,8 @@ private:
 
     std::string m_name;
     uint32_t m_baseAddr;
+    void* m_logger = nullptr;
+    void (*m_logNamed)(void*, int, const char*) = nullptr;
 
     uint8_t m_ora = 0;
     uint8_t m_ddra = 0;

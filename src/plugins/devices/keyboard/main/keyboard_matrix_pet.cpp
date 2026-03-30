@@ -1,6 +1,8 @@
 #include "keyboard_matrix_pet.h"
+#include "include/mmemu_plugin_api.h"
 #include <algorithm>
 #include <cstring>
+#include <cstdio>
 
 PetKeyboardMatrix::PetKeyboardMatrix(Layout layout) : m_layout(layout) {
     std::memset(m_matrix, 0xFF, sizeof(m_matrix));
@@ -199,6 +201,10 @@ void PetKeyboardMatrix::initKeyMap() {
 }
 
 void PetKeyboardMatrix::keyDown(const std::string& keyName) {
+    if (m_logger && m_logNamed) {
+        char buf[64]; snprintf(buf, sizeof(buf), "keyDown: %s", keyName.c_str());
+        m_logNamed(m_logger, SIM_LOG_DEBUG, buf);
+    }
     auto it = m_keyMap.find(keyName);
     if (it != m_keyMap.end()) {
         m_matrix[it->second.col] &= ~it->second.bit;
@@ -206,6 +212,10 @@ void PetKeyboardMatrix::keyDown(const std::string& keyName) {
 }
 
 void PetKeyboardMatrix::keyUp(const std::string& keyName) {
+    if (m_logger && m_logNamed) {
+        char buf[64]; snprintf(buf, sizeof(buf), "keyUp: %s", keyName.c_str());
+        m_logNamed(m_logger, SIM_LOG_DEBUG, buf);
+    }
     auto it = m_keyMap.find(keyName);
     if (it != m_keyMap.end()) {
         m_matrix[it->second.col] |= it->second.bit;

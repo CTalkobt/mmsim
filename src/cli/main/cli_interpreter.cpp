@@ -1,4 +1,5 @@
 #include "cli_interpreter.h"
+#include "include/util/logging.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
 #include "libcore/main/image_loader.h"
@@ -50,6 +51,36 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         MachineRegistry::instance().enumerate(ids);
         m_output("Available machines:\n");
         for (const auto& id : ids) m_output("  " + id + "\n");
+    } else if (cmd == "log") {
+        std::string sub;
+        if (ss >> sub) {
+            if (sub == "list") {
+                auto names = LogRegistry::instance().getLoggerNames();
+                m_output("Registered loggers:\n");
+                for (const auto& n : names) {
+                    auto l = LogRegistry::instance().getLogger(n);
+                    std::string lvl = spdlog::level::to_string_view(l->level()).data();
+                    m_output("  " + n + " [" + lvl + "]\n");
+                }
+            } else if (sub == "level") {
+                std::string target, levelStr;
+                if (ss >> target >> levelStr) {
+                    spdlog::level::level_enum lvl = spdlog::level::from_str(levelStr);
+                    if (target == "all") {
+                        LogRegistry::instance().setGlobalLevel(lvl);
+                        m_output("Set all loggers to " + levelStr + "\n");
+                    } else {
+                        auto l = LogRegistry::instance().getLogger(target);
+                        l->set_level(lvl);
+                        m_output("Set logger '" + target + "' to " + levelStr + "\n");
+                    }
+                } else {
+                    m_output("Usage: log level <name|all> <trace|debug|info|warn|error|off>\n");
+                }
+            }
+        } else {
+            m_output("Usage: log <list|level>\n");
+        }
     } else if (cmd == "create") {
         std::string id;
         if (ss >> id) {
