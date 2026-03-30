@@ -62,6 +62,9 @@ void MOS6502::reset() {
     m_state.sp = 0xFD;
     m_state.p = FLAG_U | FLAG_I;
     m_state.cycles = 0;
+    m_state.irqLine = 0;
+    m_state.nmiLine = 0;
+    m_state.nmiPrev = 0;
 
     if (m_bus) {
         uint8_t lo = m_bus->read8(0xFFFC);
@@ -73,27 +76,15 @@ void MOS6502::reset() {
 }
 
 void MOS6502::triggerIrq() {
-    if (!(m_state.p & FLAG_I)) {
-        push((uint8_t)(m_state.pc >> 8));
-        push((uint8_t)(m_state.pc & 0xFF));
-        push(m_state.p & ~FLAG_B);
-        m_state.p |= FLAG_I;
-        uint8_t lo = read(0xFFFE);
-        uint8_t hi = read(0xFFFF);
-        m_state.pc = (uint16_t)lo | ((uint16_t)hi << 8);
-        m_state.cycles += 7;
-    }
+    // Treat triggerIrq as a toggle or momentary assertion.
+    // For PET we use setIrqLine(true/false) which is cleaner.
+    m_state.irqLine = 1;
 }
 
 void MOS6502::triggerNmi() {
-    push((uint8_t)(m_state.pc >> 8));
-    push((uint8_t)(m_state.pc & 0xFF));
-    push(m_state.p & ~FLAG_B);
-    m_state.p |= FLAG_I;
-    uint8_t lo = read(0xFFFA);
-    uint8_t hi = read(0xFFFB);
-    m_state.pc = (uint16_t)lo | ((uint16_t)hi << 8);
-    m_state.cycles += 7;
+    // NMIs are edge-triggered (falling edge).
+    m_state.nmiLine = 1; 
+    m_state.nmiPrev = 0; 
 }
 
 void MOS6502::saveState(uint8_t* buf) const {
@@ -110,7 +101,6 @@ uint8_t MOS6502::read(uint16_t addr) {
 
 void MOS6502::write(uint16_t addr, uint8_t val) {
     if (m_bus) {
-        // std::cout << "MOS6502::write addr=$" << std::hex << addr << std::dec << std::endl;
         m_bus->write8(addr, val);
     }
 }
@@ -410,7 +400,8 @@ int MOS6502::opBRK(uint16_t addr) {
     m_state.pc++;
     push((uint8_t)(m_state.pc >> 8));
     push((uint8_t)(m_state.pc & 0xFF));
-    push(m_state.p | FLAG_B);
+    // BRK pushes P with bit 4 (B) and bit 5 (U) set.
+    push(m_state.p | FLAG_B | FLAG_U);
     m_state.p |= FLAG_I;
     uint8_t lo = read(0xFFFE);
     uint8_t hi = read(0xFFFF);
@@ -620,7 +611,6 @@ int MOS6502::opSED(uint16_t addr) { (void)addr; m_state.p |= FLAG_D; return 0; }
 int MOS6502::opSEI(uint16_t addr) { (void)addr; m_state.p |= FLAG_I; return 0; }
 
 int MOS6502::opSTA(uint16_t addr) {
-    // std::cout << "MOS6502::opSTA addr=$" << std::hex << addr << std::dec << std::endl;
     write(addr, m_state.a);
     return 0;
 }
@@ -724,6 +714,36 @@ const MOS6502::Opcode MOS6502::s_opcodes[256] = {
 };
 
 int MOS6502::step() {
+    // NMI handling (falling edge)
+    if (m_state.nmiLine && !m_state.nmiPrev) {
+        m_state.nmiPrev = 1;
+        push((uint8_t)(m_state.pc >> 8));
+        push((uint8_t)(m_state.pc & 0xFF));
+        // IRQ/NMI pushes P with B=0 and U=1
+        push((m_state.p & ~FLAG_B) | FLAG_U);
+        m_state.p |= FLAG_I;
+        uint8_t lo = read(0xFFFA);
+        uint8_t hi = read(0xFFFB);
+        m_state.pc = (uint16_t)lo | ((uint16_t)hi << 8);
+        m_state.cycles += 7;
+        return 7;
+    }
+    m_state.nmiPrev = m_state.nmiLine;
+
+    // IRQ handling (level-sensitive)
+    if (m_state.irqLine && !(m_state.p & FLAG_I)) {
+        push((uint8_t)(m_state.pc >> 8));
+        push((uint8_t)(m_state.pc & 0xFF));
+        // IRQ/NMI pushes P with B=0 and U=1
+        push((m_state.p & ~FLAG_B) | FLAG_U);
+        m_state.p |= FLAG_I;
+        uint8_t lo = read(0xFFFE);
+        uint8_t hi = read(0xFFFF);
+        m_state.pc = (uint16_t)lo | ((uint16_t)hi << 8);
+        m_state.cycles += 7;
+        return 7;
+    }
+
     uint16_t pc = m_state.pc;
     uint8_t op = read(m_state.pc++);
     const Opcode& info = s_opcodes[op];

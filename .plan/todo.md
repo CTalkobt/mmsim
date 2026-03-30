@@ -686,30 +686,30 @@ the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 
 ### Phase 12.4: IEEE-488 Bus Implementation (`src/libdevices/ieee488.h/cpp`)
 
-- [ ] Implement `IEEE488Bus` interface for communication with disk drives 
+- [x] Implement `IEEE488Bus` interface for communication with disk drives 
       and printers.
-- [ ] Wire PIA signals (ATN, DAV, NRFD, NDAC, EOI, SRQ, IFC, REN) to the bus.
-- [ ] **HLE Disk Drive (Unit 8)**: Trap IEEE-488 sequences to provide fast host-file access.
-- [ ] Support for PET "disk commands" (e.g., `LOAD "$",8`).
+- [x] Wire PIA signals (ATN, DAV, NRFD, NDAC, EOI, SRQ, IFC, REN) to the bus.
+- [x] **HLE Disk Drive (Unit 8)**: Trap IEEE-488 sequences to provide fast host-file access.
+- [x] Support for PET "disk commands" (e.g., `LOAD "$",8`).
 
 ### Phase 12.5: PET Machine Factory and Memory Map
 
-- [ ] `MachineDescriptor` for `"pet2001"`, `"pet4032"`, and `"pet8032"`.
-- [ ] **Banking Logic**: Support for BASIC 1.0/2.0/4.0, Editor, KERNAL, and Character ROM.
-- [ ] **I/O Window**: PET I/O window at $E800–$EFFF containing PIAs, VIAs, and CRTC.
-- [ ] **Keyboard Matrix**: Implement both Graphics (2001/4000) and Business (8000) 
+- [x] `MachineDescriptor` for `"pet2001"`, `"pet4032"`, and `"pet8032"`.
+- [x] **Banking Logic**: Support for BASIC 1.0/2.0/4.0, Editor, KERNAL, and Character ROM.
+- [x] **I/O Window**: PET I/O window at $E800–$EFFF containing PIAs, VIAs, and CRTC.
+- [x] **Keyboard Matrix**: Implement both Graphics (2001/4000) and Business (8000) 
       keyboard matrices wired to PIA #1.
-- [ ] `onReset`: Load appropriate ROMs for the selected model and reset all chips.
+- [x] `onReset`: Load appropriate ROMs for the selected model and reset all chips.
 
 ### Phase 12.6: PET Integration Tests
 
-- [ ] **PIA Loopback**: Verify Port A to Port B communication via external 
+- [x] **PIA Loopback**: Verify Port A to Port B communication via external 
       wiring model.
-- [ ] **Video Buffer**: Write to $8000 (video RAM) and verify `renderFrame` 
+- [x] **Video Buffer**: Write to $8000 (video RAM) and verify `renderFrame` 
       detects the change.
-- [ ] **CRTC Configuration**: Change registers in 6545 and verify screen 
+- [x] **CRTC Configuration**: Change registers in 6545 and verify screen 
       geometry (columns/rows) updates.
-- [ ] **IEEE-488 Smoke Test**: Perform a mock `LISTEN/DATA/UNLISTEN` sequence 
+- [x] **IEEE-488 Smoke Test**: Perform a mock `LISTEN/DATA/UNLISTEN` sequence 
       and verify PIA flags.
 
 ---

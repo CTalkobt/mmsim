@@ -20,6 +20,7 @@ void CRTC6545::reset() {
 }
 
 bool CRTC6545::ioRead(IBus*, uint32_t addr, uint8_t* val) {
+    if ((addr & ~0x0001u) != baseAddr()) return false;
     if ((addr & 1) == 0) {
         // Address register is usually write-only on 6845, but some 6545 allow reading status
         *val = m_statusReg;
@@ -35,12 +36,13 @@ bool CRTC6545::ioRead(IBus*, uint32_t addr, uint8_t* val) {
 }
 
 bool CRTC6545::ioWrite(IBus*, uint32_t addr, uint8_t val) {
+    if ((addr & ~0x0001u) != baseAddr()) return false;
     if ((addr & 1) == 0) {
         m_addressReg = val & 0x1F;
     } else {
         if (m_addressReg < 18) {
             m_regs[m_addressReg] = val;
-            
+
             // Recalculate start address if R12 or R13 written
             if (m_addressReg == 12 || m_addressReg == 13) {
                 m_maStart = (m_regs[12] << 8) | m_regs[13];

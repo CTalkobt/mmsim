@@ -75,8 +75,8 @@ public:
      * it owns the address; the write hook returns true if it owns the address.
      * Called before overlay / RAM on every read8 / write8.
      */
-    void setIoHooks(std::function<bool(uint32_t, uint8_t*)> readFn,
-                    std::function<bool(uint32_t, uint8_t)>  writeFn);
+    void setIoHooks(std::function<bool(IBus*, uint32_t, uint8_t*)> readFn,
+                    std::function<bool(IBus*, uint32_t, uint8_t)>  writeFn);
 
 private:
     std::string m_name;
@@ -87,8 +87,8 @@ private:
     std::vector<RomOverlay> m_overlays;
     CircularBuffer<WriteLogEntry> m_writeLog;
 
-    std::function<bool(uint32_t, uint8_t*)> m_ioRead;
-    std::function<bool(uint32_t, uint8_t)>  m_ioWrite;
+    std::function<bool(IBus*, uint32_t, uint8_t*)> m_ioRead;
+    std::function<bool(IBus*, uint32_t, uint8_t)>  m_ioWrite;
 
     const RomOverlay* findOverlay(uint32_t addr) const;
 };

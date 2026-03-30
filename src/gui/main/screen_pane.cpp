@@ -1,10 +1,10 @@
-#include "vic_display_pane.h"
+#include "screen_pane.h"
 #include <wx/dcbuffer.h>
 #include <wx/settings.h>
 #include <algorithm>
 #include <cstdlib>
 
-VicDisplayPane::VicDisplayPane(wxWindow* parent)
+ScreenPane::ScreenPane(wxWindow* parent)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize,
               wxFULL_REPAINT_ON_RESIZE)
 {
@@ -23,24 +23,24 @@ VicDisplayPane::VicDisplayPane(wxWindow* parent)
     sizer->Add(toolbar, 0, wxEXPAND);
     SetSizer(sizer);
 
-    Bind(wxEVT_PAINT, &VicDisplayPane::OnPaint,         this);
-    Bind(wxEVT_SIZE,  &VicDisplayPane::OnSize,           this);
+    Bind(wxEVT_PAINT, &ScreenPane::OnPaint,         this);
+    Bind(wxEVT_SIZE,  &ScreenPane::OnSize,           this);
     m_ratioBtn->Bind(wxEVT_TOGGLEBUTTON,   [this](wxCommandEvent&) { Refresh(); });
-    m_captureBtn->Bind(wxEVT_TOGGLEBUTTON, &VicDisplayPane::OnCaptureToggle, this);
+    m_captureBtn->Bind(wxEVT_TOGGLEBUTTON, &ScreenPane::OnCaptureToggle, this);
 }
 
-void VicDisplayPane::OnCaptureToggle(wxCommandEvent&) {
+void ScreenPane::OnCaptureToggle(wxCommandEvent&) {
     bool active = m_captureBtn->GetValue();
     m_captureBtn->SetLabel(active ? "Keyboard Captured \u25cf" : "Capture Keyboard");
     if (m_captureCallback) m_captureCallback(active);
 }
 
-void VicDisplayPane::SetCaptureActive(bool active) {
+void ScreenPane::SetCaptureActive(bool active) {
     m_captureBtn->SetValue(active);
     m_captureBtn->SetLabel(active ? "Keyboard Captured \u25cf" : "Capture Keyboard");
 }
 
-void VicDisplayPane::SetVideoOutput(IVideoOutput* vid) {
+void ScreenPane::SetVideoOutput(IVideoOutput* vid) {
     m_video = vid;
     if (m_video) {
         auto dim = m_video->getDimensions();
@@ -51,16 +51,16 @@ void VicDisplayPane::SetVideoOutput(IVideoOutput* vid) {
     Refresh();
 }
 
-void VicDisplayPane::RefreshFrame() {
+void ScreenPane::RefreshFrame() {
     if (m_video) Refresh();
 }
 
-void VicDisplayPane::OnSize(wxSizeEvent& event) {
+void ScreenPane::OnSize(wxSizeEvent& event) {
     Refresh();
     event.Skip();
 }
 
-void VicDisplayPane::OnPaint(wxPaintEvent&) {
+void ScreenPane::OnPaint(wxPaintEvent&) {
     wxAutoBufferedPaintDC dc(this);
 
     wxColour bgCol = wxSystemSettings::GetColour(wxSYS_COLOUR_APPWORKSPACE);

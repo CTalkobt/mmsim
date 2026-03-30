@@ -23,6 +23,7 @@
 #include "libdevices/main/io_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
 #include "gui_ids.h"
+#include "screen_pane.h"
 #include <fstream>
 
 // mmemu - Multi Machine Emulator
@@ -183,6 +184,34 @@ private:
     MmemuFrame* m_frame;
 };
 
+static void* createScreenPane(void* parentHandle, void* /*ctx*/) {
+    auto* parent = static_cast<wxWindow*>(parentHandle);
+    auto* pane = new ScreenPane(parent);
+    return static_cast<void*>(pane);
+}
+
+static void onScreenMachineLoad(void* paneHandle, MachineDescriptor* desc, void* /*ctx*/) {
+    auto* pane = static_cast<ScreenPane*>(paneHandle);
+    IVideoOutput* vid = nullptr;
+    if (desc && desc->ioRegistry) {
+        std::vector<IOHandler*> handlers;
+        desc->ioRegistry->enumerate(handlers);
+        for (auto* h : handlers) {
+            if ((vid = dynamic_cast<IVideoOutput*>(h))) break;
+        }
+    }
+    pane->SetVideoOutput(vid);
+}
+
+static void refreshScreenPane(void* paneHandle, uint64_t /*cycles*/, void* /*ctx*/) {
+    static_cast<ScreenPane*>(paneHandle)->RefreshFrame();
+}
+
+static PluginPaneInfo s_builtInScreenPane = {
+    "screen", "Screen", nullptr, nullptr,
+    createScreenPane, nullptr, refreshScreenPane, onScreenMachineLoad, nullptr
+};
+
 class MmemuApp : public wxApp {
 public:
     bool OnInit() override {
@@ -190,6 +219,7 @@ public:
         PluginLoader::instance().setPaneRegisterFn([](const PluginPaneInfo* info) {
             PluginPaneManager::instance().registerPane(info);
         });
+        PluginPaneManager::instance().registerPane(&s_builtInScreenPane);
         PluginLoader::instance().loadFromDir("./lib");
         auto *frame = new MmemuFrame();
         frame->Show(true);
@@ -362,13 +392,10 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             m_capturePane = nullptr;
             setKeyCapture(false);
 
-            PluginPaneManager::instance().onMachineSwitch(id, this, m_notebook, m_machine);
+            PluginPaneManager::instance().onMachineSwitch(id, m_notebook, m_notebook, m_machine);
 
             // Wire the screen pane's Capture button (if present) to setKeyCapture().
-            // The pane ID is "<machineFamily>.screen" where the family is the
-            // machine ID with any variant suffix (after '+') stripped off.
-            std::string family = id.substr(0, id.find('+'));
-            wxWindow* screenWin = PluginPaneManager::instance().getPaneWindow(family + ".screen");
+            wxWindow* screenWin = PluginPaneManager::instance().getPaneWindow("screen");
             if (screenWin) {
                 m_capturePane = dynamic_cast<IKeyboardCapturePane*>(screenWin);
                 if (m_capturePane)

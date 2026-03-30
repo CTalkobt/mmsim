@@ -34,7 +34,7 @@ uint8_t FlatMemoryBus::read8(uint32_t addr) {
     addr &= m_config.addrMask;
     if (m_ioRead) {
         uint8_t ioVal;
-        if (m_ioRead(addr, &ioVal)) {
+        if (m_ioRead(this, addr, &ioVal)) {
             if (observer) observer->onMemoryRead(this, addr, ioVal);
             return ioVal;
         }
@@ -52,14 +52,13 @@ uint8_t FlatMemoryBus::read8(uint32_t addr) {
 
 void FlatMemoryBus::write8(uint32_t addr, uint8_t val) {
     addr &= m_config.addrMask;
-    if (m_ioWrite && m_ioWrite(addr, val)) {
-        if (observer) observer->onMemoryWrite(this, addr, m_data[addr], val);
+    uint8_t before = peek8(addr);
+    if (m_ioWrite && m_ioWrite(this, addr, val)) {
+        if (observer) observer->onMemoryWrite(this, addr, before, val);
         return;
     }
     const RomOverlay* overlay = findOverlay(addr);
 
-    uint8_t before = peek8(addr);
-    
     if (overlay) {
         if (overlay->writable) {
             m_data[addr] = val;
@@ -79,6 +78,12 @@ void FlatMemoryBus::write8(uint32_t addr, uint8_t val) {
 
 uint8_t FlatMemoryBus::peek8(uint32_t addr) {
     addr &= m_config.addrMask;
+    if (m_ioRead) {
+        uint8_t ioVal;
+        if (m_ioRead(this, addr, &ioVal)) {
+            return ioVal;
+        }
+    }
     const RomOverlay* overlay = findOverlay(addr);
     if (overlay) {
         return overlay->data[addr - overlay->base];
@@ -87,8 +92,6 @@ uint8_t FlatMemoryBus::peek8(uint32_t addr) {
 }
 
 void FlatMemoryBus::reset() {
-    // Roadmap doesn't say reset clears memory, usually it doesn't for RAM.
-    // But it might clear the write log.
     clearWriteLog();
 }
 
@@ -129,8 +132,8 @@ void FlatMemoryBus::removeRomOverlay(uint32_t base) {
     m_overlays.erase(it, m_overlays.end());
 }
 
-void FlatMemoryBus::setIoHooks(std::function<bool(uint32_t, uint8_t*)> readFn,
-                                std::function<bool(uint32_t, uint8_t)>  writeFn) {
+void FlatMemoryBus::setIoHooks(std::function<bool(IBus*, uint32_t, uint8_t*)> readFn,
+                                std::function<bool(IBus*, uint32_t, uint8_t)>  writeFn) {
     m_ioRead  = std::move(readFn);
     m_ioWrite = std::move(writeFn);
 }

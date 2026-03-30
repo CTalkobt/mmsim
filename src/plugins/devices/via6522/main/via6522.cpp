@@ -18,6 +18,7 @@ void VIA6522::reset() {
     m_ca2Prev = true;
     m_cb1Prev = true;
     m_cb2Prev = true;
+    m_lastIrq = false;
     if (m_irqLine) m_irqLine->set(false);
     driveCA2(true);
     driveCB2(true);
@@ -108,6 +109,7 @@ bool VIA6522::ioWrite(IBus* bus, uint32_t addr, uint8_t val) {
         case IORA2:
             m_regs[ORA] = val;
             if (m_portADevice) m_portADevice->writePort(val);
+            if (m_portAWriteCb) m_portAWriteCb(val);
             if (reg == ORA) {
                 m_regs[IFR] &= ~0x02; // Clear CA1 flag
                 if (!(m_regs[PCR] & 0x08) && !(m_regs[PCR] & 0x02))
@@ -122,6 +124,7 @@ bool VIA6522::ioWrite(IBus* bus, uint32_t addr, uint8_t val) {
         case ORB:
             m_regs[ORB] = val;
             if (m_portBDevice) m_portBDevice->writePort(val);
+            if (m_portBWriteCb) m_portBWriteCb(val);
             m_regs[IFR] &= ~0x10; // Clear CB1 flag
             if (!(m_regs[PCR] & 0x80) && !(m_regs[PCR] & 0x20))
                 m_regs[IFR] &= ~0x08;
@@ -303,5 +306,9 @@ void VIA6522::updateIrq() {
     } else {
         m_regs[IFR] &= ~0x80;
     }
-    if (m_irqLine) m_irqLine->set(irq);
+    
+    if (irq != m_lastIrq) {
+        if (m_irqLine) m_irqLine->set(irq);
+        m_lastIrq = irq;
+    }
 }

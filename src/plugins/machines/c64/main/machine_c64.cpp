@@ -352,8 +352,8 @@ MachineDescriptor* createMachineC64() {
     //     IORegistry (PLA + device handlers) before reaching flat RAM.
     // -----------------------------------------------------------------------
     bus->setIoHooks(
-        [io, bus](uint32_t addr, uint8_t* val) { return io->dispatchRead (bus, addr, val); },
-        [io, bus](uint32_t addr, uint8_t  val) { return io->dispatchWrite(bus, addr, val); }
+        [io](IBus* b, uint32_t addr, uint8_t* val) { return io->dispatchRead (b, addr, val); },
+        [io](IBus* b, uint32_t addr, uint8_t  val) { return io->dispatchWrite(b, addr, val); }
     );
 
     // -----------------------------------------------------------------------

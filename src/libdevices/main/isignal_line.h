@@ -14,6 +14,9 @@ public:
 
     /**
      * Set the logic level of the line.
+     * Note: For shared lines (like IRQ), callers should avoid calling set(false) 
+     * if their internal state has not changed, to avoid overwriting an active 
+     * interrupt signal from another device sharing the same line.
      */
     virtual void set(bool level) = 0;
 

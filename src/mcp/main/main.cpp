@@ -31,6 +31,7 @@ MachineState* getMachine(const std::string& id) {
         state.machine = md;
         state.cpu = md->cpus[0].cpu;
         state.bus = md->buses[0].bus;
+        if (md->onReset) md->onReset(*md);
         g_machines[id] = state;
     }
     return &g_machines[id];
@@ -214,6 +215,16 @@ Json handleToolsList() {
     ecSchema.oVal["required"] = ecReq;
 
     addTool("eject_cartridge", "Eject currently attached cartridge", ecSchema);
+
+    Json rstSchema(Json::OBJ);
+    rstSchema.oVal["type"] = Json("object");
+    Json rstProps(Json::OBJ);
+    rstProps.oVal["machine_id"] = midProp;
+    rstSchema.oVal["properties"] = rstProps;
+    Json rstReq(Json::ARR); rstReq.push_back(Json("machine_id"));
+    rstSchema.oVal["required"] = rstReq;
+
+    addTool("reset_machine", "Reset a machine to its power-on state", rstSchema);
 
     std::vector<std::string> pluginTools;
     PluginToolRegistry::instance().listTools(pluginTools);
@@ -485,6 +496,16 @@ Json handleToolsCall(const Json& params) {
             } else {
                 textItem.oVal["text"] = Json("No cartridge attached.");
             }
+        }
+    } else if (name == "reset_machine") {
+        std::string mid = args["machine_id"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            if (ms->machine->onReset) ms->machine->onReset(*ms->machine);
+            textItem.oVal["text"] = Json("Machine " + mid + " reset.");
         }
     } else {
         std::string resultJson;

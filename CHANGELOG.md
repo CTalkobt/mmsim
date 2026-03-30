@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0-dev] - 2026-03-29
+
+### Added
+- **Deep Code Review (Critique)**:
+    - Performed a comprehensive architectural and implementation review of the Phase 0/1 codebase.
+    - Documented critical findings in `critique.md`, including ABI stability risks, memory leaks, encapsulation breaks, and performance bottlenecks.
+    - Identified "fat" interfaces and bug-prone `peek8` implementations in `ICore` and `IBus`.
+    - Recommended corrective actions for resource ownership, plugin API stability, and interface segregation.
+
 ## [0.2.0-dev] - 2026-03-28
 
 ### Added
@@ -27,6 +36,11 @@ All notable changes to this project will be documented in this file.
     - Implemented MOS 6545 / 6845 CRTC emulation with full timing counters and address generation.
     - Implemented PET Video Subsystem supporting PET 2001, 4000, and 8000 series.
     - Added support for character ROM glyph rendering, inverse video, and phosphor simulation.
+- **Commodore PET Series (Phases 12.4, 12.5)**:
+    - Implemented `IEEE488Bus` interface and `SimpleIEEE488Bus` implementation for PET peripherals.
+    - Added `MachineDescriptor` factories for PET 2001, 4032, and 8032 models.
+    - Implemented PET keyboard matrix (Graphics and Business layouts) wired to PIA/VIA.
+    - Configured model-specific memory maps with RAM and ROM overlays.
 - **Tape (Datasette) Support (Phase 14)**:
     - Added a roadmap for .tap pulse-encoded archive support across VIC-20, C64, and PET.
     - Planned core timing-exact decoder and machine-specific signal wiring.

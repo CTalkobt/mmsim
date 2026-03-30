@@ -164,8 +164,8 @@ static MachineDescriptor* createMachineVic20Impl(uint32_t expansionFlags,
     // Wire CPU reads/writes through the IO registry so VIC/VIA registers are
     // actually accessed instead of flat RAM.
     bus->setIoHooks(
-        [io, bus](uint32_t addr, uint8_t* val) { return io->dispatchRead(bus, addr, val); },
-        [io, bus](uint32_t addr, uint8_t  val) { return io->dispatchWrite(bus, addr, val); }
+        [io](IBus* b, uint32_t addr, uint8_t* val) { return io->dispatchRead(b, addr, val); },
+        [io](IBus* b, uint32_t addr, uint8_t  val) { return io->dispatchWrite(b, addr, val); }
     );
 
     // Wire VIA IRQ lines to the CPU so timer / peripheral interrupts are delivered.

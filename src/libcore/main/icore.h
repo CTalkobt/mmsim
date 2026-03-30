@@ -81,6 +81,8 @@ public:
     virtual void triggerIrq()   = 0;
     virtual void triggerNmi()   = 0;
     virtual void triggerReset() = 0;
+    virtual void setIrqLine(bool asserted) { if (asserted) triggerIrq(); }
+    virtual void setNmiLine(bool asserted) { if (asserted) triggerNmi(); }
 
     // Disassembly
     virtual int disassembleOne  (IBus* bus, uint32_t addr, char* buf, int bufsz) = 0;

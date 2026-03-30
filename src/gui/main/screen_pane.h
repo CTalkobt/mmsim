@@ -11,9 +11,9 @@
  * Also implements IKeyboardCapturePane so the host can wire the "Capture
  * Keyboard" toggle button to the frame's key-routing logic.
  */
-class VicDisplayPane : public wxPanel, public IKeyboardCapturePane {
+class ScreenPane : public wxPanel, public IKeyboardCapturePane {
 public:
-    explicit VicDisplayPane(wxWindow* parent);
+    explicit ScreenPane(wxWindow* parent);
 
     /** Set (or clear) the video device to render. */
     void SetVideoOutput(IVideoOutput* vid);

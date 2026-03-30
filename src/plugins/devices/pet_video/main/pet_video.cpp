@@ -10,11 +10,13 @@ void PetVideo::reset() {
 }
 
 bool PetVideo::ioRead(IBus*, uint32_t addr, uint8_t* val) {
+    if ((addr & ~0x07FFu) != baseAddr()) return false;
     *val = m_vram[addr & 0x07FF];
     return true;
 }
 
 bool PetVideo::ioWrite(IBus*, uint32_t addr, uint8_t val) {
+    if ((addr & ~0x07FFu) != baseAddr()) return false;
     m_vram[addr & 0x07FF] = val;
     return true;
 }

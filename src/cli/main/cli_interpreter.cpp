@@ -71,15 +71,33 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
                 m_ctx.cpu->observer = m_ctx.dbg;
                 m_ctx.bus->observer = m_ctx.dbg;
                 m_output("Created machine: " + md->displayName + "\n");
+                
+                if (m_ctx.machine->onReset) {
+                    m_ctx.machine->onReset(*m_ctx.machine);
+                }
+                showRegisters();
             } else {
                 m_output("Unknown machine type: " + id + "\n");
             }
         }
+    } else if (cmd == "reset") {
+        if (!m_ctx.machine) { m_output("No machine created.\n"); return; }
+        if (m_ctx.machine->onReset) {
+            m_ctx.machine->onReset(*m_ctx.machine);
+            m_output("Machine reset.\n");
+        }
+        showRegisters();
     } else if (cmd == "step") {
         if (!m_ctx.cpu) { m_output("No machine created.\n"); return; }
         int n = 1;
         if (ss >> n) {} else { n = 1; }
-        for (int i = 0; i < n; ++i) m_ctx.cpu->step();
+        for (int i = 0; i < n; ++i) {
+            if (m_ctx.machine && m_ctx.machine->schedulerStep) {
+                m_ctx.machine->schedulerStep(*m_ctx.machine);
+            } else {
+                m_ctx.cpu->step();
+            }
+        }
         showRegisters();
     } else if (cmd == "run") {
         if (!m_ctx.cpu) { m_output("No machine created.\n"); return; }
@@ -92,7 +110,11 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         }
         m_output("Running... (Ctrl-C to stop - actually not supported in CLI yet, will run until break)\n");
         while (true) {
-            m_ctx.cpu->step();
+            if (m_ctx.machine && m_ctx.machine->schedulerStep) {
+                m_ctx.machine->schedulerStep(*m_ctx.machine);
+            } else {
+                m_ctx.cpu->step();
+            }
             if (m_ctx.cpu->isProgramEnd(m_ctx.bus)) break;
             if (m_ctx.dbg->breakpoints().checkExec(m_ctx.cpu->pc())) break;
         }

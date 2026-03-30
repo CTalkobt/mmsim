@@ -2,6 +2,7 @@
 #include "cli/main/plugin_command_registry.h"
 #include "mcp/main/plugin_tool_registry.h"
 #include "gui/main/plugin_pane_manager.h"
+#include "libdevices/main/ivideo_output.h"
 #include <cstring>
 
 static int testCmdExecute(int argc, const char* const* argv, void* ctx) {
@@ -74,7 +75,7 @@ TEST_CASE(plugin_extension_gui_logic) {
         (void)parent;
         int* c = (int*)ctx;
         (*c)++;
-        return (void*)0xDEADBEEF; // Dummy handle
+        return (void*)0x1234; // Non-null dummy handle
     };
     auto refreshFn = [](void* handle, uint64_t cycles, void* ctx) {
         (void)handle; (void)cycles;
@@ -107,12 +108,14 @@ TEST_CASE(plugin_extension_gui_logic) {
 
     PluginPaneManager::instance().registerPane(&info);
     
+    wxWindow* dummyParent = (wxWindow*)0x5678;
+
     // Switch to non-matching machine
-    PluginPaneManager::instance().onMachineSwitch("c64", nullptr, nullptr);
+    PluginPaneManager::instance().onMachineSwitch("c64", dummyParent, nullptr);
     ASSERT(ctx.create == 0);
     
     // Switch to matching machine
-    PluginPaneManager::instance().onMachineSwitch("vic20", nullptr, nullptr);
+    PluginPaneManager::instance().onMachineSwitch("vic20", dummyParent, nullptr);
     ASSERT(ctx.create == 1);
     
     // Tick
@@ -120,6 +123,6 @@ TEST_CASE(plugin_extension_gui_logic) {
     ASSERT(ctx.refresh == 1);
     
     // Switch away
-    PluginPaneManager::instance().onMachineSwitch("c64", nullptr, nullptr);
+    PluginPaneManager::instance().onMachineSwitch("c64", dummyParent, nullptr);
     ASSERT(ctx.destroy == 1);
 }

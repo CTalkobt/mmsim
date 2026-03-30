@@ -4,6 +4,7 @@
 #include "libdevices/main/iport_device.h"
 #include "libdevices/main/isignal_line.h"
 #include <string>
+#include <functional>
 
 /**
  * MOS 6522 Versatile Interface Adapter (VIA).
@@ -37,6 +38,9 @@ public:
     void setCA2Line(ISignalLine* line)  { m_ca2Line = line; }
     void setCB1Line(ISignalLine* line)  { m_cb1Line = line; }
     void setCB2Line(ISignalLine* line)  { m_cb2Line = line; }
+
+    void setPortAWriteCallback(std::function<void(uint8_t)> cb) { m_portAWriteCb = cb; }
+    void setPortBWriteCallback(std::function<void(uint8_t)> cb) { m_portBWriteCb = cb; }
 
     // Register constants
     enum Reg {
@@ -85,8 +89,13 @@ private:
     ISignalLine* m_cb1Line  = nullptr;  // CB1 input
     ISignalLine* m_cb2Line  = nullptr;  // CB2 input/output (depends on PCR)
 
+    std::function<void(uint8_t)> m_portAWriteCb;
+    std::function<void(uint8_t)> m_portBWriteCb;
+
     bool m_ca1Prev = true;  // last sampled CA1 level
     bool m_ca2Prev = true;
     bool m_cb1Prev = true;
     bool m_cb2Prev = true;
+
+    bool m_lastIrq = false;
 };

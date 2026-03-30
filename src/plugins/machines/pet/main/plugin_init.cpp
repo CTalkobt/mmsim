@@ -6,34 +6,30 @@
 #include "libtoolchain/main/toolchain_registry.h"
 #include <vector>
 
-// Forward declarations of factory functions in machine_vic20.cpp
-MachineDescriptor* createMachineVic20();
-MachineDescriptor* createMachineVic20_3K();
-MachineDescriptor* createMachineVic20_8K();
-MachineDescriptor* createMachineVic20_16K();
-MachineDescriptor* createMachineVic20_32K();
+// Factory functions from machine_pet.cpp
+MachineDescriptor* createPet2001();
+MachineDescriptor* createPet4032();
+MachineDescriptor* createPet8032();
 
 static MachinePluginInfo s_machines[] = {
-    {"vic20",      createMachineVic20},
-    {"vic20+3k",   createMachineVic20_3K},
-    {"vic20+8k",   createMachineVic20_8K},
-    {"vic20+16k",  createMachineVic20_16K},
-    {"vic20+32k",  createMachineVic20_32K},
+    { "pet2001", createPet2001 },
+    { "pet4032", createPet4032 },
+    { "pet8032", createPet8032 }
 };
 
-static const char* s_vic20Deps[] = { "6502", "via6522", "vic6560", "kbd-vic20", "cbm-loader", nullptr };
+static const char* s_deps[] = { "6502", "pia6520", "via6522", "crtc6545", "pet-video", "cbm-loader", nullptr };
 
 static SimPluginManifest s_manifest = {
     MMEMU_PLUGIN_API_VERSION,
-    "vic20",
-    nullptr,
+    "pet",
+    "Commodore PET Series",
     "1.0.0",
-    s_vic20Deps,
-    nullptr,
+    s_deps,
+    nullptr, // supportedMachineIds
     0, nullptr,
     0, nullptr,
     0, nullptr,
-    5, s_machines,
+    3, s_machines,
     0, nullptr,
     0, nullptr
 };
