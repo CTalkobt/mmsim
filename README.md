@@ -2,6 +2,8 @@
 
 **mmsim** (Multi-Machine Simulator) is a universal 8/16-bit emulation platform designed with a modular, plugin-based architecture. It provides a robust host infrastructure that allows different CPU cores, memory models, and I/O devices to be composed into complete machine simulations at runtime.
 
+Help with this development by contributing and buy me a coffee at: https://kodecoffee.com/i/ctalkobt
+
 ## 1. Core Architecture
 
 The system is built on a strictly decoupled library system to ensure flexibility and maintainability:
