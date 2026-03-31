@@ -1,8 +1,14 @@
 #include "mmemu_plugin_api.h"
 #include "vic2.h"
 
+static const SimPluginHostAPI* g_host = nullptr;
+
 static IOHandler* createVIC2() {
-    return new VIC2("VIC-II", 0xD000);
+    auto* vic = new VIC2("VIC-II", 0xD000);
+    if (g_host && g_host->getLogger && g_host->logNamed) {
+        vic->setLogger(g_host->getLogger("vic2"), g_host->logNamed);
+    }
+    return vic;
 }
 
 static DevicePluginInfo s_devices[] = {
@@ -25,6 +31,6 @@ static SimPluginManifest s_manifest = {
 #include "libdevices/main/device_registry.h"
 
 extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host) {
-    (void)host;
+    g_host = host;
     return &s_manifest;
 }

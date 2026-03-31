@@ -18,6 +18,8 @@
 #include <string>
 #include <algorithm>
 
+const struct SimPluginHostAPI* g_c64Host = nullptr;
+
 namespace {
 
 // ---------------------------------------------------------------------------
@@ -31,7 +33,7 @@ public:
     void pulse() override { if (m_cpu) m_cpu->triggerIrq(); }
     void set(bool level) override {
         m_level = level;
-        if (level && m_cpu) m_cpu->triggerIrq();
+        if (m_cpu) m_cpu->setIrqLine(level);
     }
 private:
     ICore* m_cpu;
@@ -45,7 +47,7 @@ public:
     void pulse() override { if (m_cpu) m_cpu->triggerNmi(); }
     void set(bool level) override {
         m_level = level;
-        if (level && m_cpu) m_cpu->triggerNmi();
+        if (m_cpu) m_cpu->setNmiLine(level);
     }
 private:
     ICore* m_cpu;
@@ -81,22 +83,6 @@ private:
 
 // ---------------------------------------------------------------------------
 // C64 Keyboard Matrix
-//
-// Wired to CIA1: Port A ($DC00) = column select (CPU output, active low),
-//                Port B ($DC01) = row sense (CPU input, active low).
-//
-// Key matrix — m_matrix[PA_bit] holds PB row bitmask (0=pressed).
-// Pairs in s_keyMap are {PB_bit, PA_bit}.
-//
-//           PA0      PA1    PA2      PA3   PA4    PA5   PA6      PA7
-// PB0:     DEL      3      5        7     9      +     POUND    1
-// PB1:     RET      W      R        Y     I      P     *        ARROW_LT
-// PB2:     CRSR_RT  A      D        G     J      L     ;        CTRL
-// PB3:     F7       4      6        8     0      -     HOME     2
-// PB4:     F1       Z      C        B     M      .     R_SHFT   SPACE
-// PB5:     F3       S      F        H     K      :     =        CBM
-// PB6:     F5       E      T        U     O      @     ARROW_UP Q
-// PB7:     CRSR_DN  LSHFT  X        V     N      ,     /        RUN_STOP
 // ---------------------------------------------------------------------------
 
 class KbdC64 : public IOHandler {
@@ -104,9 +90,6 @@ public:
     KbdC64() : m_colPort(this), m_rowPort(this) { clearKeys(); }
     ~KbdC64() override = default;
 
-    // -----------------------------------------------------------------------
-    // IOHandler — null handler; registered so reset() clears keys on machine reset
-    // -----------------------------------------------------------------------
     const char* name()     const override { return "C64Keyboard"; }
     uint32_t    baseAddr() const override { return 0; }
     uint32_t    addrMask() const override { return 0; }
@@ -115,31 +98,53 @@ public:
     void reset() override { clearKeys(); }
     void tick(uint64_t) override {}
 
-    // -----------------------------------------------------------------------
-    // Keyboard matrix interface
-    // -----------------------------------------------------------------------
-
     void clearKeys() {
         std::memset(m_matrix, 0xFF, sizeof(m_matrix));
         updateMatrix();
     }
 
     bool pressKeyByName(const std::string& keyName, bool down) {
+        if (g_c64Host && g_c64Host->log) {
+            char buf[128];
+            std::snprintf(buf, sizeof(buf), "KbdC64: pressKeyByName '%s' down=%d", keyName.c_str(), (int)down);
+            g_c64Host->log(SIM_LOG_DEBUG, buf);
+        }
         std::string lower = keyName;
         std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-        auto it = s_keyMap.find(lower);
-        if (it == s_keyMap.end()) return false;
-        int pa = it->second.second;  // PA bit: which column is scanned
-        int pb = it->second.first;   // PB bit: which row goes low
-        if (down) m_matrix[pa] &= ~(1 << pb);
-        else      m_matrix[pa] |=  (1 << pb);
-        updateMatrix();
-        return true;
-    }
 
-    // -----------------------------------------------------------------------
-    // Port devices — attach these to CIA1 Port A and Port B
-    // -----------------------------------------------------------------------
+        if (lower == "exclaim")   return pressCombo({"left_shift", "1"}, down);
+        if (lower == "dquote")    return pressCombo({"left_shift", "2"}, down);
+        if (lower == "hash")      return pressCombo({"left_shift", "3"}, down);
+        if (lower == "dollar")    return pressCombo({"left_shift", "4"}, down);
+        if (lower == "percent")   return pressCombo({"left_shift", "5"}, down);
+        if (lower == "ampersand") return pressCombo({"left_shift", "6"}, down);
+        if (lower == "squote")    return pressCombo({"left_shift", "7"}, down); 
+        if (lower == "lparen")    return pressCombo({"left_shift", "8"}, down);
+        if (lower == "rparen")    return pressCombo({"left_shift", "9"}, down);
+        if (lower == "question")  return pressCombo({"left_shift", "slash"}, down);
+        if (lower == "less")      return pressCombo({"left_shift", "comma"}, down);
+        if (lower == "greater")   return pressCombo({"left_shift", "period"}, down);
+        if (lower == "bracket_left")  return pressCombo({"left_shift", "colon"}, down);
+        if (lower == "bracket_right") return pressCombo({"left_shift", "semicolon"}, down);
+
+        if (lower == "uparrow")   lower = "arrow_up";
+        if (lower == "leftarrow") lower = "arrow_left";
+        if (lower == "right")     lower = "crsr_right";
+        if (lower == "down")      lower = "crsr_down";
+        if (lower == "up")        return pressCombo({"left_shift", "crsr_down"}, down);
+        if (lower == "left")      return pressCombo({"left_shift", "crsr_right"}, down);
+
+        auto it = s_keyMap.find(lower);
+        if (it != s_keyMap.end()) {
+            int pa = it->second.second;
+            int pb = it->second.first;
+            if (down) m_matrix[pa] &= ~(1 << pb);
+            else      m_matrix[pa] |=  (1 << pb);
+            updateMatrix();
+            return true;
+        }
+        return false;
+    }
 
     /** CIA1 Port A device: CPU writes column-select here. */
     class ColumnPort : public IPortDevice {
@@ -168,6 +173,26 @@ public:
     IPortDevice* getRowPort()    { return &m_rowPort; }
 
 private:
+    bool pressCombo(const std::vector<std::string>& keys, bool down) {
+        bool ok = true;
+        for (const auto& k : keys) {
+            if (!down && (k == "left_shift" || k == "right_shift" || k == "ctrl" || k == "cbm")) {
+                continue;
+            }
+            auto it = s_keyMap.find(k);
+            if (it != s_keyMap.end()) {
+                int pa = it->second.second;
+                int pb = it->second.first;
+                if (down) m_matrix[pa] &= ~(1 << pb);
+                else      m_matrix[pa] |=  (1 << pb);
+            } else {
+                ok = false;
+            }
+        }
+        updateMatrix();
+        return ok;
+    }
+
     void updateMatrix() {
         uint8_t rows = 0xFF;
         for (int col = 0; col < 8; ++col)
@@ -184,36 +209,47 @@ private:
     static std::map<std::string, std::pair<int,int>> s_keyMap;
 };
 
+/**
+ * VIC-II DMA Bus — bypasses CPU banking (PLA) and I/O.
+ */
+class C64DmaBus : public IBus {
+public:
+    explicit C64DmaBus(FlatMemoryBus* base) : m_base(base) {}
+    const BusConfig& config() const override { return m_base->config(); }
+    const char*      name()   const override { return "C64DmaBus"; }
+    uint8_t read8(uint32_t addr)  override { return m_base->read8Raw(addr); }
+    void    write8(uint32_t, uint8_t) override {}
+    uint8_t peek8(uint32_t addr)  override { return m_base->peek8Raw(addr); }
+    size_t stateSize() const override { return 0; }
+    void   saveState(uint8_t*) const override {}
+    void   loadState(const uint8_t*) override {}
+    int    writeCount() const override { return 0; }
+    void   getWrites(uint32_t*, uint8_t*, uint8_t*, int) const override {}
+    void   clearWriteLog() override {}
+private:
+    FlatMemoryBus* m_base;
+};
+
 std::map<std::string, std::pair<int,int>> KbdC64::s_keyMap = {
-    // PB row 0
     {"delete",{0,0}},   {"3",{0,1}},    {"5",{0,2}},   {"7",{0,3}},
     {"9",{0,4}},        {"plus",{0,5}}, {"pound",{0,6}},{"1",{0,7}},
-    // PB row 1
     {"return",{1,0}},   {"w",{1,1}},    {"r",{1,2}},   {"y",{1,3}},
     {"i",{1,4}},        {"p",{1,5}},    {"asterisk",{1,6}},{"arrow_left",{1,7}},
-    // PB row 2
     {"crsr_right",{2,0}},{"a",{2,1}},  {"d",{2,2}},   {"g",{2,3}},
     {"j",{2,4}},        {"l",{2,5}},    {"semicolon",{2,6}},{"ctrl",{2,7}},
-    // PB row 3
     {"f7",{3,0}},       {"4",{3,1}},    {"6",{3,2}},   {"8",{3,3}},
     {"0",{3,4}},        {"minus",{3,5}},{"home",{3,6}}, {"2",{3,7}},
-    // PB row 4
     {"f1",{4,0}},       {"z",{4,1}},    {"c",{4,2}},   {"b",{4,3}},
     {"m",{4,4}},        {"period",{4,5}},{"right_shift",{4,6}},{"space",{4,7}},
-    // PB row 5
     {"f3",{5,0}},       {"s",{5,1}},    {"f",{5,2}},   {"h",{5,3}},
     {"k",{5,4}},        {"colon",{5,5}},{"equal",{5,6}},{"cbm",{5,7}},
-    // PB row 6
     {"f5",{6,0}},       {"e",{6,1}},    {"t",{6,2}},   {"u",{6,3}},
     {"o",{6,4}},        {"at",{6,5}},   {"arrow_up",{6,6}},{"q",{6,7}},
-    // PB row 7
     {"crsr_down",{7,0}},{"left_shift",{7,1}},{"x",{7,2}},{"v",{7,3}},
     {"n",{7,4}},        {"comma",{7,5}},{"slash",{7,6}},{"run_stop",{7,7}},
 };
 
 } // namespace
-
-const struct SimPluginHostAPI* g_c64Host = nullptr;
 
 // ---------------------------------------------------------------------------
 // C64 Machine Descriptor Factory
@@ -223,17 +259,11 @@ MachineDescriptor* createMachineC64() {
     auto* desc = new MachineDescriptor();
     desc->machineId   = "c64";
     desc->displayName = "Commodore 64";
-    desc->licenseClass = "proprietary"; // ROMs are proprietary
+    desc->licenseClass = "proprietary"; 
 
-    // -----------------------------------------------------------------------
-    // 1. Memory bus — 64 KB flat RAM; I/O and ROM regions overlaid via hooks
-    // -----------------------------------------------------------------------
     auto* bus = new FlatMemoryBus("system", 16);
     desc->buses.push_back({"system", bus});
 
-    // -----------------------------------------------------------------------
-    // 2. CPU — MOS 6510
-    // -----------------------------------------------------------------------
     ICore*    cpu    = nullptr;
     if (g_c64Host && g_c64Host->createCore) {
         cpu = g_c64Host->createCore("6510");
@@ -242,36 +272,24 @@ MachineDescriptor* createMachineC64() {
     }
 
     MOS6510*  cpu6510 = dynamic_cast<MOS6510*>(cpu);
-    if (!cpu) {
-        std::cerr << "C64: could not find '6510' core." << std::endl;
-    }
     if (cpu) {
         cpu->setDataBus(bus);
         cpu->setCodeBus(bus);
-        desc->cpus.push_back({"main", cpu, bus, bus, nullptr, true, 1});
+        IBus* dataBus = bus;
+        if (cpu6510 && cpu6510->getPortBus()) {
+            dataBus = cpu6510->getPortBus();
+        }
+        desc->cpus.push_back({"main", cpu, dataBus, dataBus, nullptr, true, 1});
     }
 
-    // -----------------------------------------------------------------------
-    // 3. I/O registry
-    // -----------------------------------------------------------------------
     auto* io = new IORegistry();
     desc->ioRegistry = io;
 
-    // -----------------------------------------------------------------------
-    // 4. Color RAM (1 KB × 4-bit at $D800)
-    // -----------------------------------------------------------------------
     uint8_t* colorRam = new uint8_t[1024];
     std::memset(colorRam, 0, 1024);
-    desc->roms.push_back(colorRam);  // owned by MachineDescriptor for cleanup
+    desc->roms.push_back(colorRam);
 
-    // -----------------------------------------------------------------------
-    // 5. Device instantiation — use DeviceRegistry if the plugin is loaded,
-    //    otherwise construct directly (useful in test environments).
-    // -----------------------------------------------------------------------
-
-    // C64 PLA — always constructed directly (no standalone plugin instance)
     auto* pla = new C64PLA();
-
     VIC2* vic2 = nullptr;
     SID6581* sid = nullptr;
     CIA6526 *cia1 = nullptr, *cia2 = nullptr;
@@ -290,48 +308,30 @@ MachineDescriptor* createMachineC64() {
 
     if (!vic2) vic2 = new VIC2("VIC-II", 0xD000);
     else { vic2->setName("VIC-II"); vic2->setBaseAddr(0xD000); }
-
     if (!sid) sid = new SID6581("SID", 0xD400);
     else { sid->setName("SID"); sid->setBaseAddr(0xD400); }
-
     if (!cia1) cia1 = new CIA6526("CIA1", 0xDC00);
     else { cia1->setName("CIA1"); cia1->setBaseAddr(0xDC00); }
-
     if (!cia2) cia2 = new CIA6526("CIA2", 0xDD00);
     else { cia2->setName("CIA2"); cia2->setBaseAddr(0xDD00); }
 
-    // -----------------------------------------------------------------------
-    // 6. Wire 6510 I/O port banking signals into the PLA
-    // -----------------------------------------------------------------------
     if (cpu6510) {
         pla->setSignals(cpu6510->signalLoram(),
                         cpu6510->signalHiram(),
                         cpu6510->signalCharen());
     }
 
-    // -----------------------------------------------------------------------
-    // 7. VIC-II DMA bus + initial bank
-    //
-    // The VIC-II sees a 16 KB window selected by CIA2 Port A bits 0-1
-    // (inverted). Power-on default: DDRA=0 → all inputs → pull-ups drive
-    // bits 0-1 high → effective output 11 → ~11 & 3 = 00 → bank 0 ($0000).
-    // -----------------------------------------------------------------------
-    vic2->setDmaBus(bus);
+    auto* dmaBus = new C64DmaBus(bus);
+    desc->deleters.push_back([dmaBus]() { delete dmaBus; });
+    vic2->setDmaBus(dmaBus);
     vic2->setBankBase(0x0000);
 
     cia2->setPortAWriteCallback([vic2](uint8_t pra, uint8_t ddra) {
-        // Effective output on bits 0-1: output-configured bits from pra;
-        // input-configured bits float high (pull-up on real hardware).
         uint8_t effective = (pra & ddra) | (~ddra & 0xFF);
         uint8_t bankBits  = (~effective) & 0x03;
         vic2->setBankBase((uint32_t)bankBits * 0x4000);
     });
 
-    // -----------------------------------------------------------------------
-    // 8. IRQ / NMI signal lines
-    //    - VIC-II raster + CIA1 timer/TOD → CPU IRQ (open-collector, shared)
-    //    - CIA2 → CPU NMI (Restore key on real hardware)
-    // -----------------------------------------------------------------------
     if (cpu) {
         auto* irqLine = new CpuIrqLine(cpu);
         auto* nmiLine = new CpuNmiLine(cpu);
@@ -342,19 +342,9 @@ MachineDescriptor* createMachineC64() {
         desc->deleters.push_back([nmiLine]() { delete nmiLine; });
     }
 
-    // PAL clock (NTSC = 1022727)
     cia1->setClockHz(985248);
     cia2->setClockHz(985248);
 
-    // -----------------------------------------------------------------------
-    // 9. Register handlers in IORegistry.
-    // Sort order matters: PLA at $A000 is examined before $D000 devices so it
-    // can intercept ROM regions before VIC-II/SID/CIA dispatch.
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
-    // 8.5 Keyboard matrix — wired to CIA1 Port A (columns) and Port B (rows).
-    //     Registered so resetAll() clears key state on machine reset.
-    // -----------------------------------------------------------------------
     auto* kbd = new KbdC64();
     cia1->setPortADevice(kbd->getColumnPort());
     cia1->setPortBDevice(kbd->getRowPort());
@@ -362,67 +352,40 @@ MachineDescriptor* createMachineC64() {
         return kbd->pressKeyByName(keyName, down);
     };
 
-    io->registerOwnedHandler(pla);                       // $A000 — sort anchor
-    io->registerOwnedHandler(vic2);                      // $D000–$D3FF
-    io->registerOwnedHandler(sid);                       // $D400–$D7FF
-    io->registerOwnedHandler(new ColorRamHandler(colorRam)); // $D800–$DBFF
-    io->registerOwnedHandler(cia1);                      // $DC00–$DCFF
-    io->registerOwnedHandler(cia2);                      // $DD00–$DDFF
-    io->registerOwnedHandler(kbd);                       // keyboard (null handler, for reset)
+    io->registerOwnedHandler(pla);
+    io->registerOwnedHandler(vic2);
+    io->registerOwnedHandler(sid);
+    io->registerOwnedHandler(new ColorRamHandler(colorRam));
+    io->registerOwnedHandler(cia1);
+    io->registerOwnedHandler(cia2);
+    io->registerOwnedHandler(kbd);
 
-    // -----------------------------------------------------------------------
-    // 10. Wire bus I/O hooks so every CPU read/write passes through the
-    //     IORegistry (PLA + device handlers) before reaching flat RAM.
-    // -----------------------------------------------------------------------
     bus->setIoHooks(
         [io](IBus* b, uint32_t addr, uint8_t* val) { return io->dispatchRead (b, addr, val); },
         [io](IBus* b, uint32_t addr, uint8_t  val) { return io->dispatchWrite(b, addr, val); }
     );
 
-    // -----------------------------------------------------------------------
-    // 11. ROM images
-    // -----------------------------------------------------------------------
-    uint8_t* basicRom  = new uint8_t[8192]();   // zero-initialised
+    uint8_t* basicRom  = new uint8_t[8192]();
     uint8_t* kernalRom = new uint8_t[8192]();
     uint8_t* charRom   = new uint8_t[4096]();
-
     desc->roms.push_back(basicRom);
     desc->roms.push_back(kernalRom);
     desc->roms.push_back(charRom);
 
-    if (!romLoad("roms/c64/basic.bin",  basicRom,  8192))
-        std::cerr << "C64: Warning: roms/c64/basic.bin not found." << std::endl;
-    if (!romLoad("roms/c64/kernal.bin", kernalRom, 8192))
-        std::cerr << "C64: Warning: roms/c64/kernal.bin not found." << std::endl;
-    if (!romLoad("roms/c64/char.bin",   charRom,   4096))
-        std::cerr << "C64: Warning: roms/c64/char.bin not found." << std::endl;
+    romLoad("roms/c64/basic.bin",  basicRom,  8192);
+    romLoad("roms/c64/kernal.bin", kernalRom, 8192);
+    romLoad("roms/c64/char.bin",   charRom,   4096);
 
-    // PLA serves ROM data on reads; VIC-II uses char ROM for character DMA.
     pla->setBasicRom (basicRom,  8192);
     pla->setKernalRom(kernalRom, 8192);
     pla->setCharRom  (charRom,   4096);
     vic2->setCharRom (charRom,   4096);
-    vic2->setColorRam(colorRam);   // direct 4-bit connection, bypasses CPU banking
-
-    // Add bus overlays so peek8() (debugger/disassembler) sees ROM content.
-    // The PLA IO hook intercepts read8() first; when ROM is banked out the
-    // PLA returns flat RAM via setRamData() — overlays are never reached then.
-    bus->addOverlay(0xA000, 8192, basicRom,  false);  // BASIC ROM
-    bus->addOverlay(0xE000, 8192, kernalRom, false);  // KERNAL ROM
-    bus->addOverlay(0xD000, 4096, charRom,   false);  // Char ROM
-
-    // Give the PLA a pointer to flat RAM so it can return correct data when
-    // a ROM region is banked out (prevents the overlay from serving ROM bytes).
+    vic2->setColorRam(colorRam);
     pla->setRamData(bus->rawData());
 
-    // -----------------------------------------------------------------------
-    // 12. Lifecycle callbacks
-    // -----------------------------------------------------------------------
     desc->onReset = [](MachineDescriptor& d) {
         if (d.ioRegistry) d.ioRegistry->resetAll();
-        for (auto& slot : d.cpus) {
-            if (slot.cpu) slot.cpu->reset();
-        }
+        for (auto& slot : d.cpus) if (slot.cpu) slot.cpu->reset();
     };
 
     desc->schedulerStep = [](MachineDescriptor& d) {

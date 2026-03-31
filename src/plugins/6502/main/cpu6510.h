@@ -45,7 +45,14 @@ public:
     uint8_t portDDR()  const { return m_ddr; }
     uint8_t portData() const { return m_data; }
 
+    /** Returns the internal proxy bus that intercepts $00/$01. */
+    IBus* getPortBus() const { return m_portBus; }
+
+    int step() override;
+
 private:
+    uint64_t     m_stepCounter = 0;
+
     // -----------------------------------------------------------------------
     // Simple edge-triggered signal line implementation.
     // -----------------------------------------------------------------------
@@ -122,15 +129,8 @@ private:
         return (m_data & m_ddr) | (~m_ddr & 0xFF);
     }
 
-    void ddrWrite(uint8_t val) {
-        m_ddr = val & 0x3F; // only 6 bits exist
-        updateSignals();
-    }
-
-    void dataWrite(uint8_t val) {
-        m_data = val & 0x3F;
-        updateSignals();
-    }
+    void ddrWrite(uint8_t val);
+    void dataWrite(uint8_t val);
 
     void updateSignals();
     void installBus(IBus* bus);

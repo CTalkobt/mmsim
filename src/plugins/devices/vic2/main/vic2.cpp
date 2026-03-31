@@ -1,7 +1,9 @@
 #include "vic2.h"
 #include "libmem/main/ibus.h"
+#include "mmemu_plugin_api.h"
 #include <cstring>
 #include <algorithm>
+#include <cstdio>
 
 VIC2::VIC2(const std::string& name, uint32_t baseAddr)
     : m_name(name), m_baseAddr(baseAddr)
@@ -53,12 +55,28 @@ uint32_t VIC2::palette(uint8_t index) const {
     return s_palette[index & 0x0F];
 }
 
+void VIC2::log(int level, const char* msg) const {
+    if (m_logger && m_logNamed) {
+        m_logNamed(m_logger, level, msg);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // DMA access helpers
 // ---------------------------------------------------------------------------
 
 uint8_t VIC2::dmaPeek(uint32_t offset) const {
     if (!m_dmaBus) return 0xFF;
+    offset &= 0x3FFF; // 14-bit internal VIC-II address
+
+    // Character ROM shadow: bank offsets $1000-$1FFF.
+    // On a real C64, this shadow is ONLY visible in banks 0 and 2
+    // (where the VIC-II's VA13 pin is effectively 0).
+    bool isBank0or2 = (m_bankBase == 0x0000 || m_bankBase == 0x8000);
+    if (m_charRom && isBank0or2 && (offset >= 0x1000 && offset <= 0x1FFF)) {
+        return m_charRom[offset & 0x0FFF];
+    }
+
     uint32_t addr = (m_bankBase + offset) & 0xFFFF;
     return m_dmaBus->peek8(addr);
 }
@@ -179,6 +197,13 @@ void VIC2::tick(uint64_t cycles) {
             m_rasterLine = 0;
         }
 
+        static int tickLogCounter = 0;
+        if (tickLogCounter++ % 10000 == 0) {
+            char msg[128];
+            std::snprintf(msg, sizeof(msg), "VIC2::tick: raster=%d cycleAccum=%lu", m_rasterLine, m_cycleAccum);
+            log(SIM_LOG_DEBUG, msg);
+        }
+
         // Raster compare: fires when current line matches $D011 bit-8 + $D012.
         uint16_t compare = (uint16_t)(m_regs[RASTER]) |
                            ((m_regs[SCR1] & SCR1_RASTER8) ? 0x100 : 0);
@@ -227,6 +252,44 @@ void VIC2::renderBackground(uint32_t* buf) {
     // $9000–$9FFF.  When the char base falls in those windows, we read from
     // the ROM image rather than from the DMA bus.
     bool useCharRom = !bmm && (cbBase == 0x1000 || cbBase == 0x9000);
+
+    // Logging for debug
+    static int frameCounter = 0;
+    if (frameCounter++ % 60 == 0) {
+        char msg[256];
+        std::snprintf(msg, sizeof(msg), 
+            "renderBackground: ECM=%d BMM=%d MCM=%d SCRBASE=$%04X CBBASE=$%04X BANK=$%04X CHARROM=%d",
+            (int)ecm, (int)bmm, (int)mcm, scrBase, cbBase, m_bankBase, (int)useCharRom);
+        log(SIM_LOG_DEBUG, msg);
+        
+        // Sample first few bytes of screen RAM
+        uint8_t s0 = dmaPeek(0 + (scrBase & 0x3FFF));
+        uint8_t s1 = dmaPeek(1 + (scrBase & 0x3FFF));
+        uint8_t c0 = m_colorRam ? (m_colorRam[0] & 0x0F) : 0;
+        std::snprintf(msg, sizeof(msg), "Sample: SCR[0]=$%02X SCR[1]=$%02X COL[0]=$%02X", s0, s1, c0);
+        log(SIM_LOG_DEBUG, msg);
+
+        // Sample screen content: count non-space characters
+        int nonSpace = 0;
+        for (int i = 0; i < 1000; ++i) {
+            if (dmaPeek(scrBase + i) != 0x20) nonSpace++;
+        }
+        std::snprintf(msg, sizeof(msg), "Screen Content: %d / 1000 cells are not space ($20)", nonSpace);
+        log(SIM_LOG_DEBUG, msg);
+
+        // Sample character ROM data for character $20 (space) and $01 (A)
+        if (useCharRom) {
+            uint8_t b20 = charRomByte(0x20 * 8); // first byte of space
+            uint8_t b01 = charRomByte(0x01 * 8); // first byte of 'A'
+            std::snprintf(msg, sizeof(msg), "CharROM Sample: CHAR[$20][0]=$%02X CHAR[$01][0]=$%02X", b20, b01);
+            log(SIM_LOG_DEBUG, msg);
+        } else {
+            uint8_t b20 = dmaPeek(cbBase + 0x20 * 8);
+            uint8_t b01 = dmaPeek(cbBase + 0x01 * 8);
+            std::snprintf(msg, sizeof(msg), "CharRAM Sample: CHAR[$20][0]=$%02X CHAR[$01][0]=$%02X", b20, b01);
+            log(SIM_LOG_DEBUG, msg);
+        }
+    }
 
     uint32_t bg0 = palette(m_regs[BGCOL0] & 0x0F);
     uint32_t bg1 = palette(m_regs[BGCOL1] & 0x0F);

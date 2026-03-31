@@ -6,12 +6,18 @@
 #include "libcore/main/machine_desc.h"
 #include "libmem/main/memory_bus.h"
 
+static const SimPluginHostAPI* g_host = nullptr;
+
 static ICore* createCore6502() {
     return new MOS6502();
 }
 
 static ICore* createCore6510() {
-    return new MOS6510();
+    auto* core = new MOS6510();
+    if (g_host && g_host->getLogger && g_host->logNamed) {
+        core->setLogger(g_host->getLogger("6510"), g_host->logNamed);
+    }
+    return core;
 }
 
 static IDisassembler* createDisasm6502() {
@@ -83,6 +89,6 @@ static SimPluginManifest s_manifest = {
 #include "libtoolchain/main/toolchain_registry.h"
 
 extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host) {
-    (void)host;
+    g_host = host;
     return &s_manifest;
 }

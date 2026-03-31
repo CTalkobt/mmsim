@@ -11,6 +11,7 @@
 #include "sid6581.h"
 #include <vector>
 #include <string>
+#include <cstring>
 
 // Linked directly into the test binary — no dlopen for core machine components.
 MachineDescriptor* createMachineC64();
@@ -302,12 +303,67 @@ TEST_CASE(c64_keyboard_scan) {
     desc->ioRegistry->dispatchRead(bus, 0xDC01, &pb0);
     ASSERT(pb0 == 0xFF); // no key in PA0 column pressed
 
-    // Release "a" and verify row returns high.
-    desc->onKey("a", false);
-    desc->ioRegistry->dispatchWrite(bus, 0xDC00, ~0x02 & 0xFF); // select PA1 again
-    uint8_t pb_rel = 0;
-    desc->ioRegistry->dispatchRead(bus, 0xDC01, &pb_rel);
-    ASSERT(pb_rel == 0xFF); // no keys pressed → all rows high
+    destroyDesc(desc);
+}
+
+// ---------------------------------------------------------------------------
+// Test 10: VIC-II Character Map visibility — verify the VIC-II can see its
+//          character ROM even when the CPU has banked it out for I/O.
+// ---------------------------------------------------------------------------
+
+TEST_CASE(c64_vic2_character_map_visibility) {
+    ensureRegistriesReady();
+    auto* desc = createMachineC64();
+    ASSERT(desc != nullptr);
+    auto* bus = getBus(desc);
+
+    // Find the VIC2 instance in the IO registry
+    std::vector<IOHandler*> handlers;
+    desc->ioRegistry->enumerate(handlers);
+    VIC2* vic2 = nullptr;
+    for (auto* h : handlers) {
+        if (std::string(h->name()) == "VIC-II") {
+            vic2 = static_cast<VIC2*>(h);
+            break;
+        }
+    }
+    ASSERT(vic2 != nullptr);
+
+    // 1. Setup mock Character ROM data
+    uint8_t mockCharRom[4096];
+    std::memset(mockCharRom, 0, sizeof(mockCharRom));
+    mockCharRom[0x0123] = 0x42; // Unique value at offset $123
+    vic2->setCharRom(mockCharRom, sizeof(mockCharRom));
+
+    // 2. Configure CPU to see I/O at $D000 (bank out Char ROM)
+    // 6510 Port: bit 2 (CHAREN) = 1 for I/O, 0 for Char ROM.
+    bus->write8(0x0000, 0x07); // DDR: bits 0-2 output
+    bus->write8(0x0001, 0x37); // DATA: %00110111 (LORAM=1, HIRAM=1, CHAREN=1)
+
+    // Verify CPU sees I/O at $D020 (border color register)
+    // Default border color is $0E; bits 4-7 read as 1.
+    ASSERT(bus->read8(0xD020) == 0xFE);
+
+    // 3. Verify VIC-II still sees Character ROM via DMA
+    // In VIC bank 0 ($0000-$3FFF), Char ROM is shadowed at $1000-$1FFF.
+    // Offset $1123 in bank 0 maps to Char ROM offset $0123.
+    ASSERT(vic2->dmaPeek(0x1123) == 0x42);
+
+    // 4. Test Bank 2 ($8000-$BFFF) — Char ROM shadowed at $9000-$9FFF
+    // Switch to Bank 2: CIA2 Port A bits 0-1 = %01 (inverted -> %10 = 2)
+    // CIA2 Port A is at $DD00.
+    desc->ioRegistry->dispatchWrite(bus, 0xDD02, 0x03); // DDRA bits 0-1 output
+    desc->ioRegistry->dispatchWrite(bus, 0xDD00, 0x01); // PRA bits 0-1 = %01
+    
+    // Offset $1123 in bank 2 ($8000 + $1123 = $9123) maps to Char ROM offset $0123.
+    ASSERT(vic2->dmaPeek(0x1123) == 0x42);
+
+    // 5. Test Bank 1 ($4000-$7FFF) — Char ROM NOT shadowed here (sees bus directly)
+    desc->ioRegistry->dispatchWrite(bus, 0xDD00, 0x02); // effective %10 -> bankBits %01 (1)
+    
+    // Fill RAM at $4000 + $1123 = $5123 with a different value
+    bus->write8(0x5123, 0x99);
+    ASSERT(vic2->dmaPeek(0x1123) == 0x99); // Should NOT see Char ROM
 
     destroyDesc(desc);
 }

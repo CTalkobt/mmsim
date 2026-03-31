@@ -59,6 +59,7 @@ public:
 
 private:
     void updateMatrix();
+    bool pressCombo(const std::vector<std::string>& keys, bool down);
 
     uint8_t m_matrix[8]; // 8 rows, each byte is 8 columns
     uint8_t m_rowVal = 0xFF;

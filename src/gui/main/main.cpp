@@ -486,7 +486,8 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             if (m_machine) delete m_machine;
             m_machine = md;
             m_cpu = m_machine->cpus[0].cpu;
-            m_bus = m_machine->buses[0].bus;
+            // Use CPU data bus for memory pane if available, otherwise fallback to machine bus
+            m_bus = m_machine->cpus[0].dataBus ? m_machine->cpus[0].dataBus : m_machine->buses[0].bus;
             if (m_disasm) delete m_disasm;
             m_disasm = ToolchainRegistry::instance().createDisassembler(m_cpu->isaName());
             

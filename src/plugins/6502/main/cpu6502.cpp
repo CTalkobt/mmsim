@@ -1,6 +1,7 @@
 #include "cpu6502.h"
 #include "libtoolchain/main/idisasm.h"
 #include "libdebug/main/execution_observer.h"
+#include "mmemu_plugin_api.h"
 #include <cstdio>
 #include <cstring>
 
@@ -716,6 +717,7 @@ const MOS6502::Opcode MOS6502::s_opcodes[256] = {
 int MOS6502::step() {
     // NMI handling (falling edge)
     if (m_state.nmiLine && !m_state.nmiPrev) {
+        log(SIM_LOG_DEBUG, "6502: Taking NMI");
         m_state.nmiPrev = 1;
         push((uint8_t)(m_state.pc >> 8));
         push((uint8_t)(m_state.pc & 0xFF));
@@ -732,6 +734,7 @@ int MOS6502::step() {
 
     // IRQ handling (level-sensitive)
     if (m_state.irqLine && !(m_state.p & FLAG_I)) {
+        log(SIM_LOG_DEBUG, "6502: Taking IRQ");
         push((uint8_t)(m_state.pc >> 8));
         push((uint8_t)(m_state.pc & 0xFF));
         // IRQ/NMI pushes P with B=0 and U=1

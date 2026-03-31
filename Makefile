@@ -253,9 +253,9 @@ BASE_LIBS = -Wl,--whole-archive -L$(ILIBDIR) -lplugins -ldebug -ltoolchain -ldev
 # Build rules
 # ---------------------------------------------------------------------------
 
-cli: $(CLI_BIN)
-gui: $(GUI_BIN)
-mcp: $(MCP_BIN)
+cli: $(CLI_BIN) plugins
+gui: $(GUI_BIN) plugins
+mcp: $(MCP_BIN) plugins
 libs: $(LIBS)
 plugins: $(PLUGINS)
 

@@ -87,6 +87,13 @@ public:
 
     void setIrqLine(ISignalLine* line) { m_irqLine = line; }
 
+    void setLogger(void* handle, void (*logFn)(void*, int, const char*)) {
+        m_logger = handle;
+        m_logNamed = logFn;
+    }
+
+    void log(int level, const char* msg) const;
+
     // -----------------------------------------------------------------------
     // IOHandler interface  ($D000–$D02E, 47 registers, with $D02F–$D3FF mirrored)
     // -----------------------------------------------------------------------
@@ -108,6 +115,9 @@ public:
         return {FRAME_W, FRAME_H, DISPLAY_W, DISPLAY_H};
     }
     void renderFrame(uint32_t* buffer) override;
+
+    /** Manual DMA peek for testing and diagnostics. */
+    uint8_t dmaPeek(uint32_t offset) const;
 
     // -----------------------------------------------------------------------
     // Register indices (relative to base address)
@@ -163,7 +173,6 @@ public:
 private:
     // Rendering helpers
     uint32_t palette(uint8_t index) const;
-    uint8_t  dmaPeek(uint32_t offset) const;
     uint8_t  charRomByte(uint32_t offset) const;
 
     uint32_t screenBase() const;
@@ -175,6 +184,8 @@ private:
 
     std::string  m_name;
     uint32_t     m_baseAddr;
+    void*        m_logger = nullptr;
+    void         (*m_logNamed)(void*, int, const char*) = nullptr;
 
     uint8_t  m_regs[64];            // 47 used, rest pad to 64
     uint64_t m_cycleAccum = 0;      // cycles since last frame start

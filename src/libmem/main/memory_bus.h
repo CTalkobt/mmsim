@@ -41,6 +41,12 @@ public:
 
     uint8_t  peek8(uint32_t addr) override;
 
+    /**
+     * Bypasses I/O hooks and reads directly from RAM or overlays.
+     */
+    uint8_t read8Raw(uint32_t addr);
+    uint8_t peek8Raw(uint32_t addr);
+
     void reset() override;
 
     size_t stateSize()             const override;

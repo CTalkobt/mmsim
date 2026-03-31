@@ -73,6 +73,28 @@ bool KbdVic20::pressKeyByName(const std::string& keyName, bool down) {
     std::string lower = keyName;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
     
+    // Handle symbolic names that require Shift on VIC-20
+    if (lower == "exclaim")   return pressCombo({"left_shift", "1"}, down);
+    if (lower == "dquote")    return pressCombo({"left_shift", "2"}, down);
+    if (lower == "hash")      return pressCombo({"left_shift", "3"}, down);
+    if (lower == "dollar")    return pressCombo({"left_shift", "4"}, down);
+    if (lower == "percent")   return pressCombo({"left_shift", "5"}, down);
+    if (lower == "ampersand") return pressCombo({"left_shift", "6"}, down);
+    if (lower == "squote")    return pressCombo({"left_shift", "7"}, down);
+    if (lower == "lparen")    return pressCombo({"left_shift", "8"}, down);
+    if (lower == "rparen")    return pressCombo({"left_shift", "9"}, down);
+    if (lower == "question")  return pressCombo({"left_shift", "slash"}, down);
+    if (lower == "less")      return pressCombo({"left_shift", "comma"}, down);
+    if (lower == "greater")   return pressCombo({"left_shift", "period"}, down);
+    if (lower == "colon")     return pressCombo({"left_shift", "semicolon"}, down);
+    if (lower == "bracket_left")  return pressCombo({"left_shift", "at"}, down); // Map to shifted @ for now?
+    // Wait, on VIC-20 [ is Shift + : ? No.
+    // I'll just use common host-side names for now.
+
+    // Aliases
+    if (lower == "uparrow")   lower = "arrow_up";
+    if (lower == "leftarrow") lower = "arrow_left";
+
     if (s_keyMap.count(lower)) {
         auto pos = s_keyMap[lower];
         if (down) keyDown(pos.first, pos.second);
@@ -80,6 +102,24 @@ bool KbdVic20::pressKeyByName(const std::string& keyName, bool down) {
         return true;
     }
     return false;
+}
+
+bool KbdVic20::pressCombo(const std::vector<std::string>& keys, bool down) {
+    bool ok = true;
+    for (const auto& k : keys) {
+        // Don't release modifiers in a combo; let the host send separate release events.
+        if (!down && (k == "left_shift" || k == "right_shift" || k == "ctrl" || k == "cbm")) {
+            continue;
+        }
+        if (s_keyMap.count(k)) {
+            auto pos = s_keyMap[k];
+            if (down) keyDown(pos.first, pos.second);
+            else keyUp(pos.first, pos.second);
+        } else {
+            ok = false;
+        }
+    }
+    return ok;
 }
 
 void KbdVic20::updateMatrix() {

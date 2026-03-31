@@ -39,6 +39,11 @@ uint8_t FlatMemoryBus::read8(uint32_t addr) {
             return ioVal;
         }
     }
+    return read8Raw(addr);
+}
+
+uint8_t FlatMemoryBus::read8Raw(uint32_t addr) {
+    addr &= m_config.addrMask;
     uint8_t val;
     const RomOverlay* overlay = findOverlay(addr);
     if (overlay) {
@@ -84,6 +89,11 @@ uint8_t FlatMemoryBus::peek8(uint32_t addr) {
             return ioVal;
         }
     }
+    return peek8Raw(addr);
+}
+
+uint8_t FlatMemoryBus::peek8Raw(uint32_t addr) {
+    addr &= m_config.addrMask;
     const RomOverlay* overlay = findOverlay(addr);
     if (overlay) {
         return overlay->data[addr - overlay->base];

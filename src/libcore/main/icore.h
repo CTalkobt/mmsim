@@ -121,6 +121,17 @@ public:
     void setObserver(ExecutionObserver* obs) { m_observer = obs; }
     ExecutionObserver* getObserver() const { return m_observer; }
 
+    virtual void setLogger(void* handle, void (*logFn)(void*, int, const char*)) {
+        m_logger = handle;
+        m_logNamed = logFn;
+    }
+
+    virtual void log(int level, const char* msg) const {
+        if (m_logger && m_logNamed) m_logNamed(m_logger, level, msg);
+    }
+
 protected:
     ExecutionObserver* m_observer = nullptr;
+    void*              m_logger = nullptr;
+    void               (*m_logNamed)(void*, int, const char*) = nullptr;
 };

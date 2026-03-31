@@ -1,4 +1,6 @@
 #include "cpu6510.h"
+#include "mmemu_plugin_api.h"
+#include <cstdio>
 
 MOS6510::MOS6510() {
     // Default pull-up state: DDR=0 (all inputs), DATA=0x3F (bits 0-5 high).
@@ -9,6 +11,32 @@ MOS6510::MOS6510() {
 
 MOS6510::~MOS6510() {
     delete m_portBus;
+}
+
+int MOS6510::step() {
+    if (m_stepCounter++ % 100000 == 0) {
+        char msg[64];
+        std::snprintf(msg, sizeof(msg), "6510: PC=$%04X", pc());
+        log(SIM_LOG_DEBUG, msg);
+    }
+    return MOS6502::step();
+}
+
+void MOS6510::ddrWrite(uint8_t val) {
+    m_ddr = val & 0x3F; // only 6 bits exist
+    char msg[64];
+    std::snprintf(msg, sizeof(msg), "6510: DDR write $%02X", val);
+    log(SIM_LOG_DEBUG, msg);
+    updateSignals();
+}
+
+void MOS6510::dataWrite(uint8_t val) {
+    m_data = val & 0x3F;
+    char msg[64];
+    std::snprintf(msg, sizeof(msg), "6510: DATA write $%02X (effective output $%02X)", 
+        val, (m_data & m_ddr) | (~m_ddr & 0x3F));
+    log(SIM_LOG_DEBUG, msg);
+    updateSignals();
 }
 
 void MOS6510::installBus(IBus* bus) {
