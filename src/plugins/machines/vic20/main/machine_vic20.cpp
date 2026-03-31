@@ -1,4 +1,5 @@
 #include "libcore/main/machine_desc.h"
+#include "mmemu_plugin_api.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libcore/main/core_registry.h"
 #include "libmem/main/memory_bus.h"
@@ -93,6 +94,8 @@ private:
 
 } // namespace
 
+const struct SimPluginHostAPI* g_vic20Host = nullptr;
+
 /**
  * VIC-20 Machine Descriptor Factory — shared implementation.
  * @param expansionFlags  Bitmask of EXP_BLKx constants for fitted RAM expansions.
@@ -112,7 +115,13 @@ static MachineDescriptor* createMachineVic20Impl(uint32_t expansionFlags,
     desc->buses.push_back({"system", bus});
 
     // 2. CPU
-    ICore* cpu = CoreRegistry::instance().createCore("6502");
+    ICore* cpu = nullptr;
+    if (g_vic20Host && g_vic20Host->createCore) {
+        cpu = g_vic20Host->createCore("6502");
+    } else {
+        cpu = CoreRegistry::instance().createCore("6502");
+    }
+
     if (cpu) {
         cpu->setDataBus(bus);
         cpu->setCodeBus(bus);
@@ -125,7 +134,12 @@ static MachineDescriptor* createMachineVic20Impl(uint32_t expansionFlags,
     auto* io = new IORegistry();
     desc->ioRegistry = io;
 
-    auto* vic = (VIC6560*)DeviceRegistry::instance().createDevice("6560");
+    VIC6560* vic = nullptr;
+    if (g_vic20Host && g_vic20Host->createDevice) {
+        vic = (VIC6560*)g_vic20Host->createDevice("6560");
+    } else {
+        vic = (VIC6560*)DeviceRegistry::instance().createDevice("6560");
+    }
     
     // 3.5 Color RAM (1K x 4 bits, mapped at $9400 or $9600 depending on RAM expansion)
     uint8_t* colorRam = new uint8_t[1024];
@@ -133,8 +147,14 @@ static MachineDescriptor* createMachineVic20Impl(uint32_t expansionFlags,
     desc->roms.push_back(colorRam);
 
     // Create VIA devices from registry (if available)
-    auto* via1 = (VIA6522*)DeviceRegistry::instance().createDevice("6522");
-    auto* via2 = (VIA6522*)DeviceRegistry::instance().createDevice("6522");
+    VIA6522 *via1 = nullptr, *via2 = nullptr;
+    if (g_vic20Host && g_vic20Host->createDevice) {
+        via1 = (VIA6522*)g_vic20Host->createDevice("6522");
+        via2 = (VIA6522*)g_vic20Host->createDevice("6522");
+    } else {
+        via1 = (VIA6522*)DeviceRegistry::instance().createDevice("6522");
+        via2 = (VIA6522*)DeviceRegistry::instance().createDevice("6522");
+    }
 
     if (!vic) {
         std::cerr << "VIC-20: VIC-I plugin not found, creating internal." << std::endl;
@@ -157,9 +177,9 @@ static MachineDescriptor* createMachineVic20Impl(uint32_t expansionFlags,
         via2->setBaseAddr(0x9120);
     }
 
-    io->registerHandler(vic);
-    io->registerHandler(via1);
-    io->registerHandler(via2);
+    io->registerOwnedHandler(vic);
+    io->registerOwnedHandler(via1);
+    io->registerOwnedHandler(via2);
 
     // Wire CPU reads/writes through the IO registry so VIC/VIA registers are
     // actually accessed instead of flat RAM.
@@ -174,17 +194,24 @@ static MachineDescriptor* createMachineVic20Impl(uint32_t expansionFlags,
         auto* irqLine = new CpuIrqLine(cpu);
         via1->setIrqLine(irqLine);
         via2->setIrqLine(irqLine);
+        desc->deleters.push_back([irqLine]() { delete irqLine; });
     }
 
     // 3.6 Keyboard Matrix — wired as two IPortDevices into the VIAs.
     // Registered in the IORegistry so resetAll() and tickAll() reach it.
-    IOHandler* kbdHandler = DeviceRegistry::instance().createDevice("kbd_vic20");
+    IOHandler* kbdHandler = nullptr;
+    if (g_vic20Host && g_vic20Host->createDevice) {
+        kbdHandler = g_vic20Host->createDevice("kbd_vic20");
+    } else {
+        kbdHandler = DeviceRegistry::instance().createDevice("kbd_vic20");
+    }
+
     if (kbdHandler) {
         IKeyboardMatrix* kbd = dynamic_cast<IKeyboardMatrix*>(kbdHandler);
         if (kbd) {
             via2->setPortBDevice(kbd->getPort(0)); // ColumnPort → VIA2 Port B (column select)
             via2->setPortADevice(kbd->getPort(1)); // RowPort   → VIA2 Port A (row sense)
-            io->registerHandler(kbdHandler);
+            io->registerOwnedHandler(kbdHandler);
             desc->onKey = [kbd](const std::string& keyName, bool down) {
                 return kbd->pressKeyByName(keyName, down);
             };
@@ -193,16 +220,15 @@ static MachineDescriptor* createMachineVic20Impl(uint32_t expansionFlags,
         std::cerr << "Error: VIC-20 could not find 'kbd_vic20' device." << std::endl;
     }
 
-    io->registerHandler(new ColorRamHandler(colorRam));
+    io->registerOwnedHandler(new ColorRamHandler(colorRam));
 
     // 3.7 Joystick
     auto* joy = new Joystick();
     via1->setPortBDevice(joy);
+    desc->deleters.push_back([joy]() { delete joy; });
     desc->onJoystick = [joy](int port, uint8_t bits) {
         if (port == 0) joy->setState(bits);
     };
-
-    // 4. ROM Overlays
     uint8_t* charRom = new uint8_t[4096];
     uint8_t* basicRom = new uint8_t[8192];
     uint8_t* kernalRom = new uint8_t[8192];

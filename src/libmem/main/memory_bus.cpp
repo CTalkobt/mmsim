@@ -10,7 +10,7 @@ FlatMemoryBus::FlatMemoryBus(const std::string& name, uint32_t addrBits)
     m_config.dataBits = 8;
     m_config.role = BusRole::DATA;
     m_config.littleEndian = true;
-    m_config.addrMask = (1u << addrBits) - 1;
+    m_config.addrMask = (addrBits == 32) ? 0xFFFFFFFFu : (1u << addrBits) - 1;
 
     m_size = 1ull << addrBits;
     m_data = new uint8_t[m_size];

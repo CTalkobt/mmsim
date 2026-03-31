@@ -17,7 +17,7 @@
 #include <map>
 #include <vector>
 
-extern const SimPluginHostAPI* g_petHost;
+const SimPluginHostAPI* g_petHost = nullptr;
 
 namespace {
 
@@ -150,9 +150,21 @@ MachineDescriptor* createPetMachine(Model model) {
                         (model == Model::PET_8032) ? "Commodore PET 8032" : "Commodore PET 4032";
 
     pm->bus = new FlatMemoryBus("system", 16);
-    pm->cpu = CoreRegistry::instance().createCore("6502");
+    if (g_petHost && g_petHost->createCore) {
+        pm->cpu = g_petHost->createCore("6502");
+    } else {
+        pm->cpu = CoreRegistry::instance().createCore("6502");
+    }
     desc->ioRegistry = new IORegistry();
     pm->ieee = new SimpleIEEE488Bus();
+    desc->deleters.push_back([pm]() { 
+        delete pm->irqManager; 
+        delete pm->videoLine; 
+        delete pm->ieee;
+        delete pm->kbdReader;
+        delete pm->kbdSelector;
+        delete pm;
+    });
 
     // IRQ Manager: Orchestrates shared IRQ signals from multiple chips
     pm->irqManager = new SharedIrqManager(pm->cpu);
@@ -209,14 +221,14 @@ MachineDescriptor* createPetMachine(Model model) {
         pm->ieee->setSignal(SimpleIEEE488Bus::EOI, (val & 0x02) == 0);
     });
 
-    desc->ioRegistry->registerHandler(pm->pia1);
-    desc->ioRegistry->registerHandler(pm->pia2);
-    desc->ioRegistry->registerHandler(pm->via);
-    desc->ioRegistry->registerHandler(pm->video);
+    desc->ioRegistry->registerOwnedHandler(pm->pia1);
+    desc->ioRegistry->registerOwnedHandler(pm->pia2);
+    desc->ioRegistry->registerOwnedHandler(pm->via);
+    desc->ioRegistry->registerOwnedHandler(pm->video);
 
     if (model != Model::PET_2001) {
         pm->crtc = new CRTC6545(); 
-        desc->ioRegistry->registerHandler(pm->crtc);
+        desc->ioRegistry->registerOwnedHandler(pm->crtc);
         pm->video->setCRTC(pm->crtc);
     }
 

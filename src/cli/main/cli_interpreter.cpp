@@ -91,9 +91,12 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
                     delete md;
                     return;
                 }
+                if (m_ctx.machine) delete m_ctx.machine;
                 m_ctx.machine = md;
                 m_ctx.cpu = md->cpus[0].cpu;
                 m_ctx.bus = md->buses[0].bus;
+                if (m_ctx.disasm) delete m_ctx.disasm;
+                if (m_ctx.assem) delete m_ctx.assem;
                 m_ctx.disasm = ToolchainRegistry::instance().createDisassembler(m_ctx.cpu->isaName());
                 m_ctx.assem = ToolchainRegistry::instance().createAssembler(m_ctx.cpu->isaName());
                 

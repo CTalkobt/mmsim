@@ -23,18 +23,21 @@ TEST_CASE(PET_2001_Setup) {
     // Test Video RAM
     bus->write8(0x8000, 0x55);
     ASSERT(bus->read8(0x8000) == 0x55);
+    delete desc;
 }
 
 TEST_CASE(PET_4032_Setup) {
     auto* desc = createPet4032();
     ASSERT(desc != nullptr);
     ASSERT(desc->machineId == "pet4032");
+    delete desc;
 }
 
 TEST_CASE(PET_8032_Setup) {
     auto* desc = createPet8032();
     ASSERT(desc != nullptr);
     ASSERT(desc->machineId == "pet8032");
+    delete desc;
 }
 
 TEST_CASE(IEEE488_Bus_Smoke) {

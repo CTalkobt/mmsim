@@ -33,6 +33,35 @@ static void hostLogNamed(void* loggerPtr, int level, const char* msg) {
     logger->log(LogRegistry::mapLevel(level), msg);
 }
 
+static ICore* hostCreateCore(const char* name) {
+    return CoreRegistry::instance().createCore(name);
+}
+
+static MachineDescriptor* hostCreateMachine(const char* machineId) {
+    return MachineRegistry::instance().createMachine(machineId);
+}
+
+static IOHandler* hostCreateDevice(const char* name) {
+    return DeviceRegistry::instance().createDevice(name);
+}
+
+static IDisassembler* hostCreateDisassembler(const char* isa) {
+    return ToolchainRegistry::instance().createDisassembler(isa);
+}
+
+static IAssembler* hostCreateAssembler(const char* isa) {
+    return ToolchainRegistry::instance().createAssembler(isa);
+}
+
+static IImageLoader* hostFindImageLoader(const char* path) {
+    return ImageLoaderRegistry::instance().findLoader(path);
+}
+
+static ICartridgeHandler* hostCreateCartridgeHandler(const char* path) {
+    auto ptr = ImageLoaderRegistry::instance().createCartridgeHandler(path);
+    return ptr.release();
+}
+
 static void stubRegisterPane(const PluginPaneInfo*) {}
 static void stubRegisterCommand(const PluginCommandInfo*) {}
 static void stubRegisterMcpTool(const PluginMcpToolInfo*) {}
@@ -41,11 +70,13 @@ static SimPluginHostAPI s_hostAPI = {
     hostLog,
     hostGetLogger,
     hostLogNamed,
-    &CoreRegistry::instance(),
-    &MachineRegistry::instance(),
-    &DeviceRegistry::instance(),
-    &ToolchainRegistry::instance(),
-    &ImageLoaderRegistry::instance(),
+    hostCreateCore,
+    hostCreateMachine,
+    hostCreateDevice,
+    hostCreateDisassembler,
+    hostCreateAssembler,
+    hostFindImageLoader,
+    hostCreateCartridgeHandler,
     stubRegisterPane,
     stubRegisterCommand,
     stubRegisterMcpTool

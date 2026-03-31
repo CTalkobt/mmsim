@@ -39,6 +39,6 @@ static SimPluginManifest s_manifest = {
 };
 
 extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host) {
-    ImageLoaderRegistry::setInstance(host->imageLoaderRegistry);
+    (void)host;
     return &s_manifest;
 }

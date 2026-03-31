@@ -1,4 +1,5 @@
 #include "libcore/main/machine_desc.h"
+#include "mmemu_plugin_api.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libcore/main/core_registry.h"
 #include "libmem/main/memory_bus.h"
@@ -212,6 +213,8 @@ std::map<std::string, std::pair<int,int>> KbdC64::s_keyMap = {
 
 } // namespace
 
+const struct SimPluginHostAPI* g_c64Host = nullptr;
+
 // ---------------------------------------------------------------------------
 // C64 Machine Descriptor Factory
 // ---------------------------------------------------------------------------
@@ -231,7 +234,13 @@ MachineDescriptor* createMachineC64() {
     // -----------------------------------------------------------------------
     // 2. CPU — MOS 6510
     // -----------------------------------------------------------------------
-    ICore*    cpu    = CoreRegistry::instance().createCore("6510");
+    ICore*    cpu    = nullptr;
+    if (g_c64Host && g_c64Host->createCore) {
+        cpu = g_c64Host->createCore("6510");
+    } else {
+        cpu = CoreRegistry::instance().createCore("6510");
+    }
+
     MOS6510*  cpu6510 = dynamic_cast<MOS6510*>(cpu);
     if (!cpu) {
         std::cerr << "C64: could not find '6510' core." << std::endl;
@@ -263,19 +272,31 @@ MachineDescriptor* createMachineC64() {
     // C64 PLA — always constructed directly (no standalone plugin instance)
     auto* pla = new C64PLA();
 
-    auto* vic2 = dynamic_cast<VIC2*>(DeviceRegistry::instance().createDevice("6567"));
+    VIC2* vic2 = nullptr;
+    SID6581* sid = nullptr;
+    CIA6526 *cia1 = nullptr, *cia2 = nullptr;
+
+    if (g_c64Host && g_c64Host->createDevice) {
+        vic2 = dynamic_cast<VIC2*>(g_c64Host->createDevice("6567"));
+        sid = dynamic_cast<SID6581*>(g_c64Host->createDevice("6581"));
+        cia1 = dynamic_cast<CIA6526*>(g_c64Host->createDevice("6526"));
+        cia2 = dynamic_cast<CIA6526*>(g_c64Host->createDevice("6526"));
+    } else {
+        vic2 = dynamic_cast<VIC2*>(DeviceRegistry::instance().createDevice("6567"));
+        sid = dynamic_cast<SID6581*>(DeviceRegistry::instance().createDevice("6581"));
+        cia1 = dynamic_cast<CIA6526*>(DeviceRegistry::instance().createDevice("6526"));
+        cia2 = dynamic_cast<CIA6526*>(DeviceRegistry::instance().createDevice("6526"));
+    }
+
     if (!vic2) vic2 = new VIC2("VIC-II", 0xD000);
     else { vic2->setName("VIC-II"); vic2->setBaseAddr(0xD000); }
 
-    auto* sid = dynamic_cast<SID6581*>(DeviceRegistry::instance().createDevice("6581"));
     if (!sid) sid = new SID6581("SID", 0xD400);
     else { sid->setName("SID"); sid->setBaseAddr(0xD400); }
 
-    auto* cia1 = dynamic_cast<CIA6526*>(DeviceRegistry::instance().createDevice("6526"));
     if (!cia1) cia1 = new CIA6526("CIA1", 0xDC00);
     else { cia1->setName("CIA1"); cia1->setBaseAddr(0xDC00); }
 
-    auto* cia2 = dynamic_cast<CIA6526*>(DeviceRegistry::instance().createDevice("6526"));
     if (!cia2) cia2 = new CIA6526("CIA2", 0xDD00);
     else { cia2->setName("CIA2"); cia2->setBaseAddr(0xDD00); }
 
@@ -317,6 +338,8 @@ MachineDescriptor* createMachineC64() {
         vic2->setIrqLine(irqLine);
         cia1->setIrqLine(irqLine);
         cia2->setIrqLine(nmiLine);
+        desc->deleters.push_back([irqLine]() { delete irqLine; });
+        desc->deleters.push_back([nmiLine]() { delete nmiLine; });
     }
 
     // PAL clock (NTSC = 1022727)
@@ -339,13 +362,13 @@ MachineDescriptor* createMachineC64() {
         return kbd->pressKeyByName(keyName, down);
     };
 
-    io->registerHandler(pla);                       // $A000 — sort anchor
-    io->registerHandler(vic2);                      // $D000–$D3FF
-    io->registerHandler(sid);                       // $D400–$D7FF
-    io->registerHandler(new ColorRamHandler(colorRam)); // $D800–$DBFF
-    io->registerHandler(cia1);                      // $DC00–$DCFF
-    io->registerHandler(cia2);                      // $DD00–$DDFF
-    io->registerHandler(kbd);                       // keyboard (null handler, for reset)
+    io->registerOwnedHandler(pla);                       // $A000 — sort anchor
+    io->registerOwnedHandler(vic2);                      // $D000–$D3FF
+    io->registerOwnedHandler(sid);                       // $D400–$D7FF
+    io->registerOwnedHandler(new ColorRamHandler(colorRam)); // $D800–$DBFF
+    io->registerOwnedHandler(cia1);                      // $DC00–$DCFF
+    io->registerOwnedHandler(cia2);                      // $DD00–$DDFF
+    io->registerOwnedHandler(kbd);                       // keyboard (null handler, for reset)
 
     // -----------------------------------------------------------------------
     // 10. Wire bus I/O hooks so every CPU read/write passes through the

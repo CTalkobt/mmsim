@@ -481,10 +481,13 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
     MachineSelectorDialog dialog(this);
     if (dialog.ShowModal() == wxID_OK) {
         std::string id = dialog.GetSelectedMachineId();
-        m_machine = MachineRegistry::instance().createMachine(id);
-        if (m_machine) {
+        MachineDescriptor* md = MachineRegistry::instance().createMachine(id);
+        if (md) {
+            if (m_machine) delete m_machine;
+            m_machine = md;
             m_cpu = m_machine->cpus[0].cpu;
             m_bus = m_machine->buses[0].bus;
+            if (m_disasm) delete m_disasm;
             m_disasm = ToolchainRegistry::instance().createDisassembler(m_cpu->isaName());
             
             m_regPane->SetCPU(m_cpu);

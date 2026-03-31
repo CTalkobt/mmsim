@@ -65,20 +65,7 @@ static FlatMemoryBus* getBus(MachineDescriptor* desc) {
     return static_cast<FlatMemoryBus*>(desc->buses[0].bus);
 }
 
-// Clean up a MachineDescriptor produced by the VIC-20 factory.
-// The factory creates IOHandlers on the heap but the registry does not own them;
-// enumerate them here so they can be freed alongside the other owned objects.
 static void destroyDesc(MachineDescriptor* desc) {
-    if (!desc) return;
-    if (desc->ioRegistry) {
-        std::vector<IOHandler*> handlers;
-        desc->ioRegistry->enumerate(handlers);
-        delete desc->ioRegistry;
-        for (auto* h : handlers) delete h;
-    }
-    for (auto& slot : desc->cpus) delete slot.cpu;
-    for (auto& slot : desc->buses) delete slot.bus;
-    for (auto* rom : desc->roms) delete[] rom;
     delete desc;
 }
 

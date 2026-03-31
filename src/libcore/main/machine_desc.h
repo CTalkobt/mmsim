@@ -2,6 +2,7 @@
 
 #include "icore.h"
 #include "libmem/main/ibus.h"
+#include "libdevices/main/io_registry.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -46,6 +47,14 @@ class IORegistry;
  * Machine Descriptor.
  */
 struct MachineDescriptor {
+    ~MachineDescriptor() {
+        for (auto& d : deleters) d();
+        delete ioRegistry;
+        for (auto& slot : cpus) delete slot.cpu;
+        for (auto& slot : buses) delete slot.bus;
+        for (auto* rom : roms) delete[] rom;
+    }
+
     std::string machineId;
     std::string displayName;
     std::string licenseClass;
@@ -54,6 +63,9 @@ struct MachineDescriptor {
     std::vector<BusSlot> buses;
 
     IORegistry* ioRegistry = nullptr;
+
+    // Generic deleters for objects not owned by Registry or Vectors
+    std::vector<std::function<void()>> deleters;
 
     // Lifecycle hooks
     std::function<void(MachineDescriptor&)> onReset;

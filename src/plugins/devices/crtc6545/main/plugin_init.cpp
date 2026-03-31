@@ -23,8 +23,6 @@ static SimPluginManifest s_manifest = {
 };
 
 extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host) {
-    if (host->deviceRegistry) {
-        DeviceRegistry::setInstance(host->deviceRegistry);
-    }
+    (void)host;
     return &s_manifest;
 }

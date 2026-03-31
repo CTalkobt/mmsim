@@ -12,12 +12,18 @@ class IBus;
 class IORegistry {
 public:
     IORegistry() = default;
-    ~IORegistry() = default;
+    ~IORegistry();
 
     /**
      * Register an I/O handler. The registry does NOT own the pointer.
      */
     void registerHandler(IOHandler* handler);
+
+    /**
+     * Register an I/O handler and take ownership. The handler will be
+     * deleted when the registry is destroyed.
+     */
+    void registerOwnedHandler(IOHandler* handler);
 
     /**
      * Dispatch a read to the first handler that matches the address.
@@ -51,4 +57,5 @@ public:
 
 private:
     std::vector<IOHandler*> m_handlers;
+    std::vector<IOHandler*> m_ownedHandlers;
 };

@@ -30,10 +30,10 @@ static SimPluginManifest s_manifest = {
     0, nullptr
 };
 
+extern const SimPluginHostAPI* g_c64Host;
+
 extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host) {
-    if (host->coreRegistry) CoreRegistry::setInstance(host->coreRegistry);
-    if (host->machineRegistry) MachineRegistry::setInstance(host->machineRegistry);
-    if (host->deviceRegistry)   DeviceRegistry::setInstance(host->deviceRegistry);
-    if (host->toolchainRegistry) ToolchainRegistry::setInstance(host->toolchainRegistry);
+    auto** ptr = const_cast<const SimPluginHostAPI**>(&g_c64Host);
+    *ptr = host;
     return &s_manifest;
 }

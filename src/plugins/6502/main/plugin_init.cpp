@@ -83,7 +83,6 @@ static SimPluginManifest s_manifest = {
 #include "libtoolchain/main/toolchain_registry.h"
 
 extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host) {
-    if (host->coreRegistry) CoreRegistry::setInstance(host->coreRegistry);
-    if (host->toolchainRegistry) ToolchainRegistry::setInstance(host->toolchainRegistry);
+    (void)host;
     return &s_manifest;
 }

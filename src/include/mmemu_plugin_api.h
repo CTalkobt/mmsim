@@ -91,19 +91,14 @@ struct SimPluginHostAPI {
     void* (*getLogger)(const char* name);
     void (*logNamed)(void* logger, int level, const char* msg);
     
-#ifdef __cplusplus
-    class CoreRegistry*        coreRegistry;
-    class MachineRegistry*     machineRegistry;
-    class DeviceRegistry*      deviceRegistry;
-    class ToolchainRegistry*   toolchainRegistry;
-    class ImageLoaderRegistry* imageLoaderRegistry;
-#else
-    void* coreRegistry;
-    void* machineRegistry;
-    void* deviceRegistry;
-    void* toolchainRegistry;
-    void* imageLoaderRegistry;
-#endif
+    // Registry access
+    ICore*             (*createCore)(const char* name);
+    MachineDescriptor* (*createMachine)(const char* machineId);
+    IOHandler*         (*createDevice)(const char* name);
+    IDisassembler*     (*createDisassembler)(const char* isa);
+    IAssembler*        (*createAssembler)(const char* isa);
+    IImageLoader*      (*findImageLoader)(const char* path);
+    ICartridgeHandler* (*createCartridgeHandler)(const char* path);
 
     // Extension points
     void (*registerPane)(const struct PluginPaneInfo* info);

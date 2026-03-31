@@ -47,12 +47,12 @@ subsequent phase has a clean home.*
    - [x] Move `ExecutionObserver* observer` to private/protected with proper accessors in `ICore` and `IBus`.
 - [x] **Side-effect-free Peeking**
    - [x] Ensure `IBus::peek8` is strictly side-effect-free; do not delegate to `read8` by default if `read8` can trigger I/O side effects.
-- [ ] **Plugin ABI Stability**
-   - [ ] Refactor `SimPluginHostAPI` to use a stable C-compatible interface (opaque pointers/function pointers) instead of C++ classes.
-- [ ] **Resource Management**
-   - [ ] Fix memory leaks in `MachineRegistry::createMachine` and `MachineDescriptor` lifecycle.
-- [ ] **Undefined Behavior**
-   - [ ] Fix potential UB in bus masking (e.g., `1u << 32`).
+- [x] **Plugin ABI Stability**
+   - [x] Refactor `SimPluginHostAPI` to use a stable C-compatible interface (opaque pointers/function pointers) instead of C++ classes.
+- [x] **Resource Management**
+   - [x] Fix memory leaks in `MachineRegistry::createMachine` and `MachineDescriptor` lifecycle.
+- [x] **Undefined Behavior**
+   - [x] Fix potential UB in bus masking (e.g., `1u << 32`).
 
 ---
 

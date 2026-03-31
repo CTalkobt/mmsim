@@ -9,6 +9,17 @@ void IORegistry::registerHandler(IOHandler* handler) {
     });
 }
 
+void IORegistry::registerOwnedHandler(IOHandler* handler) {
+    m_ownedHandlers.push_back(handler);
+    registerHandler(handler);
+}
+
+IORegistry::~IORegistry() {
+    for (auto* h : m_ownedHandlers) {
+        delete h;
+    }
+}
+
 bool IORegistry::dispatchRead(IBus* bus, uint32_t addr, uint8_t* val) {
     for (auto* handler : m_handlers) {
         if (handler->ioRead(bus, addr, val)) {

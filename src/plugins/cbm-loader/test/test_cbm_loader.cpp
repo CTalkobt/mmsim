@@ -10,12 +10,9 @@
 #include <cstring>
 
 TEST_CASE(BinLoader_Smoke) {
-    FlatMemoryBus bus("system", 16);
-    MachineDescriptor machine;
-    BusSlot slot;
-    slot.busName = "system";
-    slot.bus = &bus;
-    machine.buses.push_back(slot);
+    auto* bus = new FlatMemoryBus("system", 16);
+    auto* machine = new MachineDescriptor();
+    machine->buses.push_back({"system", bus});
 
     // Create a dummy bin file
     {
@@ -27,20 +24,22 @@ TEST_CASE(BinLoader_Smoke) {
     auto loader = ImageLoaderRegistry::instance().findLoader("test.bin");
     ASSERT(loader != nullptr);
 
-    bool success = loader->load("test.bin", &bus, &machine, 0x1000);
+    bool success = loader->load("test.bin", bus, machine, 0x1000);
     ASSERT(success);
-    ASSERT(bus.read8(0x1000) == 0x11);
-    ASSERT(bus.read8(0x1001) == 0x22);
-    ASSERT(bus.read8(0x1002) == 0x33);
-    ASSERT(bus.read8(0x1003) == 0x44);
+    ASSERT(bus->read8(0x1000) == 0x11);
+    ASSERT(bus->read8(0x1001) == 0x22);
+    ASSERT(bus->read8(0x1002) == 0x33);
+    ASSERT(bus->read8(0x1003) == 0x44);
 
     std::remove("test.bin");
+    delete machine;
 }
 
 TEST_CASE(PrgLoader_Smoke) {
     PrgLoader loader;
-    FlatMemoryBus bus("system", 16);
-    MachineDescriptor machine;
+    auto* bus = new FlatMemoryBus("system", 16);
+    auto* machine = new MachineDescriptor();
+    machine->buses.push_back({"system", bus});
     
     // Create a dummy prg file (load address $2000)
     {
@@ -52,13 +51,14 @@ TEST_CASE(PrgLoader_Smoke) {
     }
 
     ASSERT(loader.canLoad("test.prg"));
-    bool success = loader.load("test.prg", &bus, &machine);
+    bool success = loader.load("test.prg", bus, machine);
     ASSERT(success);
-    ASSERT(bus.read8(0x2000) == 0xAA);
-    ASSERT(bus.read8(0x2001) == 0xBB);
-    ASSERT(bus.read8(0x2002) == 0xCC);
+    ASSERT(bus->read8(0x2000) == 0xAA);
+    ASSERT(bus->read8(0x2001) == 0xBB);
+    ASSERT(bus->read8(0x2002) == 0xCC);
 
     std::remove("test.prg");
+    delete machine;
 }
 
 TEST_CASE(CrtParser_Smoke) {

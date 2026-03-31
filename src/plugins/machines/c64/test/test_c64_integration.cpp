@@ -43,16 +43,6 @@ static FlatMemoryBus* getBus(MachineDescriptor* desc) {
 }
 
 static void destroyDesc(MachineDescriptor* desc) {
-    if (!desc) return;
-    if (desc->ioRegistry) {
-        std::vector<IOHandler*> handlers;
-        desc->ioRegistry->enumerate(handlers);
-        delete desc->ioRegistry;
-        for (auto* h : handlers) delete h;
-    }
-    for (auto& slot : desc->cpus) delete slot.cpu;
-    for (auto& slot : desc->buses) delete slot.bus;
-    for (auto* rom : desc->roms) delete[] rom;
     delete desc;
 }
 

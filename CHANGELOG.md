@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 ## [0.2.0-dev] - 2026-03-30
 
 ### Changed
+- **Plugin ABI Stability (Phase 0.5)**:
+    - Refactored `SimPluginHostAPI` to use stable C function pointers (`createCore`, `createDevice`, etc.) instead of passing C++ class pointers.
+    - Updated `PluginLoader` to provide host-side wrappers for registry operations.
+    - Updated all plugins to use the new host API, removing brittle registry singleton synchronization.
+- **Resource Management (Phase 0.5)**:
+    - Implemented RAII-based cleanup in `MachineDescriptor` via a new destructor that handles cpus, buses, I/O registry, and ROM buffers.
+    - Updated `IORegistry` to support owned handlers, ensuring automatic deletion of machine-specific devices.
+    - Added a `deleters` mechanism to `MachineDescriptor` for cleaning up generic machine-resident objects.
+    - Fixed memory leaks in CLI, GUI, and integration tests by properly deleting machine instances on switch or shutdown.
+- **Undefined Behavior (Phase 0.5)**:
+    - Fixed potential undefined behavior in `FlatMemoryBus` address mask calculation for 32-bit address spaces.
 - **Interface Segregation (Phase 0.5)**:
     - Refactored `ICore` into `ICpuRegs` (register access) and `ICpuDisasm` (disassembly) interfaces.
     - Refactored `IBus` to be leaner, segregating `ISnapshotable` (state management) and `IBusWriteLog` (write logging) interfaces.
