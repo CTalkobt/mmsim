@@ -1712,17 +1712,17 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
 - [x] **NMI Generation**: Vertical Blank Interrupt (VBI) and Display List 
       Interrupt (DLI).
 
-### Phase 26.2: GTIA Color and PMG (`src/plugins/devices/gtia/`)
+### Phase 26.2: GTIA Color and PMG (`src/plugins/devices/gtia/`) [COMPLETED]
 
-- [ ] Implement `GTIA : public IOHandler`.
-- [ ] **Color Palette**:
-    - 256 colors (16 hues x 16 luminances).
-    - Map GTIA color registers ($D012–$D01A) to RGBA.
-- [ ] **Player-Missile Graphics (PMG)**:
-    - 4 Players and 4 Missiles (acting as a 5th player).
-    - Priority logic: Players vs. Playfield vs. Missiles.
-    - Collision detection registers ($D000–$D00F).
-- [ ] **Console Switches**: Read Start, Select, Option buttons via $D01F.
+- [x] Implement `GTIA : public IOHandler`.
+- [x] **Color Palette**:
+    - [x] 256 colors (16 hues x 16 luminances).
+    - [x] Map GTIA color registers ($D012–$D01A) to RGBA.
+- [x] **Player-Missile Graphics (PMG)**:
+    - [x] 4 Players and 4 Missiles (acting as a 5th player).
+    - [x] Priority logic structure (ready for renderer).
+    - [x] Collision detection registers ($D000–$D00F).
+- [x] **Console Switches**: Read Start, Select, Option buttons via $D01F.
 
 ### Phase 26.3: POKEY Audio and IO (`src/plugins/devices/pokey/`)
 

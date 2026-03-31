@@ -28,6 +28,8 @@ Plugins that implement the `IOHandler` interface for memory-mapped hardware.
 | `lib/mmemu-plugin-pia6520.so` | MOS 6520 PIA: dual 8-bit I/O ports, handshake lines. | [README-6520.md](README-6520.md) |
 | `lib/mmemu-plugin-crtc6545.so` | MOS 6545/6845 CRTC video controller. | [README-6545.md](README-6545.md) |
 | `lib/mmemu-plugin-pet-video.so` | PET Video Subsystem (Discrete and CRTC models). | [README-PET-VIDEO.md](README-PET-VIDEO.md) |
+| `lib/mmemu-plugin-antic.so` | Atari ANTIC DMA engine and display controller. | [README-ANTIC.md](README-ANTIC.md) |
+| `lib/mmemu-plugin-gtia.so` | Atari GTIA color and PMG chip. | [README-GTIA.md](README-GTIA.md) |
 
 ### 1.3 Machine Plugins (Presets)
 Plugins that implement `MachineDescriptor` factories.
