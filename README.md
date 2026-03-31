@@ -42,7 +42,25 @@ A single plugin module can provide multiple resources, which are automatically r
 
 ---
 
-## 3. CLI Target (Implemented)
+## 3. Supported Machines
+
+**mmsim** currently supports several 8-bit machine presets from the Commodore family:
+
+### Commodore VIC-20
+- **Profiles**: `vic20`, `vic20+3k`, `vic20+8k`, `vic20+16k`, `vic20+32k`.
+- **Hardware**: MOS 6502 CPU, 6560/6561 VIC-I Video/Sound, dual 6522 VIAs, keyboard matrix, joystick.
+
+### Commodore 64
+- **Profile**: `c64`.
+- **Hardware**: MOS 6510 CPU, 6567/6569 VIC-II Video, 6581 SID Sound, dual 6526 CIAs, PLA banking, keyboard matrix.
+
+### Commodore PET Series
+- **Profiles**: `pet2001`, `pet4032`, `pet8032`.
+- **Hardware**: MOS 6502 CPU, 6520 PIA, 6522 VIA, 6545 CRTC (for 4032/8032), discrete video logic (for 2001), IEEE-488 bus.
+
+---
+
+## 4. CLI Target (Implemented)
 
 The `mmemu-cli` binary provides an interactive REPL for low-level machine control and debugging.
 
@@ -63,7 +81,7 @@ The `mmemu-cli` binary provides an interactive REPL for low-level machine contro
 
 ---
 
-## 4. MCP Target (Implemented)
+## 5. MCP Target (Implemented)
 
 The `mmemu-mcp` binary implements the **Model Context Protocol**, allowing AI agents (like Claude) to interact directly with the simulator.
 
@@ -75,7 +93,7 @@ The `mmemu-mcp` binary implements the **Model Context Protocol**, allowing AI ag
 
 ---
 
-## 5. GUI Target (Implemented)
+## 6. GUI Target (Implemented)
 
 The `mmemu-gui` binary provides a professional, multi-pane graphical debugging environment.
 
@@ -92,54 +110,93 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 
 ---
 
-## 6. Implementation Roadmap
+## 7. Implementation Roadmap
 
-- **Phase 10 (Complete)**: VIC-20 peripheral integration — VIA 6522, VIC-I 6560, keyboard matrix, machine factory.
-- **Phase 11 (In Progress)**: C64 peripheral implementation — MOS 6510, C64 PLA, CIA 6526, VIC-II, SID 6581.
-- **Phase 11.6**: C64 machine factory wiring all Phase 11 components into a complete machine preset.
-- **Phase 12**: Performance profiling — cycle-accurate profiling and execution heatmaps.
-
----
-
-## 7. Plugin Ecosystem
-
-**mmsim** utilizes a modular plugin architecture. For a complete list of available processors, devices, and machine presets, see the **[Plugin Index (README-PLUGINS.md)](README-PLUGINS.md)**.
-
-### Quick Links:
-- [6502/6510 Processor Implementation](README-6502.md)
-- [6510 I/O Port & Banking](README-6510.md)
-- [6522 VIA Implementation](README-6522.md)
-- [6526 CIA Implementation](README-6526.md)
-- [6560 VIC-I Implementation](README-6560.md)
-- [6567/6569 VIC-II Implementation](README-VIC2.md)
-- [6581 SID Implementation](README-SID.md)
-- [C64 PLA Banking Controller](README-C64PLA.md)
-- [VIC-20 Keyboard Implementation](README-KBD-VIC20.md)
-- [VIC-20 Machine Implementation](README-VIC20.md)
+- **Phase 10 (Complete)**: VIC-20 machine integration — VIA 6522, VIC-I 6560, keyboard matrix.
+- **Phase 11 (Complete)**: C64 machine implementation — MOS 6510, C64 PLA, CIA 6526, VIC-II, SID 6581.
+- **Phase 12 (Complete)**: PET/CBM machine implementation — MOS 6520 PIA, 6545 CRTC, IEEE-488.
+- **Phase 13 (In Progress)**: Runtime Image and Cartridge Loading (`.prg`, `.crt`, `.bin`).
+- **Phase 26 (In Progress)**: Atari 8-bit Family (400/800/XL/XE) — ANTIC, GTIA, POKEY.
 
 ---
 
-## 8. Getting Started
+## 8. Plugin Ecosystem
+
+**mmsim** utilizes a modular plugin architecture. For a complete list of available processors, devices, and machine presets, see the **[Plugin Index (doc/README-PLUGINS.md)](doc/README-PLUGINS.md)**.
+
+### 8.1 Machine Types
+- [VIC-20 Machine Implementation](doc/README-VIC20.md)
+- [C64 Machine Implementation](doc/README-C64.md)
+- [PET Machine Implementation](doc/README-PET.md)
+
+### 8.2 Video
+- [6560 VIC-I (Video/Sound)](doc/README-6560.md)
+- [6567/6569 VIC-II](doc/README-VIC2.md)
+- [6545 CRTC](doc/README-6545.md)
+- [PET Video Subsystem](doc/README-PET-VIDEO.md)
+
+### 8.3 Sound
+- [6581 SID Implementation](doc/README-SID.md)
+
+### 8.4 Processors
+- [6502/6510 Implementation](doc/README-6502.md)
+- [6510 I/O Port & Banking](doc/README-6510.md)
+
+### 8.5 I/O & Peripherals
+- [6520 PIA Implementation](doc/README-6520.md)
+- [6522 VIA Implementation](doc/README-6522.md)
+- [6526 CIA Implementation](doc/README-6526.md)
+- [C64 PLA Banking Controller](doc/README-C64PLA.md)
+- [PET Keyboard Matrix](doc/README-KBD-PET.md)
+- [VIC-20 Keyboard Matrix](doc/README-KBD-VIC20.md)
+
+---
+
+## 9. Getting Started
 
 ### Prerequisites
-- C++17 compatible compiler (e.g., GCC 9+)
-- `make`
-- `wxWidgets` (optional, required for GUI target)
 
-### Building
+To build **mmsim**, you will need:
+
+- **Compiler**: A C++17 compatible compiler (e.g., GCC 9+, Clang 10+).
+- **Build System**: `make`.
+- **Libraries**:
+    - `spdlog`: Fast C++ logging library.
+    - `fmt`: Modern formatting library.
+    - `wxWidgets` (3.0+): Required for the GUI target and most machine/device plugins.
+    - `ALSA` (`libasound`): Required for audio output in the GUI and test binaries.
+- **Tools**: `pkg-config` (often used by `wx-config`).
+
+On Debian/Ubuntu-based systems, you can install the dependencies with:
 ```bash
-make all      # Build CLI, GUI, and MCP
-make plugins  # Build the core plugins (e.g., 6502)
-make test     # Build and run the unified test suite
+sudo apt-get install build-essential libwxgtk3.0-gtk3-dev libspdlog-dev libfmt-dev libasound2-dev
 ```
 
-### Running the CLI
+### Building
+
+The project uses a standard `Makefile`.
+
+```bash
+make all      # Build CLI, GUI, and MCP binaries and all plugins
+make cli      # Build only the CLI binary (mmemu-cli)
+make gui      # Build only the GUI binary (mmemu-gui)
+make mcp      # Build only the MCP binary (mmemu-mcp)
+make plugins  # Build all dynamic plugins in ./lib
+make test     # Build and run the unified test suite
+make clean    # Remove all build artifacts
+```
+
+### Running
+
+After building, the binaries are located in the `bin/` directory, and plugins in the `lib/` directory.
+
 ```bash
 ./bin/mmemu-cli
+./bin/mmemu-gui
 ```
 
 ---
 
-## 9. Development Standards
+## 10. Development Standards
 - Adhere to the conventions in [STYLEGUIDE.md](STYLEGUIDE.md).
 - Track all significant updates in [CHANGELOG.md](CHANGELOG.md).

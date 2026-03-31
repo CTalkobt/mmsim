@@ -127,13 +127,13 @@ All notable changes to this project will be documented in this file.
     - `IAudioOutput` pull model: `tick()` fills 8192-sample ring buffer; `pullSamples()` drains it.
     - Plugin: `lib/mmemu-plugin-sid6581.so`; registration name `"6581"`.
 - **Documentation (Phase 11.1–11.5)**:
-    - Created `README-6510.md` — MOS 6510 I/O port and PortBus proxy.
-    - Created `README-C64PLA.md` — C64 PLA banking matrix and signal wiring.
-    - Created `README-6526.md` — CIA 6526 register map, timer, TOD, and ICR details.
-    - Created `README-VIC2.md` — VIC-II video modes, sprite engine, banking, and register map.
-    - Created `README-SID.md` — SID voice architecture, ADSR, filter, and audio output.
-    - Updated `README-6502.md` — added MOS 6510 variant section.
-    - Updated `README-PLUGINS.md` — added all Phase 11 plugins; updated distribution strategy.
+    - Created `doc/README-6510.md` — MOS 6510 I/O port and PortBus proxy.
+    - Created `doc/README-C64PLA.md` — C64 PLA banking matrix and signal wiring.
+    - Created `doc/README-6526.md` — CIA 6526 register map, timer, TOD, and ICR details.
+    - Created `doc/README-VIC2.md` — VIC-II video modes, sprite engine, banking, and register map.
+    - Created `doc/README-SID.md` — SID voice architecture, ADSR, filter, and audio output.
+    - Updated `doc/README-6502.md` — added MOS 6510 variant section.
+    - Updated `doc/README-PLUGINS.md` — added all Phase 11 plugins; updated distribution strategy.
     - Updated `README.md` — expanded quick links and roadmap.
 
 ## [0.1.0-dev] - 2026-03-23
