@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0-dev] - 2026-03-31
+
+### Added
+- **Atari 8-bit Video implementation (Phase 26)**:
+    - **ANTIC DMA Engine**: Implemented display list interpretation, cycle-accurate timing (114 cycles/line, 262 lines/frame), LMS instruction, WSYNC, and NMI generation (VBI/DLI).
+    - **GTIA Color and PMG**: Implemented color palette (256 colors), player-missile graphics positioning, collision detection, and console switches.
+    - **POKEY Audio and IO**: Implemented 4-channel audio synthesis, polynomial-counter noise generators, frequency division, joined channels, 3 interval timers with IRQs, and skeletons for keyboard scanning and SIO.
+    - Added dedicated documentation for each chip in `doc/README-ANTIC.md`, `doc/README-GTIA.md`, and `doc/README-POKEY.md`.
+
 ## [0.2.0-dev] - 2026-03-30
 
 ### Changed

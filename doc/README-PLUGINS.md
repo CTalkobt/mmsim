@@ -30,6 +30,7 @@ Plugins that implement the `IOHandler` interface for memory-mapped hardware.
 | `lib/mmemu-plugin-pet-video.so` | PET Video Subsystem (Discrete and CRTC models). | [README-PET-VIDEO.md](README-PET-VIDEO.md) |
 | `lib/mmemu-plugin-antic.so` | Atari ANTIC DMA engine and display controller. | [README-ANTIC.md](README-ANTIC.md) |
 | `lib/mmemu-plugin-gtia.so` | Atari GTIA color and PMG chip. | [README-GTIA.md](README-GTIA.md) |
+| `lib/mmemu-plugin-pokey.so` | Atari POKEY audio, timers, and keyboard/SIO. | [README-POKEY.md](README-POKEY.md) |
 
 ### 1.3 Machine Plugins (Presets)
 Plugins that implement `MachineDescriptor` factories.

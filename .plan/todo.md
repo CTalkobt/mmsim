@@ -1724,18 +1724,18 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
     - [x] Collision detection registers ($D000–$D00F).
 - [x] **Console Switches**: Read Start, Select, Option buttons via $D01F.
 
-### Phase 26.3: POKEY Audio and IO (`src/plugins/devices/pokey/`)
+### Phase 26.3: POKEY Audio and IO (`src/plugins/devices/pokey/`) [COMPLETED]
 
-- [ ] Implement `POKEY : public IOHandler`.
-- [ ] **Audio Subsystem**:
-    - 4 independent square-wave channels.
-    - Polynomial-counter noise generators (4, 5, 9, 17-bit).
-    - Frequency division and 16-bit channel linking.
-- [ ] **Timers**: 3 interval timers with IRQ support.
-- [ ] **Keyboard**:
-    - Serial scan matrix for the Atari keyboard.
-    - Handle BREAK and Control keys.
-- [ ] **Serial Port (SIO)**: Support for SIO bus interrupts and basic data transfer.
+- [x] Implement `POKEY : public IOHandler`.
+- [x] **Audio Subsystem**:
+    - [x] 4 independent square-wave channels.
+    - [x] Polynomial-counter noise generators (4, 5, 9, 17-bit).
+    - [x] Frequency division and 16-bit channel linking.
+- [x] **Timers**: 3 interval timers with IRQ support.
+- [x] **Keyboard**:
+    - [x] Serial scan matrix for the Atari keyboard (skeleton).
+    - [x] Handle BREAK and Control keys (skeleton).
+- [x] **Serial Port (SIO)**: Support for SIO bus interrupts and basic data transfer (skeleton).
 
 ### Phase 26.4: Atari Machine Factory and Memory Map
 

@@ -16,6 +16,7 @@ INCLUDES  = -Isrc -Isrc/include -Isrc/cli/main -Isrc/gui/main -Isrc/libcore/main
             -Isrc/plugins/devices/vic2/main -Isrc/plugins/devices/sid6581/main \
             -Isrc/plugins/machines/c64/main -Isrc/plugins/devices/pia6520/main \
             -Isrc/plugins/devices/crtc6545/main -Isrc/plugins/devices/pet_video/main \
+            -Isrc/plugins/devices/pokey/main \
             -Isrc/plugins/machines/pet/main -Itests
 
 BINDIR   = bin
@@ -148,10 +149,10 @@ TEST_SRCS = tests/test_main.cpp \
             src/plugins/devices/pia6520/test/test_pia6520.cpp \
             src/plugins/devices/via6522/test/test_via6522.cpp \
             src/plugins/devices/antic/test/test_antic.cpp \
-            src/plugins/devices/gtia/test/test_gtia.cpp
+            src/plugins/devices/gtia/test/test_gtia.cpp \
+            src/plugins/devices/pokey/test/test_pokey.cpp
 
             # Test-related objects (excluding plugin entry points to avoid multiple mmemuPluginInit definitions)
-
             ALL_PLUGIN_OBJS = src/plugins/6502/main/cpu6502.o \
                   src/plugins/6502/main/cpu6510.o \
                   src/plugins/6502/main/disassembler_6502.o \
@@ -177,7 +178,8 @@ TEST_SRCS = tests/test_main.cpp \
                   src/plugins/machines/pet/main/machine_pet.o \
                   src/plugins/devices/keyboard/main/keyboard_matrix_pet.o \
                   src/plugins/devices/antic/main/antic.o \
-                  src/plugins/devices/gtia/main/gtia.o
+                  src/plugins/devices/gtia/main/gtia.o \
+                  src/plugins/devices/pokey/main/pokey.o
 REGISTRY_OBJS = src/cli/main/plugin_command_registry.o \
                  src/mcp/main/plugin_tool_registry.o \
                  src/gui/main/plugin_pane_manager.o
@@ -230,6 +232,10 @@ PLUGIN_GTIA_SRCS = src/plugins/devices/gtia/main/gtia.cpp \
                    src/plugins/devices/gtia/main/plugin_init.cpp
 PLUGIN_GTIA_OBJS = $(PLUGIN_GTIA_SRCS:.cpp=.o)
 
+PLUGIN_POKEY_SRCS = src/plugins/devices/pokey/main/pokey.cpp \
+                    src/plugins/devices/pokey/main/plugin_init.cpp
+PLUGIN_POKEY_OBJS = $(PLUGIN_POKEY_SRCS:.cpp=.o)
+
 GUI_OBJS = $(GUI_SRCS:.cpp=.o)
 
 CLI_OBJS = $(CLI_SRCS:.cpp=.o)
@@ -257,7 +263,8 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-pet-video.so \
           $(LIBDIR)/mmemu-plugin-pet.so \
           $(LIBDIR)/mmemu-plugin-antic.so \
-          $(LIBDIR)/mmemu-plugin-gtia.so
+          $(LIBDIR)/mmemu-plugin-gtia.so \
+          $(LIBDIR)/mmemu-plugin-pokey.so
 
 LIBS = $(ILIBDIR)/libmem.a $(ILIBDIR)/libcore.a $(ILIBDIR)/libdevices.a \
        $(ILIBDIR)/libtoolchain.a $(ILIBDIR)/libdebug.a $(ILIBDIR)/libplugins.a
@@ -349,6 +356,9 @@ $(LIBDIR)/mmemu-plugin-antic.so: $(PLUGIN_ANTIC_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 $(LIBDIR)/mmemu-plugin-gtia.so: $(PLUGIN_GTIA_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
+
+$(LIBDIR)/mmemu-plugin-pokey.so: $(PLUGIN_POKEY_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 # Binary rules
