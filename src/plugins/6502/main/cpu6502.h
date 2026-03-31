@@ -29,6 +29,7 @@ struct CPU6502State {
     uint8_t  irqLine;
     uint8_t  nmiLine;
     uint8_t  nmiPrev;
+    uint8_t  haltLine;
 };
 
 /**
@@ -65,6 +66,7 @@ public:
     void triggerReset() override { reset(); }
     void setIrqLine(bool asserted) override { m_state.irqLine = asserted ? 1 : 0; }
     void setNmiLine(bool asserted) override { m_state.nmiLine = asserted ? 1 : 0; }
+    void setHaltLine(bool asserted) override { m_state.haltLine = asserted ? 1 : 0; }
 
     // Disassembly
     int disassembleOne  (IBus* bus, uint32_t addr, char* buf, int bufsz) override;

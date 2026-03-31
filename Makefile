@@ -146,34 +146,35 @@ TEST_SRCS = tests/test_main.cpp \
             src/plugins/cbm-loader/test/test_cbm_loader.cpp \
             src/plugins/devices/pet_video/test/test_pet_video.cpp \
             src/plugins/devices/pia6520/test/test_pia6520.cpp \
-            src/plugins/devices/via6522/test/test_via6522.cpp
+            src/plugins/devices/via6522/test/test_via6522.cpp \
+            src/plugins/devices/antic/test/test_antic.cpp
 
-# Test-related objects (excluding plugin entry points to avoid multiple mmemuPluginInit definitions)
-ALL_PLUGIN_OBJS = src/plugins/6502/main/cpu6502.o \
-                   src/plugins/6502/main/cpu6510.o \
-                   src/plugins/6502/main/disassembler_6502.o \
-                   src/plugins/6502/main/assembler_6502.o \
-                   src/plugins/6502/main/kickassembler.o \
-                   src/plugins/devices/via6522/main/via6522.o \
-                   src/plugins/devices/vic6560/main/vic6560.o \
-                   src/plugins/devices/kbd_vic20/main/kbd_vic20.o \
-                   src/plugins/machines/vic20/main/machine_vic20.o \
-                   src/plugins/viceImporter/main/rom_discovery.o \
-                   src/plugins/viceImporter/main/rom_importer.o \
-                   src/plugins/devices/c64_pla/main/c64_pla.o \
-                   src/plugins/devices/cia6526/main/cia6526.o \
-                   src/plugins/devices/vic2/main/vic2.o \
-                   src/plugins/devices/sid6581/main/sid6581.o \
-                   src/plugins/machines/c64/main/machine_c64.o \
-                   src/plugins/devices/pia6520/main/pia6520.o \
-                   src/plugins/cbm-loader/main/prg_loader.o \
-                   src/plugins/cbm-loader/main/crt_parser.o \
-                   src/plugins/cbm-loader/main/cbm_cart_handler.o \
-                   src/plugins/devices/crtc6545/main/crtc6545.o \
-                   src/plugins/devices/pet_video/main/pet_video.o \
-                   src/plugins/machines/pet/main/machine_pet.o \
-                   src/plugins/devices/keyboard/main/keyboard_matrix_pet.o
-
+            # Test-related objects (excluding plugin entry points to avoid multiple mmemuPluginInit definitions)
+            ALL_PLUGIN_OBJS = src/plugins/6502/main/cpu6502.o \
+                  src/plugins/6502/main/cpu6510.o \
+                  src/plugins/6502/main/disassembler_6502.o \
+                  src/plugins/6502/main/assembler_6502.o \
+                  src/plugins/6502/main/kickassembler.o \
+                  src/plugins/devices/via6522/main/via6522.o \
+                  src/plugins/devices/vic6560/main/vic6560.o \
+                  src/plugins/devices/kbd_vic20/main/kbd_vic20.o \
+                  src/plugins/machines/vic20/main/machine_vic20.o \
+                  src/plugins/viceImporter/main/rom_discovery.o \
+                  src/plugins/viceImporter/main/rom_importer.o \
+                  src/plugins/devices/c64_pla/main/c64_pla.o \
+                  src/plugins/devices/cia6526/main/cia6526.o \
+                  src/plugins/devices/vic2/main/vic2.o \
+                  src/plugins/devices/sid6581/main/sid6581.o \
+                  src/plugins/machines/c64/main/machine_c64.o \
+                  src/plugins/devices/pia6520/main/pia6520.o \
+                  src/plugins/cbm-loader/main/prg_loader.o \
+                  src/plugins/cbm-loader/main/crt_parser.o \
+                  src/plugins/cbm-loader/main/cbm_cart_handler.o \
+                  src/plugins/devices/crtc6545/main/crtc6545.o \
+                  src/plugins/devices/pet_video/main/pet_video.o \
+                  src/plugins/machines/pet/main/machine_pet.o \
+                  src/plugins/devices/keyboard/main/keyboard_matrix_pet.o \
+                  src/plugins/devices/antic/main/antic.o
 REGISTRY_OBJS = src/cli/main/plugin_command_registry.o \
                  src/mcp/main/plugin_tool_registry.o \
                  src/gui/main/plugin_pane_manager.o
@@ -212,13 +213,18 @@ PLUGIN_PIA6520_OBJS  = $(PLUGIN_PIA6520_SRCS:.cpp=.o)
 PLUGIN_CBMLOADER_OBJS = $(PLUGIN_CBMLOADER_SRCS:.cpp=.o)
 PLUGIN_CRTC6545_OBJS = $(PLUGIN_CRTC6545_SRCS:.cpp=.o)
 PLUGIN_PETVIDEO_OBJS = $(PLUGIN_PETVIDEO_SRCS:.cpp=.o)
-PLUGIN_PET_OBJS      = $(PLUGIN_PET_SRCS:.cpp=.o) \
+PLUGIN_PET_OBJS      = $(PLUGIN_PET_SRCS) \
                        src/plugins/devices/pia6520/main/pia6520.o \
                        src/plugins/devices/via6522/main/via6522.o \
                        src/plugins/devices/crtc6545/main/crtc6545.o \
                        src/plugins/devices/pet_video/main/pet_video.o
 
+PLUGIN_ANTIC_SRCS = src/plugins/devices/antic/main/antic.cpp \
+                    src/plugins/devices/antic/main/plugin_init.cpp
+PLUGIN_ANTIC_OBJS = $(PLUGIN_ANTIC_SRCS:.cpp=.o)
+
 GUI_OBJS = $(GUI_SRCS:.cpp=.o)
+
 CLI_OBJS = $(CLI_SRCS:.cpp=.o)
 MCP_OBJS = $(MCP_SRCS:.cpp=.o)
 
@@ -242,7 +248,8 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-cbm-loader.so \
           $(LIBDIR)/mmemu-plugin-crtc6545.so \
           $(LIBDIR)/mmemu-plugin-pet-video.so \
-          $(LIBDIR)/mmemu-plugin-pet.so
+          $(LIBDIR)/mmemu-plugin-pet.so \
+          $(LIBDIR)/mmemu-plugin-antic.so
 
 LIBS = $(ILIBDIR)/libmem.a $(ILIBDIR)/libcore.a $(ILIBDIR)/libdevices.a \
        $(ILIBDIR)/libtoolchain.a $(ILIBDIR)/libdebug.a $(ILIBDIR)/libplugins.a
@@ -328,6 +335,9 @@ $(LIBDIR)/mmemu-plugin-pet-video.so: $(PLUGIN_PETVIDEO_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 $(LIBDIR)/mmemu-plugin-pet.so: $(PLUGIN_PET_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
+
+$(LIBDIR)/mmemu-plugin-antic.so: $(PLUGIN_ANTIC_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 # Binary rules

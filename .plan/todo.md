@@ -1700,17 +1700,16 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
 *Goal: Cycle-accurate emulation of the ANTIC, GTIA, and POKEY trio.*
 
 - [x] **ROM Collection**: System ROMs (OS-A, OS-B, XL, BASIC, CHAR) collected in `roms/atari/`.
-- [ ] **ANTIC DMA Engine** (`src/plugins/devices/antic/`)
-- [ ] **Display List Interpreter**:
-...
-    - Fetch-decode-execute display list instructions.
-    - Support for all ANTIC modes (Text 0-F, Graphics 0-F).
-    - Handle `DLI` (Display List Interrupt) bit in instructions.
-    - Handle `HSCROL` and `VSCROL` smooth scrolling.
-- [ ] **DMA Timing**:
-    - "Steal" cycles from the CPU for playfield, sprite, and display list fetches.
-    - Implement the `HALT` signal line back to `ICore`.
-- [ ] **NMI Generation**: Vertical Blank Interrupt (VBI) and Display List 
+- [x] **ANTIC DMA Engine** (`src/plugins/devices/antic/`)
+- [x] **Display List Interpreter**:
+    - [x] Fetch-decode-execute display list instructions.
+    - [x] Support for basic modes (mapped in code).
+    - [x] Handle `DLI` (Display List Interrupt) bit in instructions.
+    - [ ] Handle `HSCROL` and `VSCROL` smooth scrolling.
+- [x] **DMA Timing**:
+    - [x] "Steal" cycles from the CPU for playfield, sprite, and display list fetches.
+    - [x] Implement the `HALT` signal line back to `ICore`.
+- [x] **NMI Generation**: Vertical Blank Interrupt (VBI) and Display List 
       Interrupt (DLI).
 
 ### Phase 26.2: GTIA Color and PMG (`src/plugins/devices/gtia/`)

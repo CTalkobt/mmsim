@@ -66,6 +66,7 @@ void MOS6502::reset() {
     m_state.irqLine = 0;
     m_state.nmiLine = 0;
     m_state.nmiPrev = 0;
+    m_state.haltLine = 0;
 
     if (m_bus) {
         uint8_t lo = m_bus->read8(0xFFFC);
@@ -715,6 +716,12 @@ const MOS6502::Opcode MOS6502::s_opcodes[256] = {
 };
 
 int MOS6502::step() {
+    // If CPU is halted (e.g. by ANTIC DMA or WSYNC), it consumes 1 cycle and does nothing.
+    if (m_state.haltLine) {
+        m_state.cycles++;
+        return 1;
+    }
+
     // NMI handling (falling edge)
     if (m_state.nmiLine && !m_state.nmiPrev) {
         log(SIM_LOG_DEBUG, "6502: Taking NMI");
