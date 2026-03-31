@@ -776,10 +776,10 @@ int MOS6502::step() {
         extraCycles += (this->*(info.fn))(addr);
     }
 
-    if (observer) {
+    if (m_observer) {
         DisasmEntry entry;
         disassembleEntry(m_bus, pc, &entry);
-        observer->onStep(this, m_bus, entry);
+        m_observer->onStep(this, m_bus, entry);
     }
 
     int total = info.cycles + extraCycles;

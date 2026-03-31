@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0-dev] - 2026-03-30
+
+### Changed
+- **Interface Segregation (Phase 0.5)**:
+    - Refactored `ICore` into `ICpuRegs` (register access) and `ICpuDisasm` (disassembly) interfaces.
+    - Refactored `IBus` to be leaner, segregating `ISnapshotable` (state management) and `IBusWriteLog` (write logging) interfaces.
+    - Updated all CPU cores (`MOS6502`, `MOS6510`) and memory buses (`FlatMemoryBus`, `PortBus`) to implement the new segregated interfaces.
+- **Encapsulation & Security**:
+    - Moved `ExecutionObserver* observer` to protected members in `ICore` and `IBus`.
+    - Added `setObserver()` and `getObserver()` accessors for safer observer management.
+    - Made `IBus::peek8()` pure virtual to guarantee side-effect-free memory reads in all implementations.
+
+### Fixed
+- **Build System**: 
+    - Fixed `make test` target in `Makefile` which was previously broken (Permission denied).
+    - Configured the test binary to correctly link against plugin object files and registry implementations.
+    - Fixed naming mismatch for the `vice-importer` plugin in the build system.
+- **Hardware Emulation**:
+    - Fixed incorrect wired-AND logic in `PIA6520` read-back of Peripheral Registers A and B. It now correctly returns the combination of latch values for output bits and pin values for input bits.
+- **Testing**:
+    - Fixed missing device registrations in VIC-20 integration tests.
+    - Added missing include paths to the test build.
+
 ## [0.2.0-dev] - 2026-03-29
 
 ### Added

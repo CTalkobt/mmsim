@@ -35,7 +35,7 @@ uint8_t FlatMemoryBus::read8(uint32_t addr) {
     if (m_ioRead) {
         uint8_t ioVal;
         if (m_ioRead(this, addr, &ioVal)) {
-            if (observer) observer->onMemoryRead(this, addr, ioVal);
+            if (m_observer) m_observer->onMemoryRead(this, addr, ioVal);
             return ioVal;
         }
     }
@@ -46,7 +46,7 @@ uint8_t FlatMemoryBus::read8(uint32_t addr) {
     } else {
         val = m_data[addr];
     }
-    if (observer) observer->onMemoryRead(this, addr, val);
+    if (m_observer) m_observer->onMemoryRead(this, addr, val);
     return val;
 }
 
@@ -54,7 +54,7 @@ void FlatMemoryBus::write8(uint32_t addr, uint8_t val) {
     addr &= m_config.addrMask;
     uint8_t before = peek8(addr);
     if (m_ioWrite && m_ioWrite(this, addr, val)) {
-        if (observer) observer->onMemoryWrite(this, addr, before, val);
+        if (m_observer) m_observer->onMemoryWrite(this, addr, before, val);
         return;
     }
     const RomOverlay* overlay = findOverlay(addr);
@@ -64,14 +64,14 @@ void FlatMemoryBus::write8(uint32_t addr, uint8_t val) {
             m_data[addr] = val;
         } else {
             // ROM: write ignored
-            if (observer) observer->onMemoryWrite(this, addr, before, val);
+            if (m_observer) m_observer->onMemoryWrite(this, addr, before, val);
             return;
         }
     } else {
         m_data[addr] = val;
     }
 
-    if (observer) observer->onMemoryWrite(this, addr, before, val);
+    if (m_observer) m_observer->onMemoryWrite(this, addr, before, val);
     
     m_writeLog.push({addr, before, val});
 }

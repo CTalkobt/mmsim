@@ -99,8 +99,8 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
                 
                 if (m_ctx.dbg) delete m_ctx.dbg;
                 m_ctx.dbg = new DebugContext(m_ctx.cpu, m_ctx.bus);
-                m_ctx.cpu->observer = m_ctx.dbg;
-                m_ctx.bus->observer = m_ctx.dbg;
+                m_ctx.cpu->setObserver(m_ctx.dbg);
+                m_ctx.bus->setObserver(m_ctx.dbg);
                 m_output("Created machine: " + md->displayName + "\n");
                 
                 if (m_ctx.machine->onReset) {

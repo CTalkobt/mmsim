@@ -46,16 +46,11 @@ struct RegDescriptor {
 class ExecutionObserver;
 
 /**
- * Abstract interface for a CPU core.
+ * Interface for CPU register access.
  */
-class ICore {
+class ICpuRegs {
 public:
-    virtual ~ICore();
-
-    // ISA identification
-    virtual const char* isaName()     const = 0;
-    virtual const char* variantName() const = 0;
-    virtual uint32_t    isaCaps()     const = 0;
+    virtual ~ICpuRegs() {}
 
     // Register descriptor table
     virtual int                  regCount()             const = 0;
@@ -67,6 +62,30 @@ public:
     virtual uint32_t regReadByName (const char* name) const;
     virtual void     regWriteByName(const char* name, uint32_t val);
     virtual int      regIndexByName(const char* name) const;
+};
+
+/**
+ * Interface for CPU disassembly.
+ */
+class ICpuDisasm {
+public:
+    virtual ~ICpuDisasm() {}
+
+    virtual int disassembleOne  (IBus* bus, uint32_t addr, char* buf, int bufsz) = 0;
+    virtual int disassembleEntry(IBus* bus, uint32_t addr, void* entryOut)      = 0;
+};
+
+/**
+ * Abstract interface for a CPU core.
+ */
+class ICore : public ICpuRegs, public ICpuDisasm, public ISnapshotable {
+public:
+    virtual ~ICore();
+
+    // ISA identification
+    virtual const char* isaName()     const = 0;
+    virtual const char* variantName() const = 0;
+    virtual uint32_t    isaCaps()     const = 0;
 
     // Convenience accessors
     virtual uint32_t pc() const = 0;
@@ -84,15 +103,6 @@ public:
     virtual void setIrqLine(bool asserted) { if (asserted) triggerIrq(); }
     virtual void setNmiLine(bool asserted) { if (asserted) triggerNmi(); }
 
-    // Disassembly
-    virtual int disassembleOne  (IBus* bus, uint32_t addr, char* buf, int bufsz) = 0;
-    virtual int disassembleEntry(IBus* bus, uint32_t addr, void* entryOut)      = 0;
-
-    // Snapshot support
-    virtual size_t stateSize()             const = 0;
-    virtual void   saveState(uint8_t* buf) const = 0;
-    virtual void   loadState(const uint8_t* buf) = 0;
-
     // Step-over / step-out heuristics
     virtual int  isCallAt    (IBus* bus, uint32_t addr) = 0;
     virtual bool isReturnAt  (IBus* bus, uint32_t addr) = 0;
@@ -108,5 +118,9 @@ public:
 
     virtual uint64_t cycles() const = 0;
 
-    ExecutionObserver* observer = nullptr;
+    void setObserver(ExecutionObserver* obs) { m_observer = obs; }
+    ExecutionObserver* getObserver() const { return m_observer; }
+
+protected:
+    ExecutionObserver* m_observer = nullptr;
 };

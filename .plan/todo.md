@@ -36,6 +36,26 @@ subsequent phase has a clean home.*
 
 ---
 
+## Phase 0.5: Architectural Refactor (Critique Response)
+
+*Goal: Address structural deficiencies identified in the Phase 0/1 review.*
+
+- [x] **Interface Segregation**
+   - [x] Refactor `ICore` to separate execution, register access, and disassembly.
+   - [x] Refactor `IBus` to be leaner.
+- [x] **Encapsulation**
+   - [x] Move `ExecutionObserver* observer` to private/protected with proper accessors in `ICore` and `IBus`.
+- [x] **Side-effect-free Peeking**
+   - [x] Ensure `IBus::peek8` is strictly side-effect-free; do not delegate to `read8` by default if `read8` can trigger I/O side effects.
+- [ ] **Plugin ABI Stability**
+   - [ ] Refactor `SimPluginHostAPI` to use a stable C-compatible interface (opaque pointers/function pointers) instead of C++ classes.
+- [ ] **Resource Management**
+   - [ ] Fix memory leaks in `MachineRegistry::createMachine` and `MachineDescriptor` lifecycle.
+- [ ] **Undefined Behavior**
+   - [ ] Fix potential UB in bus masking (e.g., `1u << 32`).
+
+---
+
 ## Phase 1: libmem — Address Bus Abstraction
 
 *Goal: A working `IBus` interface and a `FlatMemoryBus` concrete implementation.
@@ -576,12 +596,12 @@ user must explicitly request it via a CLI command or GUI menu item.*
 
 ---
 
-## Phase 11: C64 Machine
+## Phase 11: C64 Machine [COMPLETED]
 
 *Goal: A bootable C64 simulation. Reuses `FlatMemoryBus`, `MOS6502` (via
 `MOS6510` subclass), VIA→CIA upgrade, and adds VIC-II and SID.*
 
-### Phase 11.1 MOS 6510 CPU (`src/plugins/6502/main/cpu6510.h/cpp`)
+### Phase 11.1 MOS 6510 CPU (`src/plugins/6502/main/cpu6510.h/cpp`) [COMPLETED]
 
 The 6510 is a 6502 with a built-in 6-bit I/O port at addresses $00 (DDR) and $01 (DATA). The port controls the PLA banking lines.
 
@@ -590,7 +610,7 @@ The 6510 is a 6502 with a built-in 6-bit I/O port at addresses $00 (DDR) and $01
 - [x] Exposes `ISignalLine` for each port output (`signalLoram()`, `signalHiram()`, `signalCharen()`) so the PLA handler can observe changes.
 - [x] Registered as `"6510"` core in the 6502 plugin manifest; `"raw6510"` machine factory added.
 
-### Phase 11.2 C64 PLA Banking (`src/plugins/devices/c64_pla/main/c64_pla.h/cpp`)
+### Phase 11.2 C64 PLA Banking (`src/plugins/devices/c64_pla/main/c64_pla.h/cpp`) [COMPLETED]
 
 The PLA maps the 6510 port bits to ROM/IO visibility in the upper address space.
 
@@ -602,7 +622,7 @@ The PLA maps the 6510 port bits to ROM/IO visibility in the upper address space.
 - [x] All writes return false: ROM areas accept writes to underlying flat RAM; I/O writes reach device handlers in the dispatch chain.
 - [x] ROM data pointers set via `setBasicRom/setKernalRom/setCharRom`; signal lines via `setSignals(loram, hiram, charen)`.
 
-### Phase 11.3 MOS 6526 CIA (`src/plugins/devices/cia6526/main/cia6526.h/cpp`)
+### Phase 11.3 MOS 6526 CIA (`src/plugins/devices/cia6526/main/cia6526.h/cpp`) [COMPLETED]
 
 - [x] Register file: PRA, PRB, DDRA, DDRB, TA lo/hi (latch + counter), TB lo/hi, TOD 10ths/sec/min/hr, SDR, ICR, CRA, CRB.
 - [x] Timer A / Timer B: continuous and one-shot modes; underflow sets ICR bits 0/1; TB can count TA underflows (CRB bits 5–6).
@@ -611,7 +631,7 @@ The PLA maps the 6510 port bits to ROM/IO visibility in the upper address space.
 - [x] `keyDown` / `keyUp` injected into PRA/PRB via `IPortDevice*` (same interface as VIA6522).
 - [x] `reset()` clears all registers; IRQ line de-asserted; port devices notified of DDR=0.
 
-### Phase 11.4 MOS 6567/6569 VIC-II (`src/plugins/devices/vic2/main/vic2.h/cpp`)
+### Phase 11.4 MOS 6567/6569 VIC-II (`src/plugins/devices/vic2/main/vic2.h/cpp`) [COMPLETED]
 
 - [x] Register file ($D000–$D02E, 47 registers): Sprites X/Y (×8), MSB X, control 1/2, raster compare, light pen X/Y, sprite enable/expand/priority/multicolor/collision, IRQ status/enable, border/background/sprite colours. Reads beyond $D02E return $FF; colour registers return $F0 in high nibble.
 - [x] Sprite engine: 8 sprites, 24×21 pixels; sprite data pointer read from screen_base+1016+sp; X/Y expansion (doubles pixels/rows); monochrome and multicolor ($D025/$D026 shared colors); priority (behind/in-front of background); sprite-sprite bounding-box collision detection ($D01E); sprite-background pixel collision detection ($D01F). Collision IRQs fire via $D019/$D01A.
@@ -620,7 +640,7 @@ The PLA maps the 6510 port bits to ROM/IO visibility in the upper address space.
 - [x] `renderFrame()`: frame-based renderer (384×272 total, 320×200 display area, 32px left/right border, 36px top/bottom). Renders background then composites sprites with priority and collision.
 - [x] `tick(cycles)`: cycle-accumulating raster counter (65 cycles/line × 263 lines NTSC); fires raster IRQ via `ISignalLine` when raster matches $D011 bit-8 + $D012 compare value.
 
-### Phase 11.5 MOS 6581 SID (`src/plugins/devices/sid6581/main/sid6581.h/cpp`)
+### Phase 11.5 MOS 6581 SID (`src/plugins/devices/sid6581/main/sid6581.h/cpp`) [COMPLETED]
 
 - [x] Three voices (offsets +0 to +6 per voice × 3): FREQ lo/hi, PW lo/hi (12-bit), Control (Gate/Sync/Ring/Test/Tri/Saw/Pulse/Noise), Attack/Decay, Sustain/Release.
 - [x] Waveform generators: Triangle (folded from 24-bit phase accumulator), Sawtooth (upper 12 bits), Pulse (threshold on upper 12 bits vs. pulse-width register), Noise (23-bit Galois LFSR, taps 22 and 17, clocked on phase bit-19 rising edge; output mapped from 8 LFSR bit positions to 12-bit value). Multiple active waveforms are ANDed (real SID behaviour for combined waveforms).
@@ -633,7 +653,7 @@ The PLA maps the 6510 port bits to ROM/IO visibility in the upper address space.
 - [x] IAudioOutput: ring buffer (8192 samples); `tick()` synthesises samples at configured rate; `pullSamples()` drains the buffer. Clock rate configurable via `setClockHz()` (default 985248 PAL; 1022727 NTSC).
 - [x] Plugin: `mmemu-plugin-sid6581.so`, device registered as `"6581"`.
 
-### Phase 11.6 C64 Memory Map and Wiring
+### Phase 11.6 C64 Memory Map and Wiring [COMPLETED]
 
 - [x] `MachineDescriptor` id `"c64"` — `src/plugins/machines/c64/main/machine_c64.cpp`.
 - [x] `onInit`: creates and registers C64PLA ($A000), VIC2 ($D000), SID ($D400), ColorRAM ($D800), CIA1 ($DC00), CIA2 ($DD00) in IORegistry; sets bus IO hooks.
@@ -650,12 +670,12 @@ The PLA maps the 6510 port bits to ROM/IO visibility in the upper address space.
 ---
 
 
-## Phase 12: Commodore PET/CBM Machine
+## Phase 12: Commodore PET/CBM Machine [COMPLETED]
 
 *Goal: Implement the Commodore PET series (2001, 3000, 4000, 8000), including 
 the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 
-### Phase 12.1: MOS 6520 PIA (`src/plugins/devices/pia6520/`)
+### Phase 12.1: MOS 6520 PIA (`src/plugins/devices/pia6520/`) [COMPLETED]
 
 - [x] Implement `PIA6520 : public IOHandler`.
 - [x] Dual 8-bit ports (Port A and Port B) with data direction registers.
@@ -664,7 +684,7 @@ the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 - [x] `reset()` clears all registers and de-asserts interrupt lines.
 - [x] Snapshot support for registers and line states.
 
-### Phase 12.2: MOS 6545/6845 CRTC (`src/plugins/devices/crtc6545/`)
+### Phase 12.2: MOS 6545/6845 CRTC (`src/plugins/devices/crtc6545/`) [COMPLETED]
 
 - [x] Implement `CRTC6545 : public IOHandler`.
 - [x] Register-based interface: Address Register ($E880) and Data Register ($E881).
@@ -673,7 +693,7 @@ the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 - [x] Support for both 40-column and 80-column PET models via register configuration.
 - [x] `tick(cycles)`: internal counters for horizontal and vertical sync pulses.
 
-### Phase 12.3: PET Video Subsystem (`src/plugins/devices/pet_video/`)
+### Phase 12.3: PET Video Subsystem (`src/plugins/devices/pet_video/`) [COMPLETED]
 
 - [x] Implement `PetVideo` inheriting from `IVideoOutput`.
 - [x] **Discrete logic model (2001)**: Simulate basic timing logic used before the CRTC was introduced.
@@ -684,7 +704,7 @@ the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 - [x] `renderFrame()`: produces RGBA buffer from PET character memory and 
       attributes. Supports "Green" or "Amber" phosphor simulation.
 
-### Phase 12.4: IEEE-488 Bus Implementation (`src/libdevices/ieee488.h/cpp`)
+### Phase 12.4: IEEE-488 Bus Implementation (`src/libdevices/ieee488.h/cpp`) [COMPLETED]
 
 - [x] Implement `IEEE488Bus` interface for communication with disk drives 
       and printers.
@@ -692,7 +712,7 @@ the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 - [x] **HLE Disk Drive (Unit 8)**: Trap IEEE-488 sequences to provide fast host-file access.
 - [x] Support for PET "disk commands" (e.g., `LOAD "$",8`).
 
-### Phase 12.5: PET Machine Factory and Memory Map
+### Phase 12.5: PET Machine Factory and Memory Map [COMPLETED]
 
 - [x] `MachineDescriptor` for `"pet2001"`, `"pet4032"`, and `"pet8032"`.
 - [x] **Banking Logic**: Support for BASIC 1.0/2.0/4.0, Editor, KERNAL, and Character ROM.
@@ -701,7 +721,7 @@ the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
       keyboard matrices wired to PIA #1.
 - [x] `onReset`: Load appropriate ROMs for the selected model and reset all chips.
 
-### Phase 12.6: PET Integration Tests
+### Phase 12.6: PET Integration Tests [COMPLETED]
 
 - [x] **PIA Loopback**: Verify Port A to Port B communication via external 
       wiring model.
@@ -714,14 +734,14 @@ the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
 
 ---
 
-## Phase 13: Runtime Image and Cartridge Loading
+## Phase 13: Runtime Image and Cartridge Loading [PARTIALLY COMPLETED]
 
 *Goal: Enable dynamic loading of .prg (RAM injection), .bin (raw memory), and
 cartridge images (.crt or raw) into a running machine via CLI, GUI, and MCP.
 Format-specific parsers live in machine-family plugins; `libcore` provides only
 the registration mechanism and the format-agnostic BIN loader.*
 
-### Phase 13.1: Core Loader Infrastructure (`src/libcore/main/image_loader.h/cpp`)
+### Phase 13.1: Core Loader Infrastructure (`src/libcore/main/image_loader.h/cpp`) [COMPLETED]
 
 - [x] Define `IImageLoader` interface: `canLoad(path)`, `load(path, IBus*, machine)`.
 - [x] Define `ICartridgeHandler` interface: `attach(IBus*)`, `eject(IBus*)`,
@@ -732,7 +752,7 @@ the registration mechanism and the format-agnostic BIN loader.*
 - [x] CLI/GUI/MCP delegate `load`, `cart`, and `eject` commands through the
       registry without knowing any specific file format.
 
-### Phase 13.2: CBM Loader Plugin (`src/plugins/cbm-loader/`)
+### Phase 13.2: CBM Loader Plugin (`src/plugins/cbm-loader/`) [COMPLETED]
 
 *Handles all Commodore-family program and cartridge image formats. Shared by
 VIC-20, C64, PET, and C128.*
@@ -763,7 +783,7 @@ Atari machine targets.*
       ROM mapping at the correct Atari address window.
 - [ ] Register via `mmemuPluginInit` into `ImageLoaderRegistry`.
 
-### Phase 13.4: CLI Interface Extensions
+### Phase 13.4: CLI Interface Extensions [COMPLETED]
 
 - [x] `load <filename> [address]`: Delegates to `ImageLoaderRegistry`; uses header
       for `.prg` / `.xex`, requires address for `.bin`.
@@ -774,7 +794,7 @@ Atari machine targets.*
 - [x] `eject`: Calls `ICartridgeHandler::eject()` and restores the machine's
       default memory mapping.
 
-### Phase 13.5: GUI Image Management
+### Phase 13.5: GUI Image Management [COMPLETED]
 
 - [x] **Load Image Dialog**: File picker with optional load address override and
       a "Run after load" checkbox.
@@ -784,7 +804,7 @@ Atari machine targets.*
       machine display window triggers immediate loading or attachment.
 - [x] **File History**: Recently loaded images list for quick reattachment.
 
-### Phase 13.6: MCP Integration
+### Phase 13.6: MCP Integration [COMPLETED]
 
 - [x] `load_image` tool: Accepts `path`, `address`, and `autoStart` boolean;
       returns the final load address and size.
@@ -792,7 +812,7 @@ Atari machine targets.*
       cartridge metadata from `ICartridgeHandler::metadata()`.
 - [x] `eject_cartridge` tool: Calls `ICartridgeHandler::eject()`.
 
-### Phase 13.7: Integration Tests
+### Phase 13.7: Integration Tests [PARTIALLY COMPLETED]
 
 - [x] **Registry Test**: Verify `ImageLoaderRegistry` correctly dispatches to the
       right `IImageLoader` based on file extension.
@@ -1675,14 +1695,14 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
 
 ---
 
-## Phase 26: Atari 8-bit Family (400/800/XL/XE)
+## Phase 26: Atari 8-bit Family (400/800/XL/XE) [IN PROGRESS]
 
 *Goal: Cycle-accurate emulation of the ANTIC, GTIA, and POKEY trio.*
 
-### Phase 26.1: ANTIC DMA Engine (`src/plugins/devices/antic/`)
-
-- [ ] Implement `ANTIC : public IOHandler`.
+- [x] **ROM Collection**: System ROMs (OS-A, OS-B, XL, BASIC, CHAR) collected in `roms/atari/`.
+- [ ] **ANTIC DMA Engine** (`src/plugins/devices/antic/`)
 - [ ] **Display List Interpreter**:
+...
     - Fetch-decode-execute display list instructions.
     - Support for all ANTIC modes (Text 0-F, Graphics 0-F).
     - Handle `DLI` (Display List Interrupt) bit in instructions.

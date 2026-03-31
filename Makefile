@@ -16,7 +16,7 @@ INCLUDES  = -Isrc -Isrc/include -Isrc/cli/main -Isrc/gui/main -Isrc/libcore/main
             -Isrc/plugins/devices/vic2/main -Isrc/plugins/devices/sid6581/main \
             -Isrc/plugins/machines/c64/main -Isrc/plugins/devices/pia6520/main \
             -Isrc/plugins/devices/crtc6545/main -Isrc/plugins/devices/pet_video/main \
-            -Isrc/plugins/machines/pet/main
+            -Isrc/plugins/machines/pet/main -Itests
 
 BINDIR   = bin
 LIBDIR   = lib
@@ -126,6 +126,61 @@ CLI_SRCS = src/cli/main/main.cpp \
 MCP_SRCS = src/mcp/main/main.cpp \
            src/mcp/main/plugin_tool_registry.cpp
 
+# Test Sources
+TEST_SRCS = tests/test_main.cpp \
+            tests/test_plugin_extension.cpp \
+            tests/test_vice_importer.cpp \
+            src/libmem/test/test_flatmembus.cpp \
+            src/libcore/test/test_libcore.cpp \
+            src/libcore/test/test_registry.cpp \
+            src/libdevices/test/test_devices.cpp \
+            src/libdevices/test/test_joystick.cpp \
+            src/libdebug/test/test_debug.cpp \
+            src/libtoolchain/test/test_toolchain.cpp \
+            src/plugins/6502/test/test_cpu6502.cpp \
+            src/plugins/6502/test/test_disasm6502.cpp \
+            src/plugins/6502/test/test_assembler6502.cpp \
+            src/plugins/machines/vic20/test/test_vic20_integration.cpp \
+            src/plugins/machines/c64/test/test_c64_integration.cpp \
+            src/plugins/machines/pet/test/test_pet_integration.cpp \
+            src/plugins/cbm-loader/test/test_cbm_loader.cpp \
+            src/plugins/devices/pet_video/test/test_pet_video.cpp \
+            src/plugins/devices/pia6520/test/test_pia6520.cpp \
+            src/plugins/devices/via6522/test/test_via6522.cpp
+
+# Test-related objects (excluding plugin entry points to avoid multiple mmemuPluginInit definitions)
+ALL_PLUGIN_OBJS = src/plugins/6502/main/cpu6502.o \
+                   src/plugins/6502/main/cpu6510.o \
+                   src/plugins/6502/main/disassembler_6502.o \
+                   src/plugins/6502/main/assembler_6502.o \
+                   src/plugins/6502/main/kickassembler.o \
+                   src/plugins/devices/via6522/main/via6522.o \
+                   src/plugins/devices/vic6560/main/vic6560.o \
+                   src/plugins/devices/kbd_vic20/main/kbd_vic20.o \
+                   src/plugins/machines/vic20/main/machine_vic20.o \
+                   src/plugins/viceImporter/main/rom_discovery.o \
+                   src/plugins/viceImporter/main/rom_importer.o \
+                   src/plugins/devices/c64_pla/main/c64_pla.o \
+                   src/plugins/devices/cia6526/main/cia6526.o \
+                   src/plugins/devices/vic2/main/vic2.o \
+                   src/plugins/devices/sid6581/main/sid6581.o \
+                   src/plugins/machines/c64/main/machine_c64.o \
+                   src/plugins/devices/pia6520/main/pia6520.o \
+                   src/plugins/cbm-loader/main/prg_loader.o \
+                   src/plugins/cbm-loader/main/crt_parser.o \
+                   src/plugins/cbm-loader/main/cbm_cart_handler.o \
+                   src/plugins/devices/crtc6545/main/crtc6545.o \
+                   src/plugins/devices/pet_video/main/pet_video.o \
+                   src/plugins/machines/pet/main/machine_pet.o \
+                   src/plugins/devices/keyboard/main/keyboard_matrix_pet.o
+
+REGISTRY_OBJS = src/cli/main/plugin_command_registry.o \
+                 src/mcp/main/plugin_tool_registry.o \
+                 src/gui/main/plugin_pane_manager.o
+
+TEST_OBJS = $(TEST_SRCS:.cpp=.o) $(sort $(ALL_PLUGIN_OBJS)) $(REGISTRY_OBJS)
+TEST_BIN  = $(BINDIR)/mmemu-test
+
 # Objects
 LIBMEM_OBJS       = $(LIBMEM_SRCS:.cpp=.o)
 LIBCORE_OBJS      = $(LIBCORE_SRCS:.cpp=.o)
@@ -177,7 +232,7 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-vic6560.so \
           $(LIBDIR)/mmemu-plugin-vic20.so \
           $(LIBDIR)/mmemu-plugin-kbd-vic20.so \
-          $(LIBDIR)/mmemu-plugin-viceImporter.so \
+          $(LIBDIR)/mmemu-plugin-vice-importer.so \
           $(LIBDIR)/mmemu-plugin-c64-pla.so \
           $(LIBDIR)/mmemu-plugin-cia6526.so \
           $(LIBDIR)/mmemu-plugin-vic2.so \
@@ -242,7 +297,7 @@ $(LIBDIR)/mmemu-plugin-vic20.so: $(PLUGIN_VIC20_CORE_OBJS) $(PLUGIN_VIC20_GUI_OB
 $(LIBDIR)/mmemu-plugin-kbd-vic20.so: $(PLUGIN_KBDVIC20_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
-$(LIBDIR)/mmemu-plugin-viceImporter.so: $(PLUGIN_VICEIMPORTER_OBJS) | $(LIBDIR)
+$(LIBDIR)/mmemu-plugin-vice-importer.so: $(PLUGIN_VICEIMPORTER_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 $(LIBDIR)/mmemu-plugin-c64-pla.so: $(PLUGIN_C64PLA_OBJS) | $(LIBDIR)
@@ -284,6 +339,9 @@ $(GUI_BIN): $(GUI_OBJS) $(LIBS) | $(BINDIR)
 
 $(MCP_BIN): $(MCP_OBJS) $(LIBS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -rdynamic -o $@ $(MCP_OBJS) $(BASE_LIBS)
+
+$(TEST_BIN): $(TEST_OBJS) $(LIBS) | $(BINDIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -Itests -rdynamic -o $@ $(TEST_OBJS) $(BASE_LIBS) $(WXLIBS) -lasound
 
 # Generic rules
 %.o: %.cpp

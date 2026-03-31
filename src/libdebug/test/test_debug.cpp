@@ -9,8 +9,8 @@ TEST_CASE(debug_breakpoints) {
     cpu.setDataBus(&bus);
     
     DebugContext dbg(&cpu, &bus);
-    cpu.observer = &dbg;
-    bus.observer = &dbg;
+    cpu.setObserver(&dbg);
+    bus.setObserver(&dbg);
 
     // Program: NOP ($EA); STA $10 ($85 $10)
     bus.write8(0x1000, 0xEA);
@@ -45,7 +45,7 @@ TEST_CASE(debug_trace) {
     cpu.setDataBus(&bus);
     
     DebugContext dbg(&cpu, &bus);
-    cpu.observer = &dbg;
+    cpu.setObserver(&dbg);
 
     bus.write8(0x1000, 0xA9); // LDA #$42
     bus.write8(0x1001, 0x42);

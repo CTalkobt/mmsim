@@ -104,8 +104,7 @@ bool PIA6520::ioRead(IBus*, uint32_t addr, uint8_t* val) {
             if (m_cra & 0x04) {
                 if (m_portADevice) {
                     uint8_t pins = m_portADevice->readPort();
-                    // Wired-AND logic
-                    *val = (m_ora | ~m_ddra) & pins;
+                    *val = (m_ora & m_ddra) | (pins & ~m_ddra);
                 } else {
                     *val = m_ora;
                 }
@@ -130,7 +129,7 @@ bool PIA6520::ioRead(IBus*, uint32_t addr, uint8_t* val) {
             if (m_crb & 0x04) {
                 if (m_portBDevice) {
                     uint8_t pins = m_portBDevice->readPort();
-                    *val = (m_orb | ~m_ddrb) & pins;
+                    *val = (m_orb & m_ddrb) | (pins & ~m_ddrb);
                 } else {
                     *val = m_orb;
                 }

@@ -3,17 +3,17 @@
 
 ICore::~ICore() {}
 
-uint32_t ICore::regReadByName(const char* name) const {
+uint32_t ICpuRegs::regReadByName(const char* name) const {
     int idx = regIndexByName(name);
     return (idx >= 0) ? regRead(idx) : 0;
 }
 
-void ICore::regWriteByName(const char* name, uint32_t val) {
+void ICpuRegs::regWriteByName(const char* name, uint32_t val) {
     int idx = regIndexByName(name);
     if (idx >= 0) regWrite(idx, val);
 }
 
-int ICore::regIndexByName(const char* name) const {
+int ICpuRegs::regIndexByName(const char* name) const {
     int count = regCount();
     for (int i = 0; i < count; ++i) {
         const auto* desc = regDescriptor(i);

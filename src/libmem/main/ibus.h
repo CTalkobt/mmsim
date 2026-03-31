@@ -6,6 +6,29 @@
 class ExecutionObserver;
 
 /**
+ * Interface for state snapshot support.
+ */
+class ISnapshotable {
+public:
+    virtual ~ISnapshotable() {}
+    virtual size_t stateSize()             const = 0;
+    virtual void   saveState(uint8_t *buf) const = 0;
+    virtual void   loadState(const uint8_t *buf) = 0;
+};
+
+/**
+ * Interface for write log support.
+ */
+class IBusWriteLog {
+public:
+    virtual ~IBusWriteLog() {}
+    virtual int  writeCount() const = 0;
+    virtual void getWrites(uint32_t *addrs, uint8_t *before,
+                            uint8_t *after, int max) const = 0;
+    virtual void clearWriteLog() = 0;
+};
+
+/**
  * Role of a specific bus in the system.
  */
 enum class BusRole {
@@ -29,7 +52,7 @@ struct BusConfig {
 /**
  * Abstract interface for an address / memory bus.
  */
-class IBus {
+class IBus : public ISnapshotable, public IBusWriteLog {
 public:
     virtual ~IBus() {}
 
@@ -52,9 +75,9 @@ public:
 
     /**
      * Side-effect-free read for debugger/disassembler.
-     * Default implementation delegates to read8.
+     * Must be implemented by subclasses to be side-effect free.
      */
-    virtual uint8_t peek8(uint32_t addr) { return read8(addr); }
+    virtual uint8_t peek8(uint32_t addr) = 0;
 
     virtual void reset() {}
 
@@ -63,23 +86,12 @@ public:
      * Default implementations are no-ops; bus types that support overlays
      * (e.g. FlatMemoryBus) override these.
      */
-    virtual void addRomOverlay   (uint32_t /*base*/, uint32_t /*size*/, const uint8_t* /*data*/) {}
-    virtual void removeRomOverlay(uint32_t /*base*/) {}
+    virtual void addRomOverlay   (uint32_t base, uint32_t size, const uint8_t* data) {}
+    virtual void removeRomOverlay(uint32_t base) {}
 
-    /**
-     * Snapshot support.
-     */
-    virtual size_t stateSize()             const { return 0; }
-    virtual void   saveState(uint8_t *buf) const { (void)buf; }
-    virtual void   loadState(const uint8_t *buf) { (void)buf; }
+    void setObserver(ExecutionObserver* obs) { m_observer = obs; }
+    ExecutionObserver* getObserver() const { return m_observer; }
 
-    /**
-     * Write-log for debug snapshot/diff.
-     */
-    virtual int  writeCount()                                               const { return 0; }
-    virtual void getWrites(uint32_t *addrs, uint8_t *before,
-                            uint8_t *after, int max)                        const {}
-    virtual void clearWriteLog() {}
-
-    ExecutionObserver* observer = nullptr;
+protected:
+    ExecutionObserver* m_observer = nullptr;
 };

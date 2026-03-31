@@ -16,6 +16,29 @@
 MachineDescriptor* createMachineVic20();
 
 // ---------------------------------------------------------------------------
+#include "kbd_vic20.h"
+
+// Local wrapper for keyboard device in tests
+class TestKeyboardWrapper : public IOHandler, public IKeyboardMatrix {
+public:
+    TestKeyboardWrapper() { m_kbd = new KbdVic20(); }
+    ~TestKeyboardWrapper() { delete m_kbd; }
+    const char* name() const override { return "kbd_vic20"; }
+    uint32_t baseAddr() const override { return 0; }
+    uint32_t addrMask() const override { return 0; }
+    bool ioRead(IBus*, uint32_t, uint8_t*) override { return false; }
+    bool ioWrite(IBus*, uint32_t, uint8_t) override { return false; }
+    void reset() override { m_kbd->clearKeys(); }
+    void tick(uint64_t) override {}
+    void keyDown(int r, int c) override { m_kbd->keyDown(r, c); }
+    void keyUp(int r, int c) override { m_kbd->keyUp(r, c); }
+    void clearKeys() override { m_kbd->clearKeys(); }
+    bool pressKeyByName(const std::string& n, bool d) override { return m_kbd->pressKeyByName(n, d); }
+    IPortDevice* getPort(int i) override { return m_kbd->getPort(i); }
+private:
+    KbdVic20* m_kbd;
+};
+
 // Registry setup — called once; singletons persist across all test cases.
 // ---------------------------------------------------------------------------
 
@@ -29,6 +52,8 @@ static void ensureRegistriesReady() {
         []() -> IOHandler* { return new VIC6560("VIC-I", 0x9000); });
     DeviceRegistry::instance().registerDevice("6522",
         []() -> IOHandler* { return new VIA6522("6522", 0); });
+    DeviceRegistry::instance().registerDevice("kbd_vic20",
+        []() -> IOHandler* { return new TestKeyboardWrapper(); });
     MachineRegistry::instance().registerMachine("vic20", createMachineVic20);
 }
 
