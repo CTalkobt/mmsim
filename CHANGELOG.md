@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0-dev] - 2026-04-05
+
+### Added
+- **`ExpressionEvaluator`** (`src/libdebug/main/expression_evaluator.h/cpp`): Stub condition evaluator used by `BreakpointList::checkExec/checkWrite/checkRead`; empty condition always matches.
+- **CLI breakpoint/watchpoint commands** (`break`, `watch`, `delete`, `enable`, `disable`, `info breaks`) wired to `DebugContext::breakpoints()`.
+- **`tests/test_breakpoints.cpp`**: Integration test exercising `create vic20` → assemble JMP loop → `break 0400` → `run 0400` → assert paused at correct PC.
+
+### Fixed
+- `cli_interpreter.cpp`: Removed duplicate `info` and `break` else-if blocks that were unreachable dead code after the `eject` handler.
+- `tests/test_plugin_extension.cpp`: Removed duplicate `int refresh;` field in local `TestCtx` struct (caused compile error).
+- `tests/test_breakpoints.cpp`: Assembly line used label syntax (`loop: JMP loop`) unsupported by the mini-assembler; replaced with `JMP $0400`.
+
+---
+
 ## [0.2.0-dev] - 2026-03-31
 
 ### Added

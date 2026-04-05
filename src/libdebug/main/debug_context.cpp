@@ -1,6 +1,8 @@
 #include "debug_context.h"
+#include "include/mmemu_plugin_api.h"
 #include "libcore/main/image_loader.h"
 #include <iostream>
+#include <string>
 
 DebugContext::DebugContext(ICore* cpu, IBus* bus)
     : m_cpu(cpu), m_bus(bus) {
@@ -21,18 +23,29 @@ void DebugContext::onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
     
     m_trace.push(te);
 
-    // Call non-const checkExec
-    m_breakpoints.checkExec(entry.addr);
+    if (auto* bp = m_breakpoints.checkExec(entry.addr, cpu, bus)) {
+        std::string msg = "Execution breakpoint " + std::to_string(bp->id) + " hit at $" + std::to_string(cpu->pc());
+        m_cpu->log(SIM_LOG_INFO, msg.c_str());
+        m_paused = true;
+    }
 }
 
 void DebugContext::onMemoryWrite(IBus* bus, uint32_t addr, uint8_t before, uint8_t after) {
     (void)bus; (void)before; (void)after;
-    m_breakpoints.checkWrite(addr);
+    if (auto* bp = m_breakpoints.checkWrite(addr, m_cpu, bus)) {
+        std::string msg = "Write watchpoint " + std::to_string(bp->id) + " hit at $" + std::to_string(addr);
+        m_cpu->log(SIM_LOG_INFO, msg.c_str());
+        m_paused = true;
+    }
 }
 
 void DebugContext::onMemoryRead(IBus* bus, uint32_t addr, uint8_t val) {
     (void)bus; (void)val;
-    m_breakpoints.checkRead(addr);
+    if (auto* bp = m_breakpoints.checkRead(addr, m_cpu, bus)) {
+        std::string msg = "Read watchpoint " + std::to_string(bp->id) + " hit at $" + std::to_string(addr);
+        m_cpu->log(SIM_LOG_INFO, msg.c_str());
+        m_paused = true;
+    }
 }
 
 int DebugContext::saveSnapshot(const std::string& label) {

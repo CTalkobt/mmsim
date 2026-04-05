@@ -1,4 +1,6 @@
 #include "breakpoint_list.h"
+#include "libcore/main/icore.h"
+#include "libmem/main/ibus.h"
 #include <algorithm>
 
 int BreakpointList::add(uint32_t addr, BreakpointType type) {
@@ -23,31 +25,37 @@ void BreakpointList::setEnabled(int id, bool enabled) {
     }
 }
 
-Breakpoint* BreakpointList::checkExec(uint32_t addr) {
+Breakpoint* BreakpointList::checkExec(uint32_t addr, ICore* cpu, IBus* bus) {
     for (auto& b : m_breakpoints) {
         if (b.enabled && b.type == BreakpointType::EXEC && b.addr == addr) {
-            b.hitCount++;
-            return &b;
+            if (m_evaluator.evaluate(b.condition, cpu, bus)) {
+                b.hitCount++;
+                return &b;
+            }
         }
     }
     return nullptr;
 }
 
-Breakpoint* BreakpointList::checkWrite(uint32_t addr) {
+Breakpoint* BreakpointList::checkWrite(uint32_t addr, ICore* cpu, IBus* bus) {
     for (auto& b : m_breakpoints) {
         if (b.enabled && b.type == BreakpointType::WRITE_WATCH && b.addr == addr) {
-            b.hitCount++;
-            return &b;
+            if (m_evaluator.evaluate(b.condition, cpu, bus)) {
+                b.hitCount++;
+                return &b;
+            }
         }
     }
     return nullptr;
 }
 
-Breakpoint* BreakpointList::checkRead(uint32_t addr) {
+Breakpoint* BreakpointList::checkRead(uint32_t addr, ICore* cpu, IBus* bus) {
     for (auto& b : m_breakpoints) {
         if (b.enabled && b.type == BreakpointType::READ_WATCH && b.addr == addr) {
-            b.hitCount++;
-            return &b;
+            if (m_evaluator.evaluate(b.condition, cpu, bus)) {
+                b.hitCount++;
+                return &b;
+            }
         }
     }
     return nullptr;

@@ -42,7 +42,8 @@ LIBDEVICES_SRCS   = src/libdevices/main/libdevices.cpp src/libdevices/main/io_re
 LIBTOOLCHAIN_SRCS = src/libtoolchain/main/symbol_table.cpp src/libtoolchain/main/source_map.cpp \
                     src/libtoolchain/main/toolchain_registry.cpp src/libtoolchain/main/libtoolchain.cpp
 LIBDEBUG_SRCS     = src/libdebug/main/breakpoint_list.cpp src/libdebug/main/debug_context.cpp \
-                    src/libdebug/main/trace_buffer.cpp src/libdebug/main/libdebug.cpp
+                    src/libdebug/main/trace_buffer.cpp src/libdebug/main/libdebug.cpp \
+                    src/libdebug/main/expression_evaluator.cpp
 LIBPLUGINS_SRCS   = src/plugin_loader/main/plugin_loader.cpp src/plugin_loader/main/logging.cpp
 
 # Plugin Sources
@@ -131,6 +132,7 @@ MCP_SRCS = src/mcp/main/main.cpp \
 TEST_SRCS = tests/test_main.cpp \
             tests/test_plugin_extension.cpp \
             tests/test_vice_importer.cpp \
+            tests/test_breakpoints.cpp \
             src/libmem/test/test_flatmembus.cpp \
             src/libcore/test/test_libcore.cpp \
             src/libcore/test/test_registry.cpp \

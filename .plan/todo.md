@@ -160,10 +160,12 @@ snapshots. Drives all debug panes described in arch.md §13.*
    - [x] `onStep(ICore*, IBus*, DisasmEntry*)` — called by `ICore::step()` after each instruction.
    - [x] `onMemoryWrite(IBus*, uint32_t addr, uint8_t before, uint8_t after)` — called by `IBus::write8`.
    - [x] Default no-op implementation; `DebugContext` is the concrete subclass.
+- [x] **`ExpressionEvaluator`** (`src/libdebug/expression_evaluator.h/cpp`)
+   - [x] `evaluate(condition, ICore*, IBus*)` — stub; empty condition returns true (full expression parsing deferred).
 - [x] **`BreakpointList`** (`src/libdebug/breakpoint_list.h/cpp`)
    - [x] `Breakpoint` struct: `addr`, `type` (EXEC / READ_WATCH / WRITE_WATCH), `condition` string, `hitCount`, `enabled`.
-   - [x] `checkExec(addr)` — returns the matching breakpoint or nullptr.
-   - [x] `checkWrite(addr)` — scans write-watch entries.
+   - [x] `checkExec(addr, cpu, bus)` — returns the matching breakpoint or nullptr; evaluates condition via `ExpressionEvaluator`.
+   - [x] `checkWrite(addr, cpu, bus)` — scans write-watch entries.
    - [x] Add, remove, enable/disable by index.
 - [x] **`TraceBuffer`** (`src/libdebug/trace_buffer.h/cpp`)
    - [x] Fixed-size ring buffer of `TraceEntry` (addr, mnemonic string, register snapshot, cycle count).
@@ -198,6 +200,12 @@ snapshots. Drives all debug panes described in arch.md §13.*
 - [x] **Machine Integration**
    - [x] Support selecting machines from `MachineRegistry`.
    - [x] Handle multiple CPU slots if present in the descriptor.
+- [x] **Debug Commands**
+   - [x] `break <addr>` / `watch <read|write> <addr>` — add exec/watchpoints via `DebugContext`.
+   - [x] `delete <id>`, `enable <id>`, `disable <id>` — manage breakpoints.
+   - [x] `info breaks` — list active breakpoints.
+   - [x] `run [addr]` loops until `DebugContext::isPaused()` or `isProgramEnd()`.
+   - [x] Integration test: `tests/test_breakpoints.cpp`.
 
 ---
 

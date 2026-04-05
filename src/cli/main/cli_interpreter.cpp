@@ -143,14 +143,14 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
             m_ctx.cpu->setPc(m_ctx.lastLoadAddr);
         }
         m_output("Running... (Ctrl-C to stop - actually not supported in CLI yet, will run until break)\n");
-        while (true) {
+        m_ctx.dbg->resume();
+        while (!m_ctx.dbg->isPaused()) {
             if (m_ctx.machine && m_ctx.machine->schedulerStep) {
                 m_ctx.machine->schedulerStep(*m_ctx.machine);
             } else {
                 m_ctx.cpu->step();
             }
             if (m_ctx.cpu->isProgramEnd(m_ctx.bus)) break;
-            if (m_ctx.dbg->breakpoints().checkExec(m_ctx.cpu->pc())) break;
         }
         showRegisters();
     } else if (cmd == "load") {
@@ -184,6 +184,88 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
             }
         } else {
             m_output("Syntax: load <path> [address]\n");
+        }
+    } else if (cmd == "info") {
+        if (!m_ctx.dbg) { m_output("No machine created.\n"); return; }
+        std::string sub;
+        ss >> sub;
+        if (sub == "breaks") {
+            const auto& breaks = m_ctx.dbg->breakpoints().breakpoints();
+            if (breaks.empty()) {
+                m_output("No breakpoints set.\n");
+            } else {
+                m_output("Num     Type        Disp Enb Address\n");
+                for (const auto& bp : breaks) {
+                    std::stringstream row;
+                    row << std::left << std::setw(8) << bp.id;
+                    std::string type;
+                    switch (bp.type) {
+                        case BreakpointType::EXEC: type = "exec"; break;
+                        case BreakpointType::READ_WATCH: type = "read"; break;
+                        case BreakpointType::WRITE_WATCH: type = "write"; break;
+                    }
+                    row << std::left << std::setw(12) << type;
+                    row << "keep  " << (bp.enabled ? "y" : "n") << "  ";
+                    row << std::hex << std::uppercase << std::setfill('0') << std::setw(4) << bp.addr;
+                    m_output(row.str() + "\n");
+                }
+            }
+        }
+    } else if (cmd == "break") {
+        if (!m_ctx.dbg) { m_output("No machine created.\n"); return; }
+        std::string addrStr;
+        if (ss >> addrStr) {
+            uint32_t addr = std::stoul(addrStr, nullptr, 16);
+            int id = m_ctx.dbg->breakpoints().add(addr, BreakpointType::EXEC);
+            m_output("Breakpoint " + std::to_string(id) + " at $" + addrStr + "\n");
+        } else {
+            m_output("Syntax: break <address>\n");
+        }
+    } else if (cmd == "delete") {
+        if (!m_ctx.dbg) { m_output("No machine created.\n"); return; }
+        int id;
+        if (ss >> id) {
+            m_ctx.dbg->breakpoints().remove(id);
+            m_output("Deleted breakpoint " + std::to_string(id) + "\n");
+        } else {
+            m_output("Syntax: delete <id>\n");
+        }
+    } else if (cmd == "enable") {
+        if (!m_ctx.dbg) { m_output("No machine created.\n"); return; }
+        int id;
+        if (ss >> id) {
+            m_ctx.dbg->breakpoints().setEnabled(id, true);
+            m_output("Enabled breakpoint " + std::to_string(id) + "\n");
+        } else {
+            m_output("Syntax: enable <id>\n");
+        }
+    } else if (cmd == "disable") {
+        if (!m_ctx.dbg) { m_output("No machine created.\n"); return; }
+        int id;
+        if (ss >> id) {
+            m_ctx.dbg->breakpoints().setEnabled(id, false);
+            m_output("Disabled breakpoint " + std::to_string(id) + "\n");
+        } else {
+            m_output("Syntax: disable <id>\n");
+        }
+    } else if (cmd == "watch") {
+        if (!m_ctx.dbg) { m_output("No machine created.\n"); return; }
+        std::string typeStr, addrStr;
+        if (ss >> typeStr >> addrStr) {
+            BreakpointType type;
+            if (typeStr == "read") {
+                type = BreakpointType::READ_WATCH;
+            } else if (typeStr == "write") {
+                type = BreakpointType::WRITE_WATCH;
+            } else {
+                m_output("Syntax: watch <read|write> <address>\n");
+                return;
+            }
+            uint32_t addr = std::stoul(addrStr, nullptr, 16);
+            int id = m_ctx.dbg->breakpoints().add(addr, type);
+            m_output("Watchpoint " + std::to_string(id) + " at $" + addrStr + "\n");
+        } else {
+            m_output("Syntax: watch <read|write> <address>\n");
         }
     } else if (cmd == "cart") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }

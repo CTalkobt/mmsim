@@ -19,19 +19,25 @@ struct Breakpoint {
     int            id;
 };
 
+class ICore;
+class IBus;
+
+#include "expression_evaluator.h"
+
 class BreakpointList {
 public:
     int  add(uint32_t addr, BreakpointType type);
     void remove(int id);
     void setEnabled(int id, bool enabled);
 
-    Breakpoint* checkExec(uint32_t addr);
-    Breakpoint* checkWrite(uint32_t addr);
-    Breakpoint* checkRead(uint32_t addr);
+    Breakpoint* checkExec(uint32_t addr, ICore* cpu, IBus* bus);
+    Breakpoint* checkWrite(uint32_t addr, ICore* cpu, IBus* bus);
+    Breakpoint* checkRead(uint32_t addr, ICore* cpu, IBus* bus);
 
     const std::vector<Breakpoint>& breakpoints() const { return m_breakpoints; }
 
 private:
     std::vector<Breakpoint> m_breakpoints;
     int m_nextId = 1;
+    ExpressionEvaluator m_evaluator;
 };

@@ -35,6 +35,9 @@ public:
      */
     std::vector<uint32_t> diffSnapshots(int idxA, int idxB);
 
+    bool isPaused() const { return m_paused; }
+    void resume() { m_paused = false; }
+
 private:
     ICore* m_cpu;
     IBus*  m_bus;
@@ -42,4 +45,5 @@ private:
     BreakpointList m_breakpoints;
     TraceBuffer    m_trace;
     std::vector<SystemSnapshot> m_snapshots;
+    bool m_paused = false;
 };
