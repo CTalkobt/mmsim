@@ -9,6 +9,8 @@
 #include "disasm_pane.h"
 #include "console_pane.h"
 #include "cartridge_pane.h"
+#include "breakpoint_pane.h"
+#include "libdebug/main/debug_context.h"
 #include "dialogs/memory_dialogs.h"
 #include "dialogs/assemble_dialog.h"
 #include "dialogs/image_dialogs.h"
@@ -95,7 +97,7 @@ static std::string wxKeyToVic20Name(int code) {
 class MmemuFrame : public wxFrame {
 public:
     MmemuFrame();
-    ~MmemuFrame() { m_timer.Stop(); delete m_audio; }
+    ~MmemuFrame() { m_timer.Stop(); delete m_audio; delete m_dbg; }
 
     /** Toggle keyboard-capture mode and sync all UI + app key handler. */
     void setKeyCapture(bool active);
@@ -115,21 +117,25 @@ private:
     void OnAttachCart(wxCommandEvent& event);
     void OnEjectCart(wxCommandEvent& event);
     void OnKbdFocus(wxCommandEvent& event);
+    void OnShowBpPane(wxCommandEvent& event);
     void OnTimer(wxTimerEvent& event);
     void OnCtrlShiftK(wxKeyEvent& event);
+    void ShowBreakpointPane();
 
     MachineDescriptor* m_machine = nullptr;
     ICore* m_cpu = nullptr;
     IBus* m_bus = nullptr;
     IDisassembler* m_disasm = nullptr;
+    DebugContext* m_dbg = nullptr;
     AudioOutput* m_audio = nullptr;
 
-    RegisterPane* m_regPane;
-    MemoryPane* m_memPane;
-    DisasmPane* m_disasmPane;
-    ConsolePane* m_consolePane;
-    CartridgePane* m_cartPane;
-    wxAuiNotebook*   m_notebook = nullptr;
+    RegisterPane*   m_regPane;
+    MemoryPane*     m_memPane;
+    DisasmPane*     m_disasmPane;
+    ConsolePane*    m_consolePane;
+    CartridgePane*  m_cartPane;
+    BreakpointPane* m_bpPane = nullptr;
+    wxAuiNotebook*  m_notebook = nullptr;
 
     wxTimer m_timer;
     bool m_running = false;
@@ -393,6 +399,8 @@ MmemuFrame::MmemuFrame()
     menuDebug->AppendSeparator();
     menuDebug->Append(ID_FILL_MEM, "Fill Memory...");
     menuDebug->Append(ID_COPY_MEM, "Copy Memory...");
+    menuDebug->AppendSeparator();
+    menuDebug->Append(ID_SHOW_BP_PANE, "Breakpoints\tCtrl-B");
     
     auto* menuBar = new wxMenuBar;
     menuBar->Append(menuFile, "&File");
@@ -432,6 +440,8 @@ MmemuFrame::MmemuFrame()
     m_notebook = new wxAuiNotebook(centerSplitter, wxID_ANY);
     m_cartPane = new CartridgePane(m_notebook);
     m_notebook->AddPage(m_cartPane, "Cartridge");
+    m_bpPane = new BreakpointPane(m_notebook);
+    m_notebook->AddPage(m_bpPane, "Breakpoints");
     
     centerSplitter->SplitVertically(notebookSplitter, m_notebook, 600);
     
@@ -466,7 +476,8 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_MENU, &MmemuFrame::OnLoadImage, this, ID_LOAD_IMAGE);
     Bind(wxEVT_MENU, &MmemuFrame::OnAttachCart, this, ID_ATTACH_CART);
     Bind(wxEVT_MENU, &MmemuFrame::OnEjectCart, this, ID_EJECT_CART);
-    Bind(wxEVT_MENU, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
+    Bind(wxEVT_MENU, &MmemuFrame::OnKbdFocus,   this, ID_KBD_FOCUS);
+    Bind(wxEVT_MENU, &MmemuFrame::OnShowBpPane, this, ID_SHOW_BP_PANE);
     Bind(wxEVT_TOOL, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
     Bind(wxEVT_TIMER, &MmemuFrame::OnTimer, this, ID_GUI_TIMER);
     
@@ -491,11 +502,18 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             if (m_disasm) delete m_disasm;
             m_disasm = ToolchainRegistry::instance().createDisassembler(m_cpu->isaName());
             
+            delete m_dbg;
+            m_dbg = new DebugContext(m_cpu, m_machine->buses[0].bus);
+            m_cpu->setObserver(m_dbg);
+            m_machine->buses[0].bus->setObserver(m_dbg);
+
             m_regPane->SetCPU(m_cpu);
             m_memPane->SetBus(m_bus);
             m_disasmPane->SetBus(m_bus);
             m_disasmPane->SetDisassembler(m_disasm);
             m_consolePane->SetContext(m_cpu, m_bus);
+            m_consolePane->SetDebugContext(m_dbg);
+            m_bpPane->SetDebugContext(m_dbg);
             m_cartPane->SetBus(m_bus);
             
             if (m_machine->onReset) m_machine->onReset(*m_machine);
@@ -552,6 +570,7 @@ void MmemuFrame::OnStep(wxCommandEvent& event) {
 
 void MmemuFrame::OnRun(wxCommandEvent& event) {
     (void)event;
+    if (m_dbg) m_dbg->resume();
     m_running = true;
     SetStatusText("Running...");
 }
@@ -789,6 +808,22 @@ void MmemuFrame::setKeyCapture(bool active) {
         : "Keyboard released.");
 }
 
+void MmemuFrame::ShowBreakpointPane() {
+    // Find the pane in the notebook (it may have been closed by the user).
+    for (size_t i = 0; i < m_notebook->GetPageCount(); ++i) {
+        if (m_notebook->GetPage(i) == m_bpPane) {
+            m_notebook->SetSelection(i);
+            return;
+        }
+    }
+    // Not present — re-add it.
+    m_notebook->AddPage(m_bpPane, "Breakpoints", true);
+}
+
+void MmemuFrame::OnShowBpPane(wxCommandEvent&) {
+    ShowBreakpointPane();
+}
+
 void MmemuFrame::OnKbdFocus(wxCommandEvent& event) {
     setKeyCapture(event.IsChecked());
 }
@@ -808,8 +843,15 @@ void MmemuFrame::OnTimer(wxTimerEvent& event) {
         // Use schedulerStep so the IO registry (VIC, VIA) is ticked each instruction.
         const int CYCLES_PER_FRAME = 33333;
         int ran = 0;
-        while (ran < CYCLES_PER_FRAME)
+        while (ran < CYCLES_PER_FRAME) {
             ran += m_machine->schedulerStep(*m_machine);
+            if (m_dbg && m_dbg->isPaused()) {
+                m_running = false;
+                SetStatusText(m_dbg->lastHitMessage());
+                if (m_bpPane) m_bpPane->RefreshValues();
+                break;
+            }
+        }
     }
 
     if (m_cpu) {

@@ -11,6 +11,7 @@ class ConsolePane : public wxPanel {
 public:
     ConsolePane(wxWindow* parent);
     void SetContext(ICore* cpu, IBus* bus);
+    void SetDebugContext(DebugContext* dbg);
 
 private:
     void OnInput(wxCommandEvent& event);

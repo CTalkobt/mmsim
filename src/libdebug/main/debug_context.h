@@ -37,6 +37,7 @@ public:
 
     bool isPaused() const { return m_paused; }
     void resume() { m_resumeSkipAddr = m_lastPausedAddr; m_paused = false; }
+    const std::string& lastHitMessage() const { return m_lastHitMessage; }
 
 private:
     ICore* m_cpu;
@@ -45,7 +46,8 @@ private:
     BreakpointList m_breakpoints;
     TraceBuffer    m_trace;
     std::vector<SystemSnapshot> m_snapshots;
-    bool     m_paused          = false;
-    uint32_t m_lastPausedAddr  = ~0u;
-    uint32_t m_resumeSkipAddr  = ~0u;
+    bool        m_paused          = false;
+    uint32_t    m_lastPausedAddr  = ~0u;
+    uint32_t    m_resumeSkipAddr  = ~0u;
+    std::string m_lastHitMessage;
 };

@@ -45,6 +45,10 @@ void ConsolePane::SetContext(ICore* cpu, IBus* bus) {
     }
 }
 
+void ConsolePane::SetDebugContext(DebugContext* dbg) {
+    m_ctx.dbg = dbg;
+}
+
 void ConsolePane::OnInput(wxCommandEvent& event) {
     (void)event;
     std::string line = m_input->GetValue().ToStdString();

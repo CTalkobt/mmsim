@@ -16,5 +16,6 @@ enum {
     ID_ATTACH_CART,
     ID_EJECT_CART,
     ID_KBD_FOCUS,
+    ID_SHOW_BP_PANE,
     ID_GUI_TIMER
 };
