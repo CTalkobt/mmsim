@@ -14,6 +14,7 @@ public:
 private:
     ICore* m_cpu = nullptr;
     wxGrid* m_grid;
+    wxStaticText* m_statusLabel;
     std::vector<uint32_t> m_prevValues;
     wxFont m_fixedFont;
 };

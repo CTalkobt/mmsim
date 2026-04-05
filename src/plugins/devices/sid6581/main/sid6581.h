@@ -72,6 +72,13 @@ public:
     int nativeSampleRate() const override { return m_sampleRate; }
     int pullSamples(float* buffer, int maxSamples) override;
 
+    void* getInterface(InterfaceID id) override {
+        if (id == InterfaceID::AudioOutput) {
+            return static_cast<IAudioOutput*>(this);
+        }
+        return nullptr;
+    }
+
     // -----------------------------------------------------------------------
     // Register offsets (relative to base address)
     // -----------------------------------------------------------------------

@@ -41,11 +41,14 @@ public:
 
     uint8_t  peek8(uint32_t addr) override;
 
+    void setIoHooks(std::function<bool(IBus*, uint32_t, uint8_t*)> readFn,
+                    std::function<bool(IBus*, uint32_t, uint8_t)>  writeFn);
+
     /**
-     * Bypasses I/O hooks and reads directly from RAM or overlays.
+     * Optional: restrict IO hooks to specific ranges. If no ranges are added,
+     * IO hooks are called for all addresses.
      */
-    uint8_t read8Raw(uint32_t addr);
-    uint8_t peek8Raw(uint32_t addr);
+    void addIoRange(uint32_t base, uint32_t size);
 
     void reset() override;
 
@@ -76,21 +79,19 @@ public:
      */
     const uint8_t* rawData() const { return m_data; }
 
-    /**
-     * Register IO dispatch hooks.  The read hook returns true and fills *val if
-     * it owns the address; the write hook returns true if it owns the address.
-     * Called before overlay / RAM on every read8 / write8.
-     */
-    void setIoHooks(std::function<bool(IBus*, uint32_t, uint8_t*)> readFn,
-                    std::function<bool(IBus*, uint32_t, uint8_t)>  writeFn);
+    uint8_t read8Raw(uint32_t addr);
+    uint8_t peek8Raw(uint32_t addr);
 
 private:
+    bool isIoAddress(uint32_t addr) const;
+
     std::string m_name;
     BusConfig   m_config;
     uint8_t*    m_data;
     size_t      m_size;
 
     std::vector<RomOverlay> m_overlays;
+    std::vector<std::pair<uint32_t, uint32_t>> m_ioRanges;
     CircularBuffer<WriteLogEntry> m_writeLog;
 
     std::function<bool(IBus*, uint32_t, uint8_t*)> m_ioRead;

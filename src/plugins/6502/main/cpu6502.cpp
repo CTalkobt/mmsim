@@ -4,6 +4,9 @@
 #include "mmemu_plugin_api.h"
 #include <cstdio>
 #include <cstring>
+#include <iostream>
+
+bool MOS6502::s_in_step = false;
 
 static const RegDescriptor s_regDescriptors[] = {
     { "A",      RegWidth::R8,  REGFLAG_ACCUMULATOR, nullptr },
@@ -72,6 +75,7 @@ void MOS6502::reset() {
         uint8_t lo = m_bus->read8(0xFFFC);
         uint8_t hi = m_bus->read8(0xFFFD);
         m_state.pc = (uint16_t)lo | ((uint16_t)hi << 8);
+        if (m_state.pc == 0) std::cerr << "6502: Reset PC is 0! lo=" << (int)lo << " hi=" << (int)hi << std::endl;
     } else {
         m_state.pc = 0;
     }
@@ -716,9 +720,16 @@ const MOS6502::Opcode MOS6502::s_opcodes[256] = {
 };
 
 int MOS6502::step() {
+    if (s_in_step) {
+        fprintf(stderr, "FATAL: Re-entrant call to MOS6502::step()\n");
+        exit(1);
+    }
+    s_in_step = true;
+
     // If CPU is halted (e.g. by ANTIC DMA or WSYNC), it consumes 1 cycle and does nothing.
     if (m_state.haltLine) {
         m_state.cycles++;
+        s_in_step = false;
         return 1;
     }
 
@@ -794,5 +805,6 @@ int MOS6502::step() {
 
     int total = info.cycles + extraCycles;
     m_state.cycles += total;
+    s_in_step = false;
     return total;
 }

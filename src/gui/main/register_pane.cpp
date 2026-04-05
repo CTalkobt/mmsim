@@ -9,6 +9,11 @@ RegisterPane::RegisterPane(wxWindow* parent)
     m_fixedFont = wxFont(10, wxFONTFAMILY_TELETYPE, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL);
     
     auto* sizer = new wxBoxSizer(wxVERTICAL);
+    
+    m_statusLabel = new wxStaticText(this, wxID_ANY, "Status: ---");
+    m_statusLabel->SetFont(m_fixedFont);
+    sizer->Add(m_statusLabel, 0, wxEXPAND | wxALL, 5);
+
     m_grid = new wxGrid(this, wxID_ANY);
     m_grid->CreateGrid(0, 2);
     m_grid->SetColLabelValue(0, "Register");
@@ -48,7 +53,19 @@ void RegisterPane::SetCPU(ICore* cpu) {
 }
 
 void RegisterPane::RefreshValues() {
-    if (!m_cpu) return;
+    if (!m_cpu) {
+        m_statusLabel->SetLabel("Status: ---");
+        m_statusLabel->SetForegroundColour(*wxBLACK);
+        return;
+    }
+    
+    if (m_cpu->isHalted()) {
+        m_statusLabel->SetLabel("Status: HALTED");
+        m_statusLabel->SetForegroundColour(*wxRED);
+    } else {
+        m_statusLabel->SetLabel("Status: RUNNING");
+        m_statusLabel->SetForegroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
+    }
     
     int count = m_cpu->regCount();
     for (int i = 0; i < count; ++i) {

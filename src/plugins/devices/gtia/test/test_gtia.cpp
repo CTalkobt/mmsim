@@ -20,11 +20,13 @@ TEST_CASE(gtia_registers) {
 }
 
 TEST_CASE(gtia_palette) {
-    // Test a few known colors
-    // Color 0 is usually black
-    ASSERT(GTIA::getRGBA(0x00) == 0x000000FF);
-    // Color 0x0F is white
-    ASSERT(GTIA::getRGBA(0x09) == 0xFFFFFFFF);
+    // Pixel buffer format is 0xAARRGGBB (alpha in high byte, as used by screen_pane.cpp).
+    // Color 0x00 = black
+    ASSERT(GTIA::getRGBA(0x00) == 0xFF000000u);
+    // Color 0x0F = white (hue 0, max luminance)
+    ASSERT(GTIA::getRGBA(0x0F) == 0xFFFFFFFFu);
+    // Color 0x0A = medium gray (hue 0, luminance 10)
+    ASSERT(GTIA::getRGBA(0x0A) == 0xFFAAAAAAu);
 }
 
 TEST_CASE(gtia_collisions) {

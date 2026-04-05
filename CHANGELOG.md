@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 ## [0.2.0-dev] - 2026-03-31
 
 ### Added
+- **GUI Register Pane Enhancements**:
+    - Added a status label to the register pane to display the CPU's current state (RUNNING or HALTED).
+    - Status label automatically updates based on `ICore::isHalted()` and uses color-coding (Red for HALTED) for better visibility.
+- **Atari 800XL Machine Factory and Memory Map (Phase 26.4)**:
+    - Implemented `createMachineAtari800XL` machine factory.
+    - Configured Atari 8-bit memory map with support for OS and BASIC ROM overlays.
+    - Implemented XL/XE memory banking via PIA Port B ($D301), supporting dynamic OS/BASIC ROM visibility.
+    - Refactored `FlatMemoryBus` to support restricted I/O ranges, preventing I/O hooks from trapping standard memory areas.
+    - Fixed range checks in `ANTIC`, `GTIA`, and `POKEY` implementations.
+    - Added Atari PIA RS-pin swapping support to accommodate the Atari-specific 6520 register mapping.
+    - Integrated ANTIC `HALT` line for cycle-accurate CPU stalling during WSYNC and DMA.
+    - Added comprehensive integration tests for Atari setup, banking, and halt states.
 - **Atari 8-bit Video implementation (Phase 26)**:
     - **ANTIC DMA Engine**: Implemented display list interpretation, cycle-accurate timing (114 cycles/line, 262 lines/frame), LMS instruction, WSYNC, and NMI generation (VBI/DLI).
     - **GTIA Color and PMG**: Implemented color palette (256 colors), player-missile graphics positioning, collision detection, and console switches.

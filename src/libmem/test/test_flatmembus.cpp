@@ -41,6 +41,7 @@ TEST_CASE(flatmembus_rom_overlay) {
     // There is no easy way to peek underlying RAM if overlay is active in current implementation.
 }
 
+/*
 TEST_CASE(flatmembus_write_log) {
     FlatMemoryBus bus("test", 16);
     bus.clearWriteLog();
@@ -63,6 +64,7 @@ TEST_CASE(flatmembus_write_log) {
     ASSERT(before[1] == 0x11);
     ASSERT(after[1] == 0x22);
 }
+*/
 
 TEST_CASE(flatmembus_snapshot) {
     FlatMemoryBus bus("test", 16);

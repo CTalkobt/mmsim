@@ -16,7 +16,9 @@ INCLUDES  = -Isrc -Isrc/include -Isrc/cli/main -Isrc/gui/main -Isrc/libcore/main
             -Isrc/plugins/devices/vic2/main -Isrc/plugins/devices/sid6581/main \
             -Isrc/plugins/machines/c64/main -Isrc/plugins/devices/pia6520/main \
             -Isrc/plugins/devices/crtc6545/main -Isrc/plugins/devices/pet_video/main \
+            -Isrc/plugins/devices/antic/main -Isrc/plugins/devices/gtia/main \
             -Isrc/plugins/devices/pokey/main \
+            -Isrc/plugins/machines/atari/main \
             -Isrc/plugins/machines/pet/main -Itests
 
 BINDIR   = bin
@@ -129,9 +131,9 @@ MCP_SRCS = src/mcp/main/main.cpp \
 
 # Test Sources
 TEST_SRCS = tests/test_main.cpp \
-            tests/test_plugin_extension.cpp \
-            tests/test_vice_importer.cpp \
-            src/libmem/test/test_flatmembus.cpp \
+             tests/test_plugin_extension.cpp \
+             tests/test_vice_importer.cpp \
+             tests/test_atari_boot.cpp \            src/libmem/test/test_flatmembus.cpp \
             src/libcore/test/test_libcore.cpp \
             src/libcore/test/test_registry.cpp \
             src/libdevices/test/test_devices.cpp \
@@ -144,13 +146,15 @@ TEST_SRCS = tests/test_main.cpp \
             src/plugins/machines/vic20/test/test_vic20_integration.cpp \
             src/plugins/machines/c64/test/test_c64_integration.cpp \
             src/plugins/machines/pet/test/test_pet_integration.cpp \
+            src/plugins/machines/atari/test/test_atari_integration.cpp \
             src/plugins/cbm-loader/test/test_cbm_loader.cpp \
             src/plugins/devices/pet_video/test/test_pet_video.cpp \
             src/plugins/devices/pia6520/test/test_pia6520.cpp \
             src/plugins/devices/via6522/test/test_via6522.cpp \
             src/plugins/devices/antic/test/test_antic.cpp \
             src/plugins/devices/gtia/test/test_gtia.cpp \
-            src/plugins/devices/pokey/test/test_pokey.cpp
+            src/plugins/devices/pokey/test/test_pokey.cpp \
+            tests/test_atari_debug.cpp
 
             # Test-related objects (excluding plugin entry points to avoid multiple mmemuPluginInit definitions)
             ALL_PLUGIN_OBJS = src/plugins/6502/main/cpu6502.o \
@@ -179,7 +183,8 @@ TEST_SRCS = tests/test_main.cpp \
                   src/plugins/devices/keyboard/main/keyboard_matrix_pet.o \
                   src/plugins/devices/antic/main/antic.o \
                   src/plugins/devices/gtia/main/gtia.o \
-                  src/plugins/devices/pokey/main/pokey.o
+                  src/plugins/devices/pokey/main/pokey.o \
+                  src/plugins/machines/atari/main/machine_atari.o
 REGISTRY_OBJS = src/cli/main/plugin_command_registry.o \
                  src/mcp/main/plugin_tool_registry.o \
                  src/gui/main/plugin_pane_manager.o
@@ -218,7 +223,7 @@ PLUGIN_PIA6520_OBJS  = $(PLUGIN_PIA6520_SRCS:.cpp=.o)
 PLUGIN_CBMLOADER_OBJS = $(PLUGIN_CBMLOADER_SRCS:.cpp=.o)
 PLUGIN_CRTC6545_OBJS = $(PLUGIN_CRTC6545_SRCS:.cpp=.o)
 PLUGIN_PETVIDEO_OBJS = $(PLUGIN_PETVIDEO_SRCS:.cpp=.o)
-PLUGIN_PET_OBJS      = $(PLUGIN_PET_SRCS) \
+PLUGIN_PET_OBJS      = $(PLUGIN_PET_SRCS:.cpp=.o) \
                        src/plugins/devices/pia6520/main/pia6520.o \
                        src/plugins/devices/via6522/main/via6522.o \
                        src/plugins/devices/crtc6545/main/crtc6545.o \
@@ -235,6 +240,14 @@ PLUGIN_GTIA_OBJS = $(PLUGIN_GTIA_SRCS:.cpp=.o)
 PLUGIN_POKEY_SRCS = src/plugins/devices/pokey/main/pokey.cpp \
                     src/plugins/devices/pokey/main/plugin_init.cpp
 PLUGIN_POKEY_OBJS = $(PLUGIN_POKEY_SRCS:.cpp=.o)
+
+PLUGIN_ATARI_SRCS = src/plugins/machines/atari/main/machine_atari.cpp \
+                    src/plugins/machines/atari/main/plugin_init.cpp
+PLUGIN_ATARI_OBJS = $(PLUGIN_ATARI_SRCS:.cpp=.o) \
+                    src/plugins/devices/antic/main/antic.o \
+                    src/plugins/devices/gtia/main/gtia.o \
+                    src/plugins/devices/pokey/main/pokey.o \
+                    src/plugins/devices/pia6520/main/pia6520.o
 
 GUI_OBJS = $(GUI_SRCS:.cpp=.o)
 
@@ -264,7 +277,8 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
           $(LIBDIR)/mmemu-plugin-pet.so \
           $(LIBDIR)/mmemu-plugin-antic.so \
           $(LIBDIR)/mmemu-plugin-gtia.so \
-          $(LIBDIR)/mmemu-plugin-pokey.so
+          $(LIBDIR)/mmemu-plugin-pokey.so \
+          $(LIBDIR)/mmemu-plugin-atari.so
 
 LIBS = $(ILIBDIR)/libmem.a $(ILIBDIR)/libcore.a $(ILIBDIR)/libdevices.a \
        $(ILIBDIR)/libtoolchain.a $(ILIBDIR)/libdebug.a $(ILIBDIR)/libplugins.a
@@ -359,6 +373,9 @@ $(LIBDIR)/mmemu-plugin-gtia.so: $(PLUGIN_GTIA_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 $(LIBDIR)/mmemu-plugin-pokey.so: $(PLUGIN_POKEY_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
+
+$(LIBDIR)/mmemu-plugin-atari.so: $(PLUGIN_ATARI_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 # Binary rules

@@ -42,6 +42,13 @@ public:
     int nativeSampleRate() const override { return m_sampleRate; }
     int pullSamples(float* buffer, int maxSamples) override;
 
+    void* getInterface(InterfaceID id) override {
+        if (id == InterfaceID::AudioOutput) {
+            return static_cast<IAudioOutput*>(this);
+        }
+        return nullptr;
+    }
+
     // -----------------------------------------------------------------------
     // Registers ($D200–$D20F)
     // -----------------------------------------------------------------------
@@ -69,7 +76,44 @@ public:
     static constexpr uint8_t CTL_FILT24  = 0x02; // Filter Ch2 with Ch4
     static constexpr uint8_t CTL_CLK_15  = 0x01; // 15kHz vs 64kHz
 
+    // SKSTAT bits
+    static constexpr uint8_t SK_FRAME_ERR = 0x80;
+    static constexpr uint8_t SK_OVERRUN   = 0x40;
+    static constexpr uint8_t SK_KBD_OVER  = 0x20;
+    static constexpr uint8_t SK_SERIN_BIT = 0x10;
+    static constexpr uint8_t SK_SHIFT_BUSY = 0x08;
+    static constexpr uint8_t SK_KBD_BUSY  = 0x04;
+    static constexpr uint8_t SK_SERIN_BUSY = 0x02;
+
+    // SKCTL bits
+    static constexpr uint8_t SK_FORCE_BREAK = 0x80;
+    static constexpr uint8_t SK_SER_MODE    = 0x70; // 3 bits for serial mode
+    static constexpr uint8_t SK_FAST_EDGES  = 0x08;
+    static constexpr uint8_t SK_KBD_SCAN    = 0x02;
+    static constexpr uint8_t SK_RESET       = 0x01;
+
+    /**
+     * Interface for external SIO devices (Disk, Printer, etc.)
+     */
+    class ISioDevice {
+    public:
+        virtual ~ISioDevice() = default;
+        virtual bool isCommandActive() = 0;
+        virtual void setCommand(bool active) = 0;
+        virtual uint8_t readData() = 0;
+        virtual void writeData(uint8_t val) = 0;
+        virtual bool hasData() = 0;
+    };
+#include <mutex>
+//...
+    void attachSioDevice(int unit, ISioDevice* device) {
+        if (unit >= 0 && unit < 4) m_sioDevices[unit] = device;
+    }
+
 private:
+    std::mutex m_mutex;
+//...
+
     struct Channel {
         uint32_t counter = 0;
         uint32_t divider = 0;
@@ -101,12 +145,21 @@ private:
     uint64_t    m_sampleFrac = 0;
 
     // Interrupt state
-    uint8_t     m_irqst = 0xFF; // Active low bits
+    uint8_t     m_irqst = 0xFF;            // Active-low: 0 = IRQ asserted
     uint8_t     m_irqen = 0x00;
 
     // Keyboard state
     uint8_t     m_kbcode = 0xFF;
     uint8_t     m_skstat = 0xFF;
+    uint8_t     m_skctl  = 0x00;
+
+    // SIO state
+    uint8_t     m_serin  = 0xFF;
+    uint8_t     m_serout = 0xFF;
+    ISioDevice* m_sioDevices[4] = {nullptr, nullptr, nullptr, nullptr};
+    
+    uint8_t     m_sioCmdBuf[5];
+    int         m_sioCmdPos = 0;
 
     // Ring buffer
     static constexpr int AUDIO_BUF = 8192;

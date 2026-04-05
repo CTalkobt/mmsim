@@ -60,6 +60,10 @@ A single plugin module can provide multiple resources, which are automatically r
 - **Profiles**: `pet2001`, `pet4032`, `pet8032`.
 - **Hardware**: MOS 6502 CPU, 6520 PIA, 6522 VIA, 6545 CRTC (for 4032/8032), discrete video logic (for 2001), IEEE-488 bus.
 
+### Atari 8-bit Family
+- **Profiles**: `atari800xl`.
+- **Hardware**: MOS 6502 CPU, ANTIC DMA, GTIA Video, POKEY Sound/Timers, 6520 PIA.
+
 ---
 
 ## 4. CLI Target (Implemented)

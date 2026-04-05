@@ -40,6 +40,7 @@ Plugins that implement `MachineDescriptor` factories.
 | `lib/mmemu-plugin-vic20.so` | Commodore VIC-20 (stock and RAM expansions). | [README-VIC20.md](README-VIC20.md) |
 | `lib/mmemu-plugin-c64.so` | Commodore 64 — full chip set and banking. | [README-C64.md](README-C64.md) |
 | `lib/mmemu-plugin-pet.so` | Commodore PET Series (2001, 4032, 8032). | [README-PET.md](README-PET.md) |
+| `lib/mmemu-plugin-atari.so` | Atari 8-bit Family (400, 800, XL, XE). | [README-ATARI.md](README-ATARI.md) |
 
 ### 1.4 Utility & Loader Plugins
 Plugins providing support services like ROM importing or file format parsing.
@@ -85,3 +86,4 @@ The `lib/` directory contains the dynamic plugins (`.so` files). Standard distri
 - **VIC-20 Support**: `6502`, `via6522`, `vic6560`, `kbd-vic20`, `vic20`, `cbm-loader`, `vice-importer`.
 - **C64 Support**: `6502`, `c64-pla`, `cia6526`, `vic2`, `sid6581`, `c64`, `cbm-loader`, `vice-importer`.
 - **PET Support**: `6502`, `pia6520`, `via6522`, `crtc6545`, `pet-video`, `pet`, `cbm-loader`, `vice-importer`.
+- **Atari Support**: `6502`, `antic`, `gtia`, `pokey`, `pia6520`, `atari`.

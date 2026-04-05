@@ -3,12 +3,18 @@
 #include <cstdint>
 
 class IBus;
+class IVideoOutput;
 
 /**
  * Abstract base class for memory-mapped I/O devices.
  */
 class IOHandler {
 public:
+    enum class InterfaceID {
+        VideoOutput,
+        AudioOutput,
+    };
+
     virtual ~IOHandler();
 
     /**
@@ -47,4 +53,11 @@ public:
      * Tick the device forward. Called each CPU step or cycle.
      */
     virtual void tick(uint64_t cycles) = 0;
+
+    /**
+     * Get a pointer to a specific interface implemented by this device.
+     * @param id The ID of the interface to get.
+     * @return A pointer to the interface, or nullptr if not implemented.
+     */
+    virtual void* getInterface(InterfaceID id) { return nullptr; }
 };

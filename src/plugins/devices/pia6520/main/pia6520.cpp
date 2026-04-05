@@ -26,6 +26,14 @@ void PIA6520::reset() {
     m_lastIrqB = false;
 }
 
+void PIA6520::setPortAWriteCallback(std::function<void(uint8_t)> cb) {
+    m_portAWriteCb = cb;
+}
+
+void PIA6520::setPortBWriteCallback(std::function<void(uint8_t)> cb) {
+    m_portBWriteCb = cb;
+}
+
 void PIA6520::updateIrq() {
     bool irqA = (m_cra & 0x80) && (m_cra & 0x01);
     irqA = irqA || ((m_cra & 0x40) && (m_cra & 0x08));
@@ -99,7 +107,13 @@ void PIA6520::driveCB2(bool level) {
 bool PIA6520::ioRead(IBus*, uint32_t addr, uint8_t* val) {
     if ((addr & ~addrMask()) != baseAddr()) return false;
 
-    switch (addr & 0x03) {
+    uint32_t offset = addr & 0x03;
+    if (m_swappedRS) {
+        // Swap bits 0 and 1 of offset
+        offset = (offset & 0xFC) | ((offset & 0x01) << 1) | ((offset & 0x02) >> 1);
+    }
+
+    switch (offset) {
         case 0x00: // ORA/DDRA
             if (m_cra & 0x04) {
                 if (m_portADevice) {
@@ -150,7 +164,13 @@ bool PIA6520::ioRead(IBus*, uint32_t addr, uint8_t* val) {
 bool PIA6520::ioWrite(IBus*, uint32_t addr, uint8_t val) {
     if ((addr & ~addrMask()) != baseAddr()) return false;
 
-    switch (addr & 0x03) {
+    uint32_t offset = addr & 0x03;
+    if (m_swappedRS) {
+        // Swap bits 0 and 1 of offset
+        offset = (offset & 0xFC) | ((offset & 0x01) << 1) | ((offset & 0x02) >> 1);
+    }
+
+    switch (offset) {
         case 0x00:
             if (m_cra & 0x04) {
                 m_ora = val;

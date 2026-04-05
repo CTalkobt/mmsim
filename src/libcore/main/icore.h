@@ -103,6 +103,7 @@ public:
     virtual void setIrqLine(bool asserted) { if (asserted) triggerIrq(); }
     virtual void setNmiLine(bool asserted) { if (asserted) triggerNmi(); }
     virtual void setHaltLine(bool asserted) { (void)asserted; }
+    virtual bool isHalted() const { return false; }
 
     // Step-over / step-out heuristics
     virtual int  isCallAt    (IBus* bus, uint32_t addr) = 0;

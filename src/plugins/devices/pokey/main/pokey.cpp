@@ -4,6 +4,7 @@
 #include <algorithm>
 
 bool POKEY::ioRead(IBus* bus, uint32_t addr, uint8_t* val) {
+    if ((addr & ~addrMask()) != baseAddr()) return false;
     uint32_t offset = addr & 0x000F;
     switch (offset) {
         case STIMER: // ALLPOT
@@ -35,6 +36,7 @@ bool POKEY::ioRead(IBus* bus, uint32_t addr, uint8_t* val) {
 }
 
 bool POKEY::ioWrite(IBus* bus, uint32_t addr, uint8_t val) {
+    if ((addr & ~addrMask()) != baseAddr()) return false;
     uint32_t offset = addr & 0x000F;
     m_regs[offset] = val;
 

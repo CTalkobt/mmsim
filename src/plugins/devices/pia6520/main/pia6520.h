@@ -43,8 +43,8 @@ public:
     void setCB1(bool level);
     void setCB2(bool level);
 
-    void setPortAWriteCallback(std::function<void(uint8_t)> cb) { m_portAWriteCb = cb; }
-    void setPortBWriteCallback(std::function<void(uint8_t)> cb) { m_portBWriteCb = cb; }
+    void setPortAWriteCallback(std::function<void(uint8_t)> cb);
+    void setPortBWriteCallback(std::function<void(uint8_t)> cb);
 
     // Snapshots
     struct Snapshot {
@@ -60,6 +60,11 @@ public:
         m_logNamed = logFn;
     }
 
+    void setSwappedRS(bool swapped) { m_swappedRS = swapped; }
+    void setBaseAddr(uint32_t addr) { m_baseAddr = addr; }
+
+    uint8_t getDdrb() const { return m_ddrb; }
+
 private:
     void updateIrq();
     void driveCA2(bool level);
@@ -69,6 +74,8 @@ private:
     uint32_t m_baseAddr;
     void* m_logger = nullptr;
     void (*m_logNamed)(void*, int, const char*) = nullptr;
+
+    bool m_swappedRS = false;
 
     uint8_t m_ora = 0;
     uint8_t m_ddra = 0;

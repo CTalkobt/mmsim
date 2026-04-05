@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <string>
 
+class GTIA;
+
 /**
  * ANTIC (Alpha-Numeric Television Interface Controller) for Atari 8-bit.
  * 
@@ -29,6 +31,7 @@ public:
     void setDmaBus(IBus* bus) { m_dmaBus = bus; }
     void setHaltLine(ISignalLine* line) { m_haltLine = line; }
     void setNmiLine(ISignalLine* line) { m_nmiLine = line; }
+    void setGtia(GTIA* gtia) { m_gtia = gtia; }
 
     // -----------------------------------------------------------------------
     // IOHandler interface
@@ -51,6 +54,13 @@ public:
         return {FRAME_W, FRAME_H, DISPLAY_W, DISPLAY_H};
     }
     void renderFrame(uint32_t* buffer) override;
+
+    void* getInterface(InterfaceID id) override {
+        if (id == InterfaceID::VideoOutput) {
+            return static_cast<IVideoOutput*>(this);
+        }
+        return nullptr;
+    }
 
     // -----------------------------------------------------------------------
     // Registers ($D400–$D40F)
@@ -83,6 +93,7 @@ public:
 
 private:
     void updateNmi();
+    void setHalt(bool halt);
     void executeDisplayList();
     uint8_t fetchByte(uint16_t addr);
 
@@ -96,12 +107,14 @@ private:
 
     // DMA state
     IBus*       m_dmaBus = nullptr;
+    GTIA*       m_gtia = nullptr;
     ISignalLine* m_haltLine = nullptr;
     ISignalLine* m_nmiLine = nullptr;
 
     uint16_t    m_dlistPtr = 0;
     uint16_t    m_memoryScanAddr = 0;
     bool        m_wsync = false;
+    bool        m_halted = false;
     uint8_t     m_nmist = 0;
     uint64_t    m_lastCycles = 0;
 

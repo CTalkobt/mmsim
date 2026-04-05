@@ -67,6 +67,7 @@ public:
     void setIrqLine(bool asserted) override { m_state.irqLine = asserted ? 1 : 0; }
     void setNmiLine(bool asserted) override { m_state.nmiLine = asserted ? 1 : 0; }
     void setHaltLine(bool asserted) override { m_state.haltLine = asserted ? 1 : 0; }
+    bool isHalted() const override { return m_state.haltLine != 0; }
 
     // Disassembly
     int disassembleOne  (IBus* bus, uint32_t addr, char* buf, int bufsz) override;
@@ -93,6 +94,7 @@ public:
     uint64_t cycles() const override { return m_state.cycles; }
 
 private:
+    static bool s_in_step;
     CPU6502State m_state;
     IBus*        m_bus = nullptr;
 

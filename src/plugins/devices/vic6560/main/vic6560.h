@@ -46,6 +46,17 @@ public:
     int nativeSampleRate() const override { return m_sampleRate; }
     int pullSamples(float* buffer, int maxSamples) override;
 
+    void* getInterface(InterfaceID id) override {
+        switch (id) {
+            case InterfaceID::VideoOutput:
+                return static_cast<IVideoOutput*>(this);
+            case InterfaceID::AudioOutput:
+                return static_cast<IAudioOutput*>(this);
+            default:
+                return nullptr;
+        }
+    }
+
 private:
     uint32_t getVicColor(uint8_t index);
     void     tickAudio(uint64_t cycles);

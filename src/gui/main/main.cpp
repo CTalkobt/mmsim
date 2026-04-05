@@ -322,7 +322,10 @@ static void onScreenMachineLoad(void* paneHandle, MachineDescriptor* desc, void*
         std::vector<IOHandler*> handlers;
         desc->ioRegistry->enumerate(handlers);
         for (auto* h : handlers) {
-            if ((vid = dynamic_cast<IVideoOutput*>(h))) break;
+            if (auto* v = (IVideoOutput*)h->getInterface(IOHandler::InterfaceID::VideoOutput)) {
+                vid = v;
+                break;
+            }
         }
     }
     pane->SetVideoOutput(vid);
@@ -508,7 +511,7 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
                 std::vector<IOHandler*> handlers;
                 m_machine->ioRegistry->enumerate(handlers);
                 for (auto* h : handlers) {
-                    if (auto* ao = dynamic_cast<IAudioOutput*>(h)) {
+                    if (auto* ao = (IAudioOutput*)h->getInterface(IOHandler::InterfaceID::AudioOutput)) {
                         m_audio = new AudioOutput();
                         if (!m_audio->start(ao)) {
                             delete m_audio;

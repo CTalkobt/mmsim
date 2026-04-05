@@ -2,88 +2,89 @@
 #include "libdebug/main/execution_observer.h"
 #include <cstring>
 #include <algorithm>
+#include <iostream>
 
 FlatMemoryBus::FlatMemoryBus(const std::string& name, uint32_t addrBits)
     : m_name(name)
 {
     m_config.addrBits = addrBits;
     m_config.dataBits = 8;
-    m_config.role = BusRole::DATA;
+    m_config.addrMask = (1ULL << addrBits) - 1;
     m_config.littleEndian = true;
-    m_config.addrMask = (addrBits == 32) ? 0xFFFFFFFFu : (1u << addrBits) - 1;
+    m_config.role = BusRole::DATA;
 
-    m_size = 1ull << addrBits;
+    m_size = 1ULL << addrBits;
     m_data = new uint8_t[m_size];
-    std::memset(m_data, 0, m_size);
+    std::memset(m_data, 0xFF, m_size);
 }
 
 FlatMemoryBus::~FlatMemoryBus() {
     delete[] m_data;
 }
 
-const RomOverlay* FlatMemoryBus::findOverlay(uint32_t addr) const {
-    for (const auto& overlay : m_overlays) {
-        if (addr >= overlay.base && addr < (overlay.base + overlay.size)) {
-            return &overlay;
-        }
-    }
-    return nullptr;
-}
-
 uint8_t FlatMemoryBus::read8(uint32_t addr) {
     addr &= m_config.addrMask;
-    if (m_ioRead) {
-        uint8_t ioVal;
-        if (m_ioRead(this, addr, &ioVal)) {
-            if (m_observer) m_observer->onMemoryRead(this, addr, ioVal);
-            return ioVal;
+    uint8_t val;
+    bool handled = false;
+    if (m_ioRead && isIoAddress(addr)) {
+        if (m_ioRead(this, addr, &val)) {
+            handled = true;
         }
     }
-    return read8Raw(addr);
+    
+    if (!handled) {
+        val = read8Raw(addr);
+    }
+
+    if (m_observer) m_observer->onMemoryRead(this, addr, val);
+    
+    // Debug: Trace XL OS entry if it looks like we are in a crash loop
+    // if (addr >= 0xC000 && addr < 0xC100) std::cerr << "R " << std::hex << addr << "=" << (int)val << std::endl;
+
+    return val;
 }
 
 uint8_t FlatMemoryBus::read8Raw(uint32_t addr) {
     addr &= m_config.addrMask;
-    uint8_t val;
     const RomOverlay* overlay = findOverlay(addr);
     if (overlay) {
-        val = overlay->data[addr - overlay->base];
-    } else {
-        val = m_data[addr];
+        return overlay->data[addr - overlay->base];
     }
-    if (m_observer) m_observer->onMemoryRead(this, addr, val);
-    return val;
+    return m_data[addr];
 }
 
 void FlatMemoryBus::write8(uint32_t addr, uint8_t val) {
     addr &= m_config.addrMask;
     uint8_t before = peek8(addr);
-    if (m_ioWrite && m_ioWrite(this, addr, val)) {
-        if (m_observer) m_observer->onMemoryWrite(this, addr, before, val);
-        return;
-    }
-    const RomOverlay* overlay = findOverlay(addr);
+    bool handled = false;
 
-    if (overlay) {
-        if (overlay->writable) {
-            m_data[addr] = val;
-        } else {
-            // ROM: write ignored
-            if (m_observer) m_observer->onMemoryWrite(this, addr, before, val);
-            return;
+    if (m_ioWrite && isIoAddress(addr)) {
+        if (m_ioWrite(this, addr, val)) {
+            handled = true;
         }
-    } else {
+    }
+
+    if (!handled) {
+        const RomOverlay* overlay = findOverlay(addr);
+        if (overlay) {
+            if (overlay->writable) {
+                const_cast<uint8_t*>(overlay->data)[addr - overlay->base] = val;
+            }
+            handled = true;
+        }
+    }
+
+    if (!handled) {
         m_data[addr] = val;
+        m_writeLog.push({addr, before, val});
     }
 
     if (m_observer) m_observer->onMemoryWrite(this, addr, before, val);
-    
-    m_writeLog.push({addr, before, val});
 }
 
 uint8_t FlatMemoryBus::peek8(uint32_t addr) {
     addr &= m_config.addrMask;
-    if (m_ioRead) {
+    if (m_ioRead && isIoAddress(addr)) {
         uint8_t ioVal;
         if (m_ioRead(this, addr, &ioVal)) {
             return ioVal;
@@ -102,7 +103,7 @@ uint8_t FlatMemoryBus::peek8Raw(uint32_t addr) {
 }
 
 void FlatMemoryBus::reset() {
-    clearWriteLog();
+    std::memset(m_data, 0xFF, m_size);
 }
 
 size_t FlatMemoryBus::stateSize() const {
@@ -118,12 +119,13 @@ void FlatMemoryBus::loadState(const uint8_t *buf) {
 }
 
 void FlatMemoryBus::getWrites(uint32_t *addrs, uint8_t *before,
-                               uint8_t *after, int max) const {
-    int count = std::min((int)m_writeLog.size(), max);
+                                uint8_t *after, int max) const {
+    int count = std::min(max, (int)m_writeLog.size());
     for (int i = 0; i < count; ++i) {
-        addrs[i] = m_writeLog[i].address;
-        before[i] = m_writeLog[i].before;
-        after[i] = m_writeLog[i].after;
+        const auto& entry = m_writeLog[m_writeLog.size() - count + i];
+        addrs[i] = entry.address;
+        before[i] = entry.before;
+        after[i] = entry.after;
     }
 }
 
@@ -147,3 +149,27 @@ void FlatMemoryBus::setIoHooks(std::function<bool(IBus*, uint32_t, uint8_t*)> re
     m_ioRead  = std::move(readFn);
     m_ioWrite = std::move(writeFn);
 }
+
+void FlatMemoryBus::addIoRange(uint32_t base, uint32_t size) {
+    m_ioRanges.push_back({base, size});
+}
+
+bool FlatMemoryBus::isIoAddress(uint32_t addr) const {
+    if (m_ioRanges.empty()) return true;
+    for (const auto& range : m_ioRanges) {
+        if (addr >= range.first && addr < (range.first + range.second)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+const RomOverlay* FlatMemoryBus::findOverlay(uint32_t addr) const {
+    for (auto it = m_overlays.rbegin(); it != m_overlays.rend(); ++it) {
+        if (addr >= it->base && addr < (it->base + it->size)) {
+            return &(*it);
+        }
+    }
+    return nullptr;
+}
+
