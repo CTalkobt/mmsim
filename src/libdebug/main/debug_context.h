@@ -17,7 +17,7 @@ class DebugContext : public ExecutionObserver {
 public:
     DebugContext(ICore* cpu, IBus* bus);
 
-    void onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) override;
+    bool onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) override;
     void onMemoryWrite(IBus* bus, uint32_t addr, uint8_t before, uint8_t after) override;
     void onMemoryRead(IBus* bus, uint32_t addr, uint8_t val) override;
 
@@ -36,7 +36,7 @@ public:
     std::vector<uint32_t> diffSnapshots(int idxA, int idxB);
 
     bool isPaused() const { return m_paused; }
-    void resume() { m_paused = false; }
+    void resume() { m_resumeSkipAddr = m_lastPausedAddr; m_paused = false; }
 
 private:
     ICore* m_cpu;
@@ -45,5 +45,7 @@ private:
     BreakpointList m_breakpoints;
     TraceBuffer    m_trace;
     std::vector<SystemSnapshot> m_snapshots;
-    bool m_paused = false;
+    bool     m_paused          = false;
+    uint32_t m_lastPausedAddr  = ~0u;
+    uint32_t m_resumeSkipAddr  = ~0u;
 };

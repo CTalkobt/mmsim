@@ -782,14 +782,21 @@ int MOS6502::step() {
         }
     }
 
-    if (info.fn) {
-        extraCycles += (this->*(info.fn))(addr);
-    }
-
     if (m_observer) {
+        uint16_t pcAfterDecode = m_state.pc;
         DisasmEntry entry;
         disassembleEntry(m_bus, pc, &entry);
-        m_observer->onStep(this, m_bus, entry);
+        m_state.pc = pc;  // expose pre-fetch PC to observer (cpu->pc() == breakpoint addr)
+        bool cont = m_observer->onStep(this, m_bus, entry);
+        if (!cont) {
+            // Breakpoint fired: leave m_state.pc = pc so next step re-executes here.
+            return 1;
+        }
+        m_state.pc = pcAfterDecode;  // restore for execution
+    }
+
+    if (info.fn) {
+        extraCycles += (this->*(info.fn))(addr);
     }
 
     int total = info.cycles + extraCycles;

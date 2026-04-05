@@ -2,38 +2,54 @@
 #include "include/mmemu_plugin_api.h"
 #include "libcore/main/image_loader.h"
 #include <iostream>
+#include <sstream>
 #include <string>
+
+static std::string toHex(uint32_t v) {
+    std::ostringstream ss;
+    ss << std::uppercase << std::hex << v;
+    return ss.str();
+}
 
 DebugContext::DebugContext(ICore* cpu, IBus* bus)
     : m_cpu(cpu), m_bus(bus) {
 }
 
-void DebugContext::onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
+bool DebugContext::onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
     TraceEntry te;
     te.addr = entry.addr;
     te.mnemonic = entry.complete;
     te.cycles = cpu->cycles();
-    
+
     for (int i = 0; i < cpu->regCount(); ++i) {
         const auto* desc = cpu->regDescriptor(i);
         if (!(desc->flags & REGFLAG_INTERNAL)) {
             te.regs[desc->name] = cpu->regRead(i);
         }
     }
-    
+
     m_trace.push(te);
 
-    if (auto* bp = m_breakpoints.checkExec(entry.addr, cpu, bus)) {
-        std::string msg = "Execution breakpoint " + std::to_string(bp->id) + " hit at $" + std::to_string(cpu->pc());
-        m_cpu->log(SIM_LOG_INFO, msg.c_str());
-        m_paused = true;
+    // On resume, skip the breakpoint at the address we just paused on (one step).
+    if (entry.addr == m_resumeSkipAddr) {
+        m_resumeSkipAddr = ~0u;
+        return true;
     }
+
+    if (auto* bp = m_breakpoints.checkExec(entry.addr, cpu, bus)) {
+        std::string msg = "Execution breakpoint " + std::to_string(bp->id) + " hit at $" + toHex(entry.addr);
+        m_cpu->log(SIM_LOG_INFO, msg.c_str());
+        m_lastPausedAddr = entry.addr;
+        m_paused = true;
+        return false;
+    }
+    return true;
 }
 
 void DebugContext::onMemoryWrite(IBus* bus, uint32_t addr, uint8_t before, uint8_t after) {
     (void)bus; (void)before; (void)after;
     if (auto* bp = m_breakpoints.checkWrite(addr, m_cpu, bus)) {
-        std::string msg = "Write watchpoint " + std::to_string(bp->id) + " hit at $" + std::to_string(addr);
+        std::string msg = "Write watchpoint " + std::to_string(bp->id) + " hit at $" + toHex(addr);
         m_cpu->log(SIM_LOG_INFO, msg.c_str());
         m_paused = true;
     }
@@ -42,7 +58,7 @@ void DebugContext::onMemoryWrite(IBus* bus, uint32_t addr, uint8_t before, uint8
 void DebugContext::onMemoryRead(IBus* bus, uint32_t addr, uint8_t val) {
     (void)bus; (void)val;
     if (auto* bp = m_breakpoints.checkRead(addr, m_cpu, bus)) {
-        std::string msg = "Read watchpoint " + std::to_string(bp->id) + " hit at $" + std::to_string(addr);
+        std::string msg = "Read watchpoint " + std::to_string(bp->id) + " hit at $" + toHex(addr);
         m_cpu->log(SIM_LOG_INFO, msg.c_str());
         m_paused = true;
     }

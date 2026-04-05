@@ -13,10 +13,12 @@ public:
     virtual ~ExecutionObserver() {}
 
     /**
-     * Called after each instruction step.
+     * Called before each instruction executes.
+     * Returns false to abort execution of the current instruction (e.g. breakpoint hit).
      */
-    virtual void onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
+    virtual bool onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
         (void)cpu; (void)bus; (void)entry;
+        return true;
     }
 
     /**

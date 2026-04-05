@@ -13,13 +13,25 @@
 #include "plugin_loader/main/plugin_loader.h"
 #include "libmem/main/memory_bus.h"
 #include "libcore/main/icore.h"
+#include "libtoolchain/main/toolchain_registry.h"
+#include "libtoolchain/main/idisasm.h"
+#include "libdebug/main/debug_context.h"
+#include "libdebug/main/breakpoint_list.h"
 #include "plugin_tool_registry.h"
 #include "include/util/logging.h"
 
+static std::string toHex(uint32_t v, int width = 4) {
+    std::ostringstream ss;
+    ss << std::uppercase << std::hex << std::setfill('0') << std::setw(width) << v;
+    return ss.str();
+}
+
 struct MachineState {
     MachineDescriptor* machine = nullptr;
-    ICore* cpu = nullptr;
-    IBus* bus = nullptr;
+    ICore*        cpu   = nullptr;
+    IBus*         bus   = nullptr;
+    DebugContext* dbg   = nullptr;
+    IDisassembler* disasm = nullptr;
 };
 
 std::map<std::string, MachineState> g_machines;
@@ -32,6 +44,10 @@ MachineState* getMachine(const std::string& id) {
         state.machine = md;
         state.cpu = md->cpus[0].cpu;
         state.bus = md->buses[0].bus;
+        state.dbg = new DebugContext(state.cpu, state.bus);
+        state.cpu->setObserver(state.dbg);
+        state.bus->setObserver(state.dbg);
+        state.disasm = ToolchainRegistry::instance().createDisassembler(state.cpu->isaName());
         if (md->onReset) md->onReset(*md);
         g_machines[id] = state;
     }
@@ -242,6 +258,89 @@ Json handleToolsList() {
     Json sllReq(Json::ARR); sllReq.push_back(Json("target")); sllReq.push_back(Json("level"));
     sllSchema.oVal["required"] = sllReq;
     addTool("set_log_level", "Set log level for a logger or 'all'", sllSchema);
+
+    // list_machines
+    addTool("list_machines", "List all available machine types", emptySchema);
+
+    // create_machine
+    Json cmSchema(Json::OBJ); cmSchema.oVal["type"] = Json("object");
+    Json cmProps(Json::OBJ); cmProps.oVal["machine_id"] = midProp;
+    cmSchema.oVal["properties"] = cmProps;
+    Json cmReq(Json::ARR); cmReq.push_back(Json("machine_id"));
+    cmSchema.oVal["required"] = cmReq;
+    addTool("create_machine", "Create (or re-create) a machine by ID", cmSchema);
+
+    // run_cpu
+    Json runSchema(Json::OBJ); runSchema.oVal["type"] = Json("object");
+    Json runProps(Json::OBJ); runProps.oVal["machine_id"] = midProp;
+    Json maxStepsProp(Json::OBJ); maxStepsProp.oVal["type"] = Json("integer");
+    runProps.oVal["max_steps"] = maxStepsProp;
+    runSchema.oVal["properties"] = runProps;
+    Json runReq(Json::ARR); runReq.push_back(Json("machine_id"));
+    runSchema.oVal["required"] = runReq;
+    addTool("run_cpu", "Run until breakpoint, program end, or max_steps (default 10000000)", runSchema);
+
+    // disassemble
+    Json daSchema(Json::OBJ); daSchema.oVal["type"] = Json("object");
+    Json daProps(Json::OBJ); daProps.oVal["machine_id"] = midProp; daProps.oVal["addr"] = addrProp; daProps.oVal["count"] = cntProp;
+    daSchema.oVal["properties"] = daProps;
+    Json daReq(Json::ARR); daReq.push_back(Json("machine_id"));
+    daSchema.oVal["required"] = daReq;
+    addTool("disassemble", "Disassemble instructions (addr defaults to PC, count defaults to 10)", daSchema);
+
+    // fill_memory
+    Json fmSchema(Json::OBJ); fmSchema.oVal["type"] = Json("object");
+    Json fmProps(Json::OBJ); fmProps.oVal["machine_id"] = midProp; fmProps.oVal["addr"] = addrProp;
+    Json valProp(Json::OBJ); valProp.oVal["type"] = Json("integer");
+    fmProps.oVal["value"] = valProp; fmProps.oVal["size"] = sizeProp;
+    fmSchema.oVal["properties"] = fmProps;
+    Json fmReq(Json::ARR); fmReq.push_back(Json("machine_id")); fmReq.push_back(Json("addr")); fmReq.push_back(Json("value")); fmReq.push_back(Json("size"));
+    fmSchema.oVal["required"] = fmReq;
+    addTool("fill_memory", "Fill a memory range with a byte value", fmSchema);
+
+    // copy_memory
+    Json cpSchema(Json::OBJ); cpSchema.oVal["type"] = Json("object");
+    Json cpProps(Json::OBJ); cpProps.oVal["machine_id"] = midProp;
+    Json srcProp(Json::OBJ); srcProp.oVal["type"] = Json("integer");
+    Json dstProp(Json::OBJ); dstProp.oVal["type"] = Json("integer");
+    cpProps.oVal["src_addr"] = srcProp; cpProps.oVal["dst_addr"] = dstProp; cpProps.oVal["size"] = sizeProp;
+    cpSchema.oVal["properties"] = cpProps;
+    Json cpReq(Json::ARR); cpReq.push_back(Json("machine_id")); cpReq.push_back(Json("src_addr")); cpReq.push_back(Json("dst_addr")); cpReq.push_back(Json("size"));
+    cpSchema.oVal["required"] = cpReq;
+    addTool("copy_memory", "Copy a memory range to another address", cpSchema);
+
+    // set_breakpoint
+    Json sbpSchema(Json::OBJ); sbpSchema.oVal["type"] = Json("object");
+    Json sbpProps(Json::OBJ); sbpProps.oVal["machine_id"] = midProp; sbpProps.oVal["addr"] = addrProp;
+    sbpSchema.oVal["properties"] = sbpProps;
+    Json sbpReq(Json::ARR); sbpReq.push_back(Json("machine_id")); sbpReq.push_back(Json("addr"));
+    sbpSchema.oVal["required"] = sbpReq;
+    addTool("set_breakpoint", "Set an execution breakpoint at an address", sbpSchema);
+
+    // set_watchpoint
+    Json swpSchema(Json::OBJ); swpSchema.oVal["type"] = Json("object");
+    Json swpProps(Json::OBJ); swpProps.oVal["machine_id"] = midProp; swpProps.oVal["addr"] = addrProp;
+    Json wpTypeProp(Json::OBJ); wpTypeProp.oVal["type"] = Json("string");
+    swpProps.oVal["type"] = wpTypeProp;
+    swpSchema.oVal["properties"] = swpProps;
+    Json swpReq(Json::ARR); swpReq.push_back(Json("machine_id")); swpReq.push_back(Json("addr")); swpReq.push_back(Json("type"));
+    swpSchema.oVal["required"] = swpReq;
+    addTool("set_watchpoint", "Set a read or write watchpoint (type: \"read\" or \"write\")", swpSchema);
+
+    // delete_breakpoint / enable_breakpoint / disable_breakpoint share the same schema
+    Json bpIdSchema(Json::OBJ); bpIdSchema.oVal["type"] = Json("object");
+    Json bpIdProps(Json::OBJ); bpIdProps.oVal["machine_id"] = midProp;
+    Json idProp(Json::OBJ); idProp.oVal["type"] = Json("integer");
+    bpIdProps.oVal["id"] = idProp;
+    bpIdSchema.oVal["properties"] = bpIdProps;
+    Json bpIdReq(Json::ARR); bpIdReq.push_back(Json("machine_id")); bpIdReq.push_back(Json("id"));
+    bpIdSchema.oVal["required"] = bpIdReq;
+    addTool("delete_breakpoint",  "Delete a breakpoint or watchpoint by id", bpIdSchema);
+    addTool("enable_breakpoint",  "Enable a breakpoint or watchpoint by id", bpIdSchema);
+    addTool("disable_breakpoint", "Disable a breakpoint or watchpoint by id", bpIdSchema);
+
+    // list_breakpoints
+    addTool("list_breakpoints", "List all breakpoints and watchpoints", cmSchema);  // reuse machine_id-only schema
 
     std::vector<std::string> pluginTools;
     PluginToolRegistry::instance().listTools(pluginTools);
@@ -545,6 +644,187 @@ Json handleToolsCall(const Json& params) {
             auto l = LogRegistry::instance().getLogger(target);
             l->set_level(lvl);
             textItem.oVal["text"] = Json("Set logger '" + target + "' to " + levelStr);
+        }
+    } else if (name == "list_machines") {
+        std::vector<std::string> ids;
+        MachineRegistry::instance().enumerate(ids);
+        std::stringstream ss;
+        for (const auto& id : ids) ss << id << "\n";
+        textItem.oVal["text"] = Json(ss.str().empty() ? "(none)\n" : ss.str());
+    } else if (name == "create_machine") {
+        std::string mid = args["machine_id"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Unknown machine ID: " + mid);
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            textItem.oVal["text"] = Json("Created machine: " + std::string(ms->machine->displayName));
+        }
+    } else if (name == "run_cpu") {
+        std::string mid = args["machine_id"].sVal;
+        int maxSteps = args.contains("max_steps") ? (int)args["max_steps"].nVal : 10000000;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            ms->dbg->resume();
+            int steps = 0;
+            while (!ms->dbg->isPaused() && steps < maxSteps) {
+                if (ms->machine && ms->machine->schedulerStep) {
+                    ms->machine->schedulerStep(*ms->machine);
+                } else {
+                    ms->cpu->step();
+                }
+                if (ms->cpu->isProgramEnd(ms->bus)) break;
+                ++steps;
+            }
+            std::stringstream ss;
+            if (ms->dbg->isPaused())   ss << "Breakpoint hit. ";
+            else if (steps >= maxSteps) ss << "Stopped after " << maxSteps << " steps. ";
+            else                        ss << "Program ended. ";
+            int regCount = ms->cpu->regCount();
+            for (int i = 0; i < regCount; ++i) {
+                const auto* desc = ms->cpu->regDescriptor(i);
+                if (desc->flags & REGFLAG_INTERNAL) continue;
+                uint32_t val = ms->cpu->regRead(i);
+                ss << desc->name << ": $"
+                   << toHex(val, desc->width == RegWidth::R16 ? 4 : 2) << "  ";
+            }
+            textItem.oVal["text"] = Json(ss.str());
+        }
+    } else if (name == "disassemble") {
+        std::string mid = args["machine_id"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms || !ms->disasm) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID or no disassembler");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            uint32_t addr = args.contains("addr") ? (uint32_t)args["addr"].nVal : ms->cpu->pc();
+            int count = args.contains("count") ? (int)args["count"].nVal : 10;
+            std::stringstream ss;
+            for (int i = 0; i < count; ++i) {
+                char buf[64];
+                ss << toHex(addr) << ": ";
+                int bytes = ms->disasm->disasmOne(ms->bus, addr, buf, sizeof(buf));
+                ss << buf << "\n";
+                addr += bytes;
+            }
+            textItem.oVal["text"] = Json(ss.str());
+        }
+    } else if (name == "fill_memory") {
+        std::string mid = args["machine_id"].sVal;
+        uint32_t addr  = (uint32_t)args["addr"].nVal;
+        uint8_t  value = (uint8_t)args["value"].nVal;
+        uint32_t size  = (uint32_t)args["size"].nVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            for (uint32_t i = 0; i < size; ++i) ms->bus->write8(addr + i, value);
+            textItem.oVal["text"] = Json("Filled " + std::to_string(size) + " bytes at $" + toHex(addr));
+        }
+    } else if (name == "copy_memory") {
+        std::string mid = args["machine_id"].sVal;
+        uint32_t src  = (uint32_t)args["src_addr"].nVal;
+        uint32_t dst  = (uint32_t)args["dst_addr"].nVal;
+        uint32_t size = (uint32_t)args["size"].nVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            std::vector<uint8_t> buf(size);
+            for (uint32_t i = 0; i < size; ++i) buf[i] = ms->bus->peek8(src + i);
+            for (uint32_t i = 0; i < size; ++i) ms->bus->write8(dst + i, buf[i]);
+            textItem.oVal["text"] = Json("Copied " + std::to_string(size) + " bytes from $" + toHex(src) + " to $" + toHex(dst));
+        }
+    } else if (name == "set_breakpoint") {
+        std::string mid = args["machine_id"].sVal;
+        uint32_t addr = (uint32_t)args["addr"].nVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            int id = ms->dbg->breakpoints().add(addr, BreakpointType::EXEC);
+            textItem.oVal["text"] = Json("Breakpoint " + std::to_string(id) + " at $" + toHex(addr));
+        }
+    } else if (name == "set_watchpoint") {
+        std::string mid = args["machine_id"].sVal;
+        uint32_t addr = (uint32_t)args["addr"].nVal;
+        std::string type = args["type"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else if (type != "read" && type != "write") {
+            textItem.oVal["text"] = Json("Error: type must be \"read\" or \"write\"");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            BreakpointType btype = (type == "read") ? BreakpointType::READ_WATCH : BreakpointType::WRITE_WATCH;
+            int id = ms->dbg->breakpoints().add(addr, btype);
+            textItem.oVal["text"] = Json("Watchpoint " + std::to_string(id) + " (" + type + ") at $" + toHex(addr));
+        }
+    } else if (name == "delete_breakpoint") {
+        std::string mid = args["machine_id"].sVal;
+        int id = (int)args["id"].nVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            ms->dbg->breakpoints().remove(id);
+            textItem.oVal["text"] = Json("Deleted breakpoint " + std::to_string(id));
+        }
+    } else if (name == "enable_breakpoint") {
+        std::string mid = args["machine_id"].sVal;
+        int id = (int)args["id"].nVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            ms->dbg->breakpoints().setEnabled(id, true);
+            textItem.oVal["text"] = Json("Enabled breakpoint " + std::to_string(id));
+        }
+    } else if (name == "disable_breakpoint") {
+        std::string mid = args["machine_id"].sVal;
+        int id = (int)args["id"].nVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            ms->dbg->breakpoints().setEnabled(id, false);
+            textItem.oVal["text"] = Json("Disabled breakpoint " + std::to_string(id));
+        }
+    } else if (name == "list_breakpoints") {
+        std::string mid = args["machine_id"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            const auto& bps = ms->dbg->breakpoints().breakpoints();
+            if (bps.empty()) {
+                textItem.oVal["text"] = Json("No breakpoints set.");
+            } else {
+                std::stringstream ss;
+                for (const auto& bp : bps) {
+                    std::string type;
+                    switch (bp.type) {
+                        case BreakpointType::EXEC:        type = "exec";  break;
+                        case BreakpointType::READ_WATCH:  type = "read";  break;
+                        case BreakpointType::WRITE_WATCH: type = "write"; break;
+                    }
+                    ss << bp.id << "  " << std::left << std::setw(6) << type
+                       << (bp.enabled ? "y" : "n") << "  $" << toHex(bp.addr)
+                       << "  hits=" << bp.hitCount << "\n";
+                }
+                textItem.oVal["text"] = Json(ss.str());
+            }
         }
     } else {
         std::string resultJson;

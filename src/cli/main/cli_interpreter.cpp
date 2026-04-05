@@ -494,7 +494,15 @@ void CliInterpreter::printHelp() {
              "  eject            - Eject currently attached cartridge\n"
              "  run [addr]       - Run from address (or last loaded address)\n"
              "  .<instr>         - Assemble and execute a single instruction\n"
-             "  quit, q          - Exit the program\n");
+             "  quit, q          - Exit the program\n"
+             "\nDebugging:\n"
+             "  break <addr>     - Set execution breakpoint at address\n"
+             "  watch read <addr> - Set read watchpoint at address\n"
+             "  watch write <addr>- Set write watchpoint at address\n"
+             "  delete <id>      - Delete breakpoint/watchpoint by id\n"
+             "  enable <id>      - Enable breakpoint/watchpoint\n"
+             "  disable <id>     - Disable breakpoint/watchpoint\n"
+             "  info breaks      - List all breakpoints and watchpoints\n");
 
     std::vector<std::string> pluginCmds;
     PluginCommandRegistry::instance().listCommands(pluginCmds);
