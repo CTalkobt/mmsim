@@ -35,6 +35,24 @@ struct TestRegistrar {
         exit(1); \
     }
 
+#define ASSERT_EQ(a, b) \
+    if (!((a) == (b))) { \
+        std::cerr << "Assertion failed: " << #a << " == " << #b \
+                  << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+        exit(1); \
+    }
+
+#define ASSERT_NE(a, b) \
+    if (!((a) != (b))) { \
+        std::cerr << "Assertion failed: " << #a << " != " << #b \
+                  << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+        exit(1); \
+    }
+
+// EXPECT_* mirrors ASSERT_* (both abort on failure in this harness)
+#define EXPECT_TRUE(expr)   ASSERT(expr)
+#define EXPECT_EQ(a, b)     ASSERT_EQ(a, b)
+
 inline int runAllTests() {
     int passed = 0;
     auto& cases = getTestCases();

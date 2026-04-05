@@ -35,7 +35,7 @@ PLUGIN_LIBS =
 LIBMEM_SRCS       = src/libmem/main/ibus.cpp src/libmem/main/memory_bus.cpp src/libmem/main/libmem.cpp
 LIBCORE_SRCS      = src/libcore/main/icore.cpp src/libcore/main/rom_loader.cpp src/libcore/main/core_registry.cpp \
                     src/libcore/main/machines/machine_registry.cpp src/libcore/main/libcore.cpp \
-                    src/libcore/main/image_loader.cpp
+                    src/libcore/main/image_loader.cpp src/libcore/main/json_machine_loader.cpp
 LIBDEVICES_SRCS   = src/libdevices/main/libdevices.cpp src/libdevices/main/io_registry.cpp \
                     src/libdevices/main/device_registry.cpp src/libdevices/main/joystick.cpp \
                     src/libdevices/main/ieee488.cpp
@@ -139,6 +139,7 @@ TEST_SRCS = tests/test_main.cpp \
             src/libmem/test/test_flatmembus.cpp \
             src/libcore/test/test_libcore.cpp \
             src/libcore/test/test_registry.cpp \
+            src/libcore/test/test_json_machine_loader.cpp \
             src/libdevices/test/test_devices.cpp \
             src/libdevices/test/test_joystick.cpp \
             src/libdebug/test/test_debug.cpp \
@@ -185,7 +186,8 @@ TEST_SRCS = tests/test_main.cpp \
                   src/plugins/devices/antic/main/antic.o \
                   src/plugins/devices/gtia/main/gtia.o \
                   src/plugins/devices/pokey/main/pokey.o
-REGISTRY_OBJS = src/cli/main/plugin_command_registry.o \
+REGISTRY_OBJS = src/cli/main/cli_interpreter.o \
+                 src/cli/main/plugin_command_registry.o \
                  src/mcp/main/plugin_tool_registry.o \
                  src/gui/main/plugin_pane_manager.o
 
