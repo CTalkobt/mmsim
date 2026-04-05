@@ -11,6 +11,7 @@ bin/*
 lib/*.a
 lib/*.so
 
+.junie/
 CLAUDE.md
 GEMINI.md
 ref/
