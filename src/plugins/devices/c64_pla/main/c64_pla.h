@@ -2,6 +2,7 @@
 
 #include "libdevices/main/io_handler.h"
 #include "libdevices/main/isignal_line.h"
+#include <string>
 
 /**
  * C64 PLA (Programmable Logic Array) — Banking Controller.
@@ -50,14 +51,22 @@ public:
         m_charen = charen;
     }
 
-    void setBasicRom (const uint8_t* data, uint32_t size) { m_basicRom  = data; m_basicSize  = size; }
-    void setKernalRom(const uint8_t* data, uint32_t size) { m_kernalRom = data; m_kernalSize = size; }
-    void setCharRom  (const uint8_t* data, uint32_t size) { m_charRom   = data; m_charSize   = size; }
+    /** Generic named-signal setter: "loram", "hiram", "charen". */
+    void setSignalLine(const char* name, ISignalLine* line) override {
+        std::string n(name);
+        if (n == "loram")  m_loram  = line;
+        else if (n == "hiram")  m_hiram  = line;
+        else if (n == "charen") m_charen = line;
+    }
+
+    void setBasicRom (const uint8_t* data, uint32_t size) override { m_basicRom  = data; m_basicSize  = size; }
+    void setKernalRom(const uint8_t* data, uint32_t size) override { m_kernalRom = data; m_kernalSize = size; }
+    void setCharRom  (const uint8_t* data, uint32_t size) override { m_charRom   = data; m_charSize   = size; }
 
     /** Pointer to the flat system RAM (64 KB).  When set, the PLA always claims
      *  its banking regions and returns flat RAM content when ROM is banked out,
      *  preventing bus overlays from serving stale ROM data through peek8(). */
-    void setRamData(const uint8_t* ram) { m_ram = ram; }
+    void setRamData(const uint8_t* ram) override { m_ram = ram; }
 
     // -----------------------------------------------------------------------
     // IOHandler interface

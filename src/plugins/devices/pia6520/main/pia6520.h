@@ -15,6 +15,10 @@ public:
     PIA6520(const std::string& name, uint32_t baseAddr);
     virtual ~PIA6520() = default;
 
+    // Configuration
+    void setName(const std::string& name) override { m_name = name; }
+    void setBaseAddr(uint32_t addr)       override { m_baseAddr = addr; }
+
     // IOHandler interface
     const char* name() const override { return m_name.c_str(); }
     uint32_t baseAddr() const override { return m_baseAddr; }
@@ -26,16 +30,16 @@ public:
     void tick(uint64_t cycles) override;
 
     // Peripheral attachment
-    void setPortADevice(IPortDevice* device) { m_portADevice = device; }
-    void setPortBDevice(IPortDevice* device) { m_portBDevice = device; }
+    void setPortADevice(IPortDevice* device) override { m_portADevice = device; }
+    void setPortBDevice(IPortDevice* device) override { m_portBDevice = device; }
 
     // Line signals
-    void setIrqALine(class ISignalLine* line) { m_irqALine = line; }
-    void setIrqBLine(class ISignalLine* line) { m_irqBLine = line; }
-    void setCA1Line(class ISignalLine* line) { m_ca1Line = line; }
-    void setCA2Line(class ISignalLine* line) { m_ca2Line = line; }
-    void setCB1Line(class ISignalLine* line) { m_cb1Line = line; }
-    void setCB2Line(class ISignalLine* line) { m_cb2Line = line; }
+    void setIrqALine(ISignalLine* line) override { m_irqALine = line; }
+    void setIrqBLine(ISignalLine* line) override { m_irqBLine = line; }
+    void setCA1Line (ISignalLine* line) override { m_ca1Line  = line; }
+    void setCA2Line (ISignalLine* line) override { m_ca2Line  = line; }
+    void setCB1Line (ISignalLine* line) override { m_cb1Line  = line; }
+    void setCB2Line (ISignalLine* line) override { m_cb2Line  = line; }
 
     // Manual signal triggers (for tests/HLE)
     void setCA1(bool level);

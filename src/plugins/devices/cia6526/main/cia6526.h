@@ -45,13 +45,13 @@ public:
     void setBaseAddr(uint32_t addr) override       { m_baseAddr = addr; }
     void setClockHz(uint32_t hz) override          { m_clockHz = hz; }
 
-    void setPortADevice(IPortDevice* d) { m_portADevice = d; }
-    void setPortBDevice(IPortDevice* d) { m_portBDevice = d; }
-    void setIrqLine(ISignalLine* line) override  { m_irqLine = line; }
+    void setPortADevice(IPortDevice* d) override { m_portADevice = d; }
+    void setPortBDevice(IPortDevice* d) override { m_portBDevice = d; }
+    void setIrqLine(ISignalLine* line)  override { m_irqLine = line; }
 
     /** Called after every write to PRA or DDRA with the new (pra, ddra) values.
      *  Useful for CIA2 VIC-II bank switching in the C64 machine factory. */
-    void setPortAWriteCallback(std::function<void(uint8_t pra, uint8_t ddra)> cb) {
+    void setPortAWriteCallback(std::function<void(uint8_t pra, uint8_t ddra)> cb) override {
         m_portAWriteCallback = std::move(cb);
     }
 

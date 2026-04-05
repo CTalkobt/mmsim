@@ -2,9 +2,11 @@
 
 #include <cstdint>
 #include <string>
+#include <functional>
 
 class IBus;
 class ISignalLine;
+class IPortDevice;
 
 /**
  * Abstract base class for memory-mapped I/O devices.
@@ -22,6 +24,42 @@ public:
     virtual void setClockHz (uint32_t)           {}
     virtual void setIrqLine (ISignalLine*)        {}
     virtual void setNmiLine (ISignalLine*)        {}
+
+    // Port device attachment (VIA, CIA, PIA)
+    virtual void setPortADevice(IPortDevice*) {}
+    virtual void setPortBDevice(IPortDevice*) {}
+
+    // Port-A write callback — called with (pra, ddra) after each PRA/DDRA write.
+    // CIA6526 overrides this for VIC-II bank switching.
+    virtual void setPortAWriteCallback(std::function<void(uint8_t, uint8_t)>) {}
+
+    // Control-line attachment (VIA, PIA)
+    virtual void setCA1Line(ISignalLine*) {}
+    virtual void setCB1Line(ISignalLine*) {}
+    virtual void setCA2Line(ISignalLine*) {}
+    virtual void setCB2Line(ISignalLine*) {}
+
+    // PIA-specific dual interrupt lines
+    virtual void setIrqALine(ISignalLine*) {}
+    virtual void setIrqBLine(ISignalLine*) {}
+
+    // Named signal-line input (used by C64PLA for loram/hiram/charen)
+    virtual void setSignalLine(const char*, ISignalLine*) {}
+
+    // DMA / direct-read bus (VIC-II, ANTIC)
+    virtual void setDmaBus(IBus*) {}
+
+    // VIC banking base address
+    virtual void setBankBase(uint32_t) {}
+
+    // Color RAM pointer (VIC-I, VIC-II)
+    virtual void setColorRam(const uint8_t*) {}
+
+    // ROM data passthrough (video chips and banking controllers)
+    virtual void setCharRom (const uint8_t*, uint32_t) {}
+    virtual void setBasicRom(const uint8_t*, uint32_t) {}
+    virtual void setKernalRom(const uint8_t*, uint32_t) {}
+    virtual void setRamData  (const uint8_t*)           {}
 
     // -----------------------------------------------------------------------
     // Identity (pure virtual — every device must provide these)

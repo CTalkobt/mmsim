@@ -31,13 +31,13 @@ public:
     void tick(uint64_t cycles) override;
 
     // Peripheral attachment
-    void setPortADevice(IPortDevice* device) { m_portADevice = device; }
-    void setPortBDevice(IPortDevice* device) { m_portBDevice = device; }
+    void setPortADevice(IPortDevice* device) override { m_portADevice = device; }
+    void setPortBDevice(IPortDevice* device) override { m_portBDevice = device; }
     void setIrqLine(ISignalLine* line) override { m_irqLine = line; }
-    void setCA1Line(ISignalLine* line)  { m_ca1Line = line; }
-    void setCA2Line(ISignalLine* line)  { m_ca2Line = line; }
-    void setCB1Line(ISignalLine* line)  { m_cb1Line = line; }
-    void setCB2Line(ISignalLine* line)  { m_cb2Line = line; }
+    void setCA1Line(ISignalLine* line) override { m_ca1Line = line; }
+    void setCA2Line(ISignalLine* line) override { m_ca2Line = line; }
+    void setCB1Line(ISignalLine* line) override { m_cb1Line = line; }
+    void setCB2Line(ISignalLine* line) override { m_cb2Line = line; }
 
     void setPortAWriteCallback(std::function<void(uint8_t)> cb) { m_portAWriteCb = cb; }
     void setPortBWriteCallback(std::function<void(uint8_t)> cb) { m_portBWriteCb = cb; }

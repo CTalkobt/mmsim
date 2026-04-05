@@ -167,11 +167,12 @@ To build **mmsim**, you will need:
     - `fmt`: Modern formatting library.
     - `wxWidgets` (3.0+): Required for the GUI target and most machine/device plugins.
     - `ALSA` (`libasound`): Required for audio output in the GUI and test binaries.
+    - `nlohmann/json` (3.x): JSON parsing library used by the machine loader.
 - **Tools**: `pkg-config` (often used by `wx-config`).
 
 On Debian/Ubuntu-based systems, you can install the dependencies with:
 ```bash
-sudo apt-get install build-essential libwxgtk3.0-gtk3-dev libspdlog-dev libfmt-dev libasound2-dev
+sudo apt-get install build-essential libwxgtk3.0-gtk3-dev libspdlog-dev libfmt-dev libasound2-dev nlohmann-json3-dev
 ```
 
 ### Building

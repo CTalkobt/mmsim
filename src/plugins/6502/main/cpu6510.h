@@ -3,6 +3,7 @@
 #include "cpu6502.h"
 #include "libdevices/main/isignal_line.h"
 #include "libmem/main/ibus.h"
+#include <string>
 
 /**
  * MOS 6510 CPU — MOS 6502 with a built-in 6-bit I/O port at $00/$01.
@@ -40,6 +41,15 @@ public:
     ISignalLine* signalLoram()  { return &m_loram; }
     ISignalLine* signalHiram()  { return &m_hiram; }
     ISignalLine* signalCharen() { return &m_charen; }
+
+    /** ICore override: returns "loram", "hiram", or "charen" signal lines. */
+    ISignalLine* getSignalLine(const char* name) override {
+        std::string n(name);
+        if (n == "loram")  return signalLoram();
+        if (n == "hiram")  return signalHiram();
+        if (n == "charen") return signalCharen();
+        return nullptr;
+    }
 
     // Direct read-back of port registers (for debugger use).
     uint8_t portDDR()  const { return m_ddr; }

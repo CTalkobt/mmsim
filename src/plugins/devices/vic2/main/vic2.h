@@ -71,19 +71,19 @@ public:
     void setBaseAddr(uint32_t addr) override       { m_baseAddr = addr; }
 
     /** Bus used for all DMA reads (screen RAM, bitmap, sprite data). */
-    void setDmaBus(IBus* bus) { m_dmaBus = bus; }
+    void setDmaBus(IBus* bus)      override { m_dmaBus = bus; }
 
     /** Pointer to the 4 KB character ROM image (always visible at VIC bank
      *  offsets $1000–$1FFF and $9000–$9FFF regardless of CPU banking). */
-    void setCharRom(const uint8_t* data, uint32_t size) { m_charRom = data; m_charRomSize = size; }
+    void setCharRom(const uint8_t* data, uint32_t size) override { m_charRom = data; m_charRomSize = size; }
 
     /** Direct pointer to the 1 KB × 4-bit color RAM (1024 bytes, lower nibble
      *  used).  Mirrors the real VIC-II's dedicated 4-bit color RAM connection —
      *  bypasses the DMA bus so CPU banking / overlays don't affect rendering. */
-    void setColorRam(const uint8_t* data) { m_colorRam = data; }
+    void setColorRam(const uint8_t* data) override { m_colorRam = data; }
 
     /** 16 KB VIC bank base address in system memory (0x0000/0x4000/0x8000/0xC000). */
-    void setBankBase(uint32_t base) { m_bankBase = base & 0xC000; }
+    void setBankBase(uint32_t base) override { m_bankBase = base & 0xC000; }
 
     void setIrqLine(ISignalLine* line) override { m_irqLine = line; }
 

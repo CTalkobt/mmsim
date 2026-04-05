@@ -4,6 +4,8 @@
 #include <cstddef>
 #include "libmem/main/ibus.h"
 
+class ISignalLine;
+
 /**
  * Register width.
  */
@@ -103,6 +105,9 @@ public:
     virtual void setIrqLine(bool asserted) { if (asserted) triggerIrq(); }
     virtual void setNmiLine(bool asserted) { if (asserted) triggerNmi(); }
     virtual void setHaltLine(bool asserted) { (void)asserted; }
+
+    /** Return a named signal line output (e.g. "loram"/"hiram"/"charen" for MOS6510). */
+    virtual ISignalLine* getSignalLine(const char*) { return nullptr; }
 
     // Step-over / step-out heuristics
     virtual int  isCallAt    (IBus* bus, uint32_t addr) = 0;
