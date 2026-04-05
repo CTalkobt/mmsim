@@ -17,8 +17,8 @@ public:
     virtual ~VIA6522() = default;
 
     // Configuration
-    void setName(const std::string& name) { m_name = name; }
-    void setBaseAddr(uint32_t addr) { m_baseAddr = addr; }
+    void setName(const std::string& name) override { m_name = name; }
+    void setBaseAddr(uint32_t addr) override { m_baseAddr = addr; }
 
     // IOHandler interface
     const char* name() const override { return m_name.c_str(); }
@@ -33,7 +33,7 @@ public:
     // Peripheral attachment
     void setPortADevice(IPortDevice* device) { m_portADevice = device; }
     void setPortBDevice(IPortDevice* device) { m_portBDevice = device; }
-    void setIrqLine(ISignalLine* line) { m_irqLine = line; }
+    void setIrqLine(ISignalLine* line) override { m_irqLine = line; }
     void setCA1Line(ISignalLine* line)  { m_ca1Line = line; }
     void setCA2Line(ISignalLine* line)  { m_ca2Line = line; }
     void setCB1Line(ISignalLine* line)  { m_cb1Line = line; }

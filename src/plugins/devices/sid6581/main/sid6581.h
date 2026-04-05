@@ -47,10 +47,10 @@ public:
     SID6581(const std::string& name, uint32_t baseAddr);
     ~SID6581() override = default;
 
-    void setName(const std::string& name) { m_name = name; }
-    void setBaseAddr(uint32_t addr)        { m_baseAddr = addr; }
-    void setSampleRate(int hz)             { m_sampleRate = hz; }
-    void setClockHz(uint32_t hz)           { m_clockHz = hz; }
+    void setName(const std::string& name) override { m_name = name; }
+    void setBaseAddr(uint32_t addr) override       { m_baseAddr = addr; }
+    void setSampleRate(int hz)                     { m_sampleRate = hz; }
+    void setClockHz(uint32_t hz) override          { m_clockHz = hz; }
 
     // -----------------------------------------------------------------------
     // IOHandler interface  ($D400–$D41C, 29 registers)

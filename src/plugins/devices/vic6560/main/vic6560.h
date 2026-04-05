@@ -21,10 +21,10 @@ public:
     virtual ~VIC6560() = default;
 
     // Configuration
-    void setName(const std::string& name) { m_name = name; }
-    void setBaseAddr(uint32_t addr) { m_baseAddr = addr; }
+    void setName(const std::string& name) override { m_name = name; }
+    void setBaseAddr(uint32_t addr) override { m_baseAddr = addr; }
     void setBus(IBus* bus) { m_bus = bus; }
-    void setIrqLine(ISignalLine* line) { m_irqLine = line; }
+    void setIrqLine(ISignalLine* line) override { m_irqLine = line; }
     void setColorRam(const uint8_t* colorRam) { m_colorRam = colorRam; }
     void setAudioSampleRate(int hz) { m_sampleRate = hz; }
 

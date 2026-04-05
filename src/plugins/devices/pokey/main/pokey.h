@@ -18,9 +18,9 @@ public:
     POKEY() : m_name("POKEY"), m_baseAddr(0xD200) { reset(); }
     ~POKEY() override = default;
 
-    void setClockHz(uint32_t hz) { m_clockHz = hz; }
-    void setSampleRate(int hz)   { m_sampleRate = hz; }
-    void setIrqLine(ISignalLine* line) { m_irqLine = line; }
+    void setClockHz(uint32_t hz) override  { m_clockHz = hz; }
+    void setSampleRate(int hz)             { m_sampleRate = hz; }
+    void setIrqLine(ISignalLine* line) override { m_irqLine = line; }
 
     // -----------------------------------------------------------------------
     // IOHandler interface

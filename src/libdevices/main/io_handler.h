@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 class IBus;
+class ISignalLine;
 
 /**
  * Abstract base class for memory-mapped I/O devices.
@@ -10,6 +12,20 @@ class IBus;
 class IOHandler {
 public:
     virtual ~IOHandler();
+
+    // -----------------------------------------------------------------------
+    // Configuration setters (overridden by concrete devices).
+    // Defaults are no-ops so devices that don't need a setter can ignore it.
+    // -----------------------------------------------------------------------
+    virtual void setName    (const std::string&) {}
+    virtual void setBaseAddr(uint32_t)           {}
+    virtual void setClockHz (uint32_t)           {}
+    virtual void setIrqLine (ISignalLine*)        {}
+    virtual void setNmiLine (ISignalLine*)        {}
+
+    // -----------------------------------------------------------------------
+    // Identity (pure virtual — every device must provide these)
+    // -----------------------------------------------------------------------
 
     /**
      * Unique name of the device (e.g. "VIC-II").

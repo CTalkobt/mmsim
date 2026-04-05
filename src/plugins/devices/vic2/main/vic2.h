@@ -67,8 +67,8 @@ public:
     // Configuration
     // -----------------------------------------------------------------------
 
-    void setName(const std::string& name) { m_name = name; }
-    void setBaseAddr(uint32_t addr)        { m_baseAddr = addr; }
+    void setName(const std::string& name) override { m_name = name; }
+    void setBaseAddr(uint32_t addr) override       { m_baseAddr = addr; }
 
     /** Bus used for all DMA reads (screen RAM, bitmap, sprite data). */
     void setDmaBus(IBus* bus) { m_dmaBus = bus; }
@@ -85,7 +85,7 @@ public:
     /** 16 KB VIC bank base address in system memory (0x0000/0x4000/0x8000/0xC000). */
     void setBankBase(uint32_t base) { m_bankBase = base & 0xC000; }
 
-    void setIrqLine(ISignalLine* line) { m_irqLine = line; }
+    void setIrqLine(ISignalLine* line) override { m_irqLine = line; }
 
     void setLogger(void* handle, void (*logFn)(void*, int, const char*)) {
         m_logger = handle;

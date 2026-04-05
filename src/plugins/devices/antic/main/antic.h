@@ -28,7 +28,7 @@ public:
 
     void setDmaBus(IBus* bus) { m_dmaBus = bus; }
     void setHaltLine(ISignalLine* line) { m_haltLine = line; }
-    void setNmiLine(ISignalLine* line) { m_nmiLine = line; }
+    void setNmiLine(ISignalLine* line) override { m_nmiLine = line; }
 
     // -----------------------------------------------------------------------
     // IOHandler interface
