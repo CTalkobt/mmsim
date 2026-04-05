@@ -34,6 +34,7 @@ public:
         sizer->Add(form, 0, wxEXPAND | wxALL, 10);
         sizer->Add(CreateButtonSizer(wxOK | wxCANCEL), 0, wxEXPAND | wxBOTTOM | wxLEFT | wxRIGHT, 8);
         SetSizerAndFit(sizer);
+        if (auto* btn = dynamic_cast<wxButton*>(FindWindowById(wxID_OK, this))) btn->SetDefault();
         m_addr->SetFocus();
     }
 

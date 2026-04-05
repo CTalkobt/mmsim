@@ -10,6 +10,7 @@
 #include "console_pane.h"
 #include "cartridge_pane.h"
 #include "breakpoint_pane.h"
+#include "stack_pane.h"
 #include "libdebug/main/debug_context.h"
 #include "dialogs/memory_dialogs.h"
 #include "dialogs/assemble_dialog.h"
@@ -118,9 +119,11 @@ private:
     void OnEjectCart(wxCommandEvent& event);
     void OnKbdFocus(wxCommandEvent& event);
     void OnShowBpPane(wxCommandEvent& event);
+    void OnShowStackPane(wxCommandEvent& event);
     void OnTimer(wxTimerEvent& event);
     void OnCtrlShiftK(wxKeyEvent& event);
     void ShowBreakpointPane();
+    void ShowStackPane();
 
     MachineDescriptor* m_machine = nullptr;
     ICore* m_cpu = nullptr;
@@ -134,8 +137,9 @@ private:
     DisasmPane*     m_disasmPane;
     ConsolePane*    m_consolePane;
     CartridgePane*  m_cartPane;
-    BreakpointPane* m_bpPane = nullptr;
-    wxAuiNotebook*  m_notebook = nullptr;
+    BreakpointPane* m_bpPane    = nullptr;
+    StackPane*      m_stackPane = nullptr;
+    wxAuiNotebook*  m_notebook  = nullptr;
 
     wxTimer m_timer;
     bool m_running = false;
@@ -400,7 +404,8 @@ MmemuFrame::MmemuFrame()
     menuDebug->Append(ID_FILL_MEM, "Fill Memory...");
     menuDebug->Append(ID_COPY_MEM, "Copy Memory...");
     menuDebug->AppendSeparator();
-    menuDebug->Append(ID_SHOW_BP_PANE, "Breakpoints\tCtrl-B");
+    menuDebug->Append(ID_SHOW_BP_PANE,    "Breakpoints\tCtrl-B");
+    menuDebug->Append(ID_SHOW_STACK_PANE, "Stack Trace\tCtrl-T");
     
     auto* menuBar = new wxMenuBar;
     menuBar->Append(menuFile, "&File");
@@ -442,6 +447,8 @@ MmemuFrame::MmemuFrame()
     m_notebook->AddPage(m_cartPane, "Cartridge");
     m_bpPane = new BreakpointPane(m_notebook);
     m_notebook->AddPage(m_bpPane, "Breakpoints");
+    m_stackPane = new StackPane(m_notebook);
+    m_notebook->AddPage(m_stackPane, "Stack");
     
     centerSplitter->SplitVertically(notebookSplitter, m_notebook, 600);
     
@@ -477,7 +484,8 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_MENU, &MmemuFrame::OnAttachCart, this, ID_ATTACH_CART);
     Bind(wxEVT_MENU, &MmemuFrame::OnEjectCart, this, ID_EJECT_CART);
     Bind(wxEVT_MENU, &MmemuFrame::OnKbdFocus,   this, ID_KBD_FOCUS);
-    Bind(wxEVT_MENU, &MmemuFrame::OnShowBpPane, this, ID_SHOW_BP_PANE);
+    Bind(wxEVT_MENU, &MmemuFrame::OnShowBpPane,    this, ID_SHOW_BP_PANE);
+    Bind(wxEVT_MENU, &MmemuFrame::OnShowStackPane, this, ID_SHOW_STACK_PANE);
     Bind(wxEVT_TOOL, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
     Bind(wxEVT_TIMER, &MmemuFrame::OnTimer, this, ID_GUI_TIMER);
     
@@ -514,6 +522,8 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             m_consolePane->SetContext(m_cpu, m_bus);
             m_consolePane->SetDebugContext(m_dbg);
             m_bpPane->SetDebugContext(m_dbg);
+            m_stackPane->SetDebugContext(m_dbg);
+            m_stackPane->SetGotoCallback([this](uint32_t addr){ m_disasmPane->GoTo(addr); });
             m_cartPane->SetBus(m_bus);
             
             if (m_machine->onReset) m_machine->onReset(*m_machine);
@@ -565,6 +575,7 @@ void MmemuFrame::OnStep(wxCommandEvent& event) {
         m_cpu->step();
         m_regPane->RefreshValues();
         m_disasmPane->RefreshValues(m_cpu->pc());
+        m_stackPane->RefreshValues();
     }
 }
 
@@ -824,6 +835,20 @@ void MmemuFrame::OnShowBpPane(wxCommandEvent&) {
     ShowBreakpointPane();
 }
 
+void MmemuFrame::ShowStackPane() {
+    for (size_t i = 0; i < m_notebook->GetPageCount(); ++i) {
+        if (m_notebook->GetPage(i) == m_stackPane) {
+            m_notebook->SetSelection(i);
+            return;
+        }
+    }
+    m_notebook->AddPage(m_stackPane, "Stack", true);
+}
+
+void MmemuFrame::OnShowStackPane(wxCommandEvent&) {
+    ShowStackPane();
+}
+
 void MmemuFrame::OnKbdFocus(wxCommandEvent& event) {
     setKeyCapture(event.IsChecked());
 }
@@ -858,6 +883,7 @@ void MmemuFrame::OnTimer(wxTimerEvent& event) {
         m_regPane->RefreshValues();
         m_disasmPane->RefreshValues(m_cpu->pc());
         m_memPane->RefreshValues();
+        m_stackPane->RefreshValues();
         PluginPaneManager::instance().tickAll(m_cpu->cycles());
     }
 }

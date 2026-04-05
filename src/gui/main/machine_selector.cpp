@@ -22,13 +22,15 @@ MachineSelectorDialog::MachineSelectorDialog(wxWindow* parent)
     btnSizer->AddButton(okBtn);
     btnSizer->AddButton(cancelBtn);
     btnSizer->Realize();
-    
+    okBtn->SetDefault();
+
     sizer->Add(btnSizer, 0, wxALIGN_RIGHT | wxALL, 10);
-    
+
     SetSizer(sizer);
-    
+
     Bind(wxEVT_BUTTON, &MachineSelectorDialog::OnOK, this, wxID_OK);
     Bind(wxEVT_BUTTON, &MachineSelectorDialog::OnCancel, this, wxID_CANCEL);
+    m_machineList->Bind(wxEVT_LISTBOX_DCLICK, [this](wxCommandEvent& e){ OnOK(e); });
 }
 
 void MachineSelectorDialog::OnOK(wxCommandEvent& event) {

@@ -3,6 +3,7 @@
 #include "execution_observer.h"
 #include "breakpoint_list.h"
 #include "trace_buffer.h"
+#include "stack_trace.h"
 #include <vector>
 #include <memory>
 
@@ -23,6 +24,7 @@ public:
 
     BreakpointList& breakpoints() { return m_breakpoints; }
     TraceBuffer&    trace()       { return m_trace; }
+    StackTrace&     stackTrace()  { return m_stackTrace; }
 
     int  saveSnapshot(const std::string& label);
     bool restoreSnapshot(int index);
@@ -40,11 +42,14 @@ public:
     const std::string& lastHitMessage() const { return m_lastHitMessage; }
 
 private:
+    void trackStack(ICore* cpu, const DisasmEntry& entry);
+
     ICore* m_cpu;
     IBus*  m_bus;
 
     BreakpointList m_breakpoints;
     TraceBuffer    m_trace;
+    StackTrace     m_stackTrace;
     std::vector<SystemSnapshot> m_snapshots;
     bool        m_paused          = false;
     uint32_t    m_lastPausedAddr  = ~0u;

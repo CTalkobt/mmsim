@@ -17,6 +17,7 @@
 #include "libtoolchain/main/idisasm.h"
 #include "libdebug/main/debug_context.h"
 #include "libdebug/main/breakpoint_list.h"
+#include "libdebug/main/stack_trace.h"
 #include "plugin_tool_registry.h"
 #include "include/util/logging.h"
 
@@ -341,6 +342,14 @@ Json handleToolsList() {
 
     // list_breakpoints
     addTool("list_breakpoints", "List all breakpoints and watchpoints", cmSchema);  // reuse machine_id-only schema
+
+    // get_stack
+    Json gsSchema(Json::OBJ); gsSchema.oVal["type"] = Json("object");
+    Json gsProps(Json::OBJ); gsProps.oVal["machine_id"] = midProp; gsProps.oVal["count"] = cntProp;
+    gsSchema.oVal["properties"] = gsProps;
+    Json gsReq(Json::ARR); gsReq.push_back(Json("machine_id"));
+    gsSchema.oVal["required"] = gsReq;
+    addTool("get_stack", "Show stack trace (count defaults to 8, 0 = all)", gsSchema);
 
     std::vector<std::string> pluginTools;
     PluginToolRegistry::instance().listTools(pluginTools);
@@ -825,6 +834,30 @@ Json handleToolsCall(const Json& params) {
                 }
                 textItem.oVal["text"] = Json(ss.str());
             }
+        }
+    } else if (name == "get_stack") {
+        std::string mid = args["machine_id"].sVal;
+        int count = args.contains("count") ? (int)args["count"].nVal : 8;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            auto& st = ms->dbg->stackTrace();
+            auto entries = st.recent(count);
+            std::stringstream ss;
+            ss << "Stack (depth " << st.depth() << ", showing " << entries.size() << "):\n";
+            for (int i = 0; i < (int)entries.size(); ++i) {
+                const auto& e = entries[i];
+                ss << "  " << std::setw(3) << i << "  "
+                   << std::left << std::setw(5) << stackPushTypeName(e.type) << "  ";
+                if (e.type == StackPushType::CALL || e.type == StackPushType::BRK)
+                    ss << "$" << std::uppercase << std::hex << std::setfill('0') << std::setw(4) << e.value;
+                else
+                    ss << "$" << std::uppercase << std::hex << std::setfill('0') << std::setw(2) << e.value;
+                ss << "  pushed by $" << std::setw(4) << e.pushedByPc << "\n";
+            }
+            textItem.oVal["text"] = Json(ss.str());
         }
     } else {
         std::string resultJson;

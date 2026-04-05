@@ -25,7 +25,7 @@ AssembleDialog::AssembleDialog(wxWindow* parent, uint32_t currentAddr)
     sizer->Add(btnSizer, 0, wxALIGN_RIGHT | wxALL, 10);
     
     SetSizerAndFit(sizer);
-    
+    if (auto* btn = dynamic_cast<wxButton*>(FindWindowById(wxID_OK, this))) btn->SetDefault();
     Bind(wxEVT_BUTTON, &AssembleDialog::OnOK, this, wxID_OK);
 }
 

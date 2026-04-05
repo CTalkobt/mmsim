@@ -24,7 +24,7 @@ FillMemoryDialog::FillMemoryDialog(wxWindow* parent)
     sizer->Add(btnSizer, 0, wxALIGN_RIGHT | wxALL, 10);
     
     SetSizerAndFit(sizer);
-    
+    if (auto* btn = dynamic_cast<wxButton*>(FindWindowById(wxID_OK, this))) btn->SetDefault();
     Bind(wxEVT_BUTTON, &FillMemoryDialog::OnOK, this, wxID_OK);
 }
 
@@ -63,7 +63,7 @@ CopyMemoryDialog::CopyMemoryDialog(wxWindow* parent)
     sizer->Add(btnSizer, 0, wxALIGN_RIGHT | wxALL, 10);
     
     SetSizerAndFit(sizer);
-    
+    if (auto* btn = dynamic_cast<wxButton*>(FindWindowById(wxID_OK, this))) btn->SetDefault();
     Bind(wxEVT_BUTTON, &CopyMemoryDialog::OnOK, this, wxID_OK);
 }
 void CopyMemoryDialog::OnOK(wxCommandEvent& event) {
@@ -95,6 +95,7 @@ GotoAddressDialog::GotoAddressDialog(wxWindow* parent, uint32_t currentAddr)
     sizer->Add(btnSizer, 0, wxEXPAND | wxALL, 10);
 
     SetSizerAndFit(sizer);
+    if (auto* btn = dynamic_cast<wxButton*>(FindWindowById(wxID_OK, this))) btn->SetDefault();
     Bind(wxEVT_BUTTON, &GotoAddressDialog::OnOK, this, wxID_OK);
 }
 
@@ -138,6 +139,7 @@ SearchMemoryDialog::SearchMemoryDialog(wxWindow* parent)
     sizer->Add(btnSizer, 0, wxEXPAND | wxALL, 10);
 
     SetSizerAndFit(sizer);
+    if (auto* btn = dynamic_cast<wxButton*>(FindWindowById(wxID_OK, this))) btn->SetDefault();
     Bind(wxEVT_BUTTON, &SearchMemoryDialog::OnOK, this, wxID_OK);
 }
 

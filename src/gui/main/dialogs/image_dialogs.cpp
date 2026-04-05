@@ -28,7 +28,7 @@ LoadImageDialog::LoadImageDialog(wxWindow* parent, const std::string& defaultPat
     mainSizer->Add(CreateButtonSizer(wxOK | wxCANCEL), 0, wxEXPAND | wxALL, 10);
     
     SetSizerAndFit(mainSizer);
-    
+    if (auto* btn = dynamic_cast<wxButton*>(FindWindowById(wxID_OK, this))) btn->SetDefault();
     browseBtn->Bind(wxEVT_BUTTON, &LoadImageDialog::OnBrowse, this);
     Bind(wxEVT_BUTTON, &LoadImageDialog::OnOK, this, wxID_OK);
 }

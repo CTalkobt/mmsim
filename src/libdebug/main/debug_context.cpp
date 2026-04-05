@@ -2,6 +2,7 @@
 #include "include/mmemu_plugin_api.h"
 #include "libcore/main/image_loader.h"
 #include <iostream>
+#include <cstring>
 #include <sstream>
 #include <string>
 
@@ -33,6 +34,7 @@ bool DebugContext::onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
     // On resume, skip the breakpoint at the address we just paused on (one step).
     if (entry.addr == m_resumeSkipAddr) {
         m_resumeSkipAddr = ~0u;
+        trackStack(cpu, entry);
         return true;
     }
 
@@ -41,9 +43,39 @@ bool DebugContext::onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
         m_cpu->log(SIM_LOG_INFO, m_lastHitMessage.c_str());
         m_lastPausedAddr = entry.addr;
         m_paused = true;
-        return false;
+        return false;  // instruction will NOT execute — don't update stack
     }
+
+    trackStack(cpu, entry);
     return true;
+}
+
+static uint32_t regByName(ICore* cpu, const char* name) {
+    for (int i = 0; i < cpu->regCount(); ++i) {
+        if (strcmp(cpu->regDescriptor(i)->name, name) == 0)
+            return cpu->regRead(i);
+    }
+    return 0;
+}
+
+void DebugContext::trackStack(ICore* cpu, const DisasmEntry& entry) {
+    if (entry.isCall) {
+        m_stackTrace.push(StackPushType::CALL, entry.addr, entry.targetAddr);
+        return;
+    }
+    if (entry.isReturn) {
+        m_stackTrace.pop();
+        return;
+    }
+    const std::string& mn = entry.mnemonic;
+    if      (mn == "PHA") m_stackTrace.push(StackPushType::PHA, entry.addr, regByName(cpu, "A"));
+    else if (mn == "PHX") m_stackTrace.push(StackPushType::PHX, entry.addr, regByName(cpu, "X"));
+    else if (mn == "PHY") m_stackTrace.push(StackPushType::PHY, entry.addr, regByName(cpu, "Y"));
+    else if (mn == "PHP") m_stackTrace.push(StackPushType::PHP, entry.addr, regByName(cpu, "P"));
+    else if (mn == "PHZ") m_stackTrace.push(StackPushType::PHZ, entry.addr, regByName(cpu, "Z"));
+    else if (mn == "BRK") m_stackTrace.push(StackPushType::BRK, entry.addr, 0);
+    else if (mn == "PLA" || mn == "PLX" || mn == "PLY" || mn == "PLP" || mn == "PLZ")
+        m_stackTrace.pop();
 }
 
 void DebugContext::onMemoryWrite(IBus* bus, uint32_t addr, uint8_t before, uint8_t after) {

@@ -43,7 +43,8 @@ LIBTOOLCHAIN_SRCS = src/libtoolchain/main/symbol_table.cpp src/libtoolchain/main
                     src/libtoolchain/main/toolchain_registry.cpp src/libtoolchain/main/libtoolchain.cpp
 LIBDEBUG_SRCS     = src/libdebug/main/breakpoint_list.cpp src/libdebug/main/debug_context.cpp \
                     src/libdebug/main/trace_buffer.cpp src/libdebug/main/libdebug.cpp \
-                    src/libdebug/main/expression_evaluator.cpp
+                    src/libdebug/main/expression_evaluator.cpp \
+                    src/libdebug/main/stack_trace.cpp
 LIBPLUGINS_SRCS   = src/plugin_loader/main/plugin_loader.cpp src/plugin_loader/main/logging.cpp
 
 # Plugin Sources
@@ -113,6 +114,7 @@ GUI_SRCS = src/gui/main/main.cpp \
            src/gui/main/console_pane.cpp \
            src/gui/main/cartridge_pane.cpp \
            src/gui/main/breakpoint_pane.cpp \
+           src/gui/main/stack_pane.cpp \
            src/gui/main/screen_pane.cpp \
            src/gui/main/dialogs/memory_dialogs.cpp \
            src/gui/main/dialogs/assemble_dialog.cpp \

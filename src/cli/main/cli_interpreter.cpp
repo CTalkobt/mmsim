@@ -6,6 +6,8 @@
 #include "plugin_command_registry.h"
 #include <iostream>
 #include <fstream>
+#include <iomanip>
+#include <sstream>
 
 void CliInterpreter::processLine(const std::string& line) {
     if (m_asmMode) {
@@ -267,6 +269,32 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         } else {
             m_output("Syntax: watch <read|write> <address>\n");
         }
+    } else if (cmd == "stack") {
+        if (!m_ctx.dbg) { m_output("No machine created.\n"); return; }
+        int n = 8;
+        std::string nStr;
+        if (ss >> nStr) { try { n = std::stoi(nStr); } catch (...) {} }
+        auto& st = m_ctx.dbg->stackTrace();
+        auto entries = st.recent(n);
+        if (entries.empty()) {
+            m_output("Stack: empty\n");
+        } else {
+            m_output("Stack (depth " + std::to_string(st.depth()) +
+                     ", showing " + std::to_string(entries.size()) + "):\n");
+            std::stringstream out;
+            out << std::hex << std::uppercase << std::setfill('0');
+            for (int i = 0; i < (int)entries.size(); ++i) {
+                const auto& e = entries[i];
+                out << "  " << std::dec << std::setw(3) << i << "  "
+                    << std::left << std::setw(5) << stackPushTypeName(e.type) << "  ";
+                if (e.type == StackPushType::CALL || e.type == StackPushType::BRK)
+                    out << "$" << std::hex << std::setw(4) << e.value;
+                else
+                    out << "$" << std::hex << std::setw(2) << e.value;
+                out << "  pushed by $" << std::setw(4) << e.pushedByPc << "\n";
+            }
+            m_output(out.str());
+        }
     } else if (cmd == "cart") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
         std::string path;
@@ -502,7 +530,8 @@ void CliInterpreter::printHelp() {
              "  delete <id>      - Delete breakpoint/watchpoint by id\n"
              "  enable <id>      - Enable breakpoint/watchpoint\n"
              "  disable <id>     - Disable breakpoint/watchpoint\n"
-             "  info breaks      - List all breakpoints and watchpoints\n");
+             "  info breaks      - List all breakpoints and watchpoints\n"
+             "  stack [n]        - Show stack trace (default 8 most recent entries)\n");
 
     std::vector<std::string> pluginCmds;
     PluginCommandRegistry::instance().listCommands(pluginCmds);
