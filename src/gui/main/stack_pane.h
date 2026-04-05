@@ -12,7 +12,6 @@ public:
     void RefreshValues();
 
 private:
-    void OnClear(wxCommandEvent&);
     void OnItemActivated(wxListEvent& event);
 
     DebugContext* m_dbg = nullptr;

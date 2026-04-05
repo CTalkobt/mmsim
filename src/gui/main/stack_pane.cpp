@@ -16,16 +16,11 @@ StackPane::StackPane(wxWindow* parent)
     m_list->InsertColumn(3, "Pushed By",  wxLIST_FORMAT_LEFT,  80);
     sizer->Add(m_list, 1, wxEXPAND | wxALL, 4);
 
-    auto* bottom = new wxBoxSizer(wxHORIZONTAL);
     m_depthLabel = new wxStaticText(this, wxID_ANY, "Depth: 0");
-    auto* btnClear = new wxButton(this, wxID_ANY, "Clear");
-    bottom->Add(m_depthLabel, 1, wxALIGN_CENTER_VERTICAL | wxLEFT, 4);
-    bottom->Add(btnClear, 0, wxRIGHT | wxBOTTOM, 4);
-    sizer->Add(bottom, 0, wxEXPAND);
+    sizer->Add(m_depthLabel, 0, wxLEFT | wxBOTTOM, 4);
 
     SetSizer(sizer);
 
-    btnClear->Bind(wxEVT_BUTTON, &StackPane::OnClear, this);
     m_list->Bind(wxEVT_LIST_ITEM_ACTIVATED, &StackPane::OnItemActivated, this);
 }
 
@@ -64,11 +59,6 @@ void StackPane::RefreshValues() {
     }
 
     m_depthLabel->SetLabel(wxString::Format("Depth: %d", st.depth()));
-}
-
-void StackPane::OnClear(wxCommandEvent&) {
-    if (m_dbg) m_dbg->stackTrace().clear();
-    RefreshValues();
 }
 
 void StackPane::OnItemActivated(wxListEvent& event) {

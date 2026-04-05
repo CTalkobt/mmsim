@@ -17,6 +17,7 @@ struct DisasmEntry {
     bool     isCall;
     bool     isReturn;
     bool     isBranch;
+    bool     isIllegal;  // opcode is unofficial/undocumented
     uint32_t targetAddr;
 };
 

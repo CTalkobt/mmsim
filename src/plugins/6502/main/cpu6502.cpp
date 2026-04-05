@@ -194,9 +194,24 @@ int MOS6502::disassembleEntry(IBus* bus, uint32_t addr, void* entryOut) {
     }
     entry->complete = buf;
 
-    entry->isCall = (op == 0x20); // JSR
+    entry->isCall   = (op == 0x20); // JSR
     entry->isReturn = (op == 0x60 || op == 0x40); // RTS or RTI
     entry->isBranch = (info.mode == Mode::REL);
+
+    // Mark unofficial/illegal opcodes.  All handlers that exist exclusively
+    // for undocumented opcodes are listed here.  opNOP and opSBC each serve
+    // one official opcode ($EA and $E9 respectively), so we special-case them.
+    auto fn = info.fn;
+    entry->isIllegal =
+        fn == &MOS6502::opKIL || fn == &MOS6502::opSLO || fn == &MOS6502::opRLA ||
+        fn == &MOS6502::opSRE || fn == &MOS6502::opRRA || fn == &MOS6502::opSAX ||
+        fn == &MOS6502::opLAX || fn == &MOS6502::opDCP || fn == &MOS6502::opISC ||
+        fn == &MOS6502::opANC || fn == &MOS6502::opALR || fn == &MOS6502::opARR ||
+        fn == &MOS6502::opXAA || fn == &MOS6502::opAHX || fn == &MOS6502::opTAS ||
+        fn == &MOS6502::opSHY || fn == &MOS6502::opSHX || fn == &MOS6502::opLAS ||
+        fn == &MOS6502::opAXS ||
+        (fn == &MOS6502::opNOP && op != 0xEA) ||   // $EA is the only official NOP
+        (fn == &MOS6502::opSBC && op == 0xEB);      // $EB is the unofficial SBC
     
     if (entry->isCall || entry->isBranch || op == 0x4C || op == 0x6C) {
         // Calculate targetAddr
