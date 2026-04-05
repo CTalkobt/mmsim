@@ -218,7 +218,7 @@ PLUGIN_PIA6520_OBJS  = $(PLUGIN_PIA6520_SRCS:.cpp=.o)
 PLUGIN_CBMLOADER_OBJS = $(PLUGIN_CBMLOADER_SRCS:.cpp=.o)
 PLUGIN_CRTC6545_OBJS = $(PLUGIN_CRTC6545_SRCS:.cpp=.o)
 PLUGIN_PETVIDEO_OBJS = $(PLUGIN_PETVIDEO_SRCS:.cpp=.o)
-PLUGIN_PET_OBJS      = $(PLUGIN_PET_SRCS) \
+PLUGIN_PET_OBJS      = $(PLUGIN_PET_SRCS:.cpp=.o) \
                        src/plugins/devices/pia6520/main/pia6520.o \
                        src/plugins/devices/via6522/main/via6522.o \
                        src/plugins/devices/crtc6545/main/crtc6545.o \
