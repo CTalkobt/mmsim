@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0-dev] - 2026-04-07
+
+### Added
+- **MemoryPane Enhancements**:
+    - Added a context menu to `MemoryPane` for quick access to Fill, Copy, Swap, Go to Address, and Search Memory.
+    - Implemented **Swap Memory** functionality (`ID_SWAP_MEM`) with a new `SwapMemoryDialog`.
+    - Integrated Fill, Copy, and Swap operations into `MmemuFrame` and `MemoryPane`.
+    - Added error handling (try-catch) to `CopyMemoryDialog` and `SwapMemoryDialog` for robust hex input validation.
+
 ## [0.2.0-dev] - 2026-04-05
 
 ### Added

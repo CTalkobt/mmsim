@@ -112,6 +112,7 @@ private:
     void OnReset(wxCommandEvent& event);
     void OnFillMem(wxCommandEvent& event);
     void OnCopyMem(wxCommandEvent& event);
+    void OnSwapMem(wxCommandEvent& event);
     void OnAssemble(wxCommandEvent& event);
     void OnGotoAddr(wxCommandEvent& event);
     void OnSearchMem(wxCommandEvent& event);
@@ -415,6 +416,7 @@ MmemuFrame::MmemuFrame()
     menuDebug->AppendSeparator();
     menuDebug->Append(ID_FILL_MEM, "Fill Memory...");
     menuDebug->Append(ID_COPY_MEM, "Copy Memory...");
+    menuDebug->Append(ID_SWAP_MEM, "Swap Memory...");
     menuDebug->AppendSeparator();
     menuDebug->Append(ID_SHOW_BP_PANE,    "Breakpoints\tCtrl-B");
     menuDebug->Append(ID_SHOW_STACK_PANE, "Stack Trace\tCtrl-T");
@@ -491,6 +493,7 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_MENU, &MmemuFrame::OnReset, this, ID_RESET);
     Bind(wxEVT_MENU, &MmemuFrame::OnFillMem, this, ID_FILL_MEM);
     Bind(wxEVT_MENU, &MmemuFrame::OnCopyMem, this, ID_COPY_MEM);
+    Bind(wxEVT_MENU, &MmemuFrame::OnSwapMem, this, ID_SWAP_MEM);
     Bind(wxEVT_MENU, &MmemuFrame::OnAssemble, this, ID_ASSEMBLE);
     Bind(wxEVT_MENU, &MmemuFrame::OnGotoAddr, this, ID_GOTO_ADDR);
     Bind(wxEVT_TOOL, &MmemuFrame::OnGotoAddr, this, ID_GOTO_ADDR);
@@ -644,6 +647,24 @@ void MmemuFrame::OnCopyMem(wxCommandEvent& event) {
         std::vector<uint8_t> tmp(len);
         for (uint32_t i = 0; i < len; ++i) tmp[i] = m_bus->read8(src + i);
         for (uint32_t i = 0; i < len; ++i) m_bus->write8(dst + i, tmp[i]);
+        m_memPane->RefreshValues();
+    }
+}
+
+void MmemuFrame::OnSwapMem(wxCommandEvent& event) {
+    (void)event;
+    if (!m_bus) return;
+    SwapMemoryDialog dialog(this);
+    if (dialog.ShowModal() == wxID_OK) {
+        uint32_t addr1 = dialog.GetAddress1();
+        uint32_t len = dialog.GetLength();
+        uint32_t addr2 = dialog.GetAddress2();
+        for (uint32_t i = 0; i < len; ++i) {
+            uint8_t v1 = m_bus->read8(addr1 + i);
+            uint8_t v2 = m_bus->read8(addr2 + i);
+            m_bus->write8(addr1 + i, v2);
+            m_bus->write8(addr2 + i, v1);
+        }
         m_memPane->RefreshValues();
     }
 }

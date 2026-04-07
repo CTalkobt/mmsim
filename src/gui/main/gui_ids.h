@@ -9,6 +9,7 @@ enum {
     ID_RESET,
     ID_FILL_MEM,
     ID_COPY_MEM,
+    ID_SWAP_MEM,
     ID_ASSEMBLE,
     ID_GOTO_ADDR,
     ID_SEARCH_MEM,

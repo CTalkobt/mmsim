@@ -36,6 +36,22 @@ private:
     uint32_t m_srcAddr = 0, m_length = 0, m_dstAddr = 0;
 };
 
+class SwapMemoryDialog : public wxDialog {
+public:
+    SwapMemoryDialog(wxWindow* parent);
+    uint32_t GetAddress1() const { return m_addr1; }
+    uint32_t GetLength() const { return m_length; }
+    uint32_t GetAddress2() const { return m_addr2; }
+
+private:
+    void OnOK(wxCommandEvent& event);
+    
+    wxTextCtrl* m_addr1Ctrl;
+    wxTextCtrl* m_lenCtrl;
+    wxTextCtrl* m_addr2Ctrl;
+    uint32_t m_addr1 = 0, m_length = 0, m_addr2 = 0;
+};
+
 class GotoAddressDialog : public wxDialog {
 public:
     GotoAddressDialog(wxWindow* parent, uint32_t currentAddr = 0);

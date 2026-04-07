@@ -1,4 +1,5 @@
 #include "memory_pane.h"
+#include "gui_ids.h"
 #include <wx/dcbuffer.h>
 #include <iomanip>
 #include <sstream>
@@ -16,6 +17,7 @@ MemoryPane::MemoryPane(wxWindow* parent)
     SetBackgroundStyle(wxBG_STYLE_PAINT);
     Bind(wxEVT_PAINT, &MemoryPane::OnPaint, this);
     Bind(wxEVT_SIZE, &MemoryPane::OnSize, this);
+    Bind(wxEVT_CONTEXT_MENU, &MemoryPane::OnContextMenu, this);
     
     auto scrollHandler = [this](wxScrollWinEvent& event) {
         Refresh();
@@ -63,6 +65,19 @@ void MemoryPane::OnSize(wxSizeEvent& event) {
     }
     Refresh();
     event.Skip();
+}
+
+void MemoryPane::OnContextMenu(wxContextMenuEvent& event) {
+    wxMenu menu;
+    menu.Append(ID_GOTO_ADDR, "Go to Address...");
+    menu.AppendSeparator();
+    menu.Append(ID_FILL_MEM, "Fill Memory...");
+    menu.Append(ID_COPY_MEM, "Copy Memory...");
+    menu.Append(ID_SWAP_MEM, "Swap Memory...");
+    menu.AppendSeparator();
+    menu.Append(ID_SEARCH_MEM, "Search Memory...");
+    
+    PopupMenu(&menu);
 }
 
 void MemoryPane::OnPaint(wxPaintEvent& event) {

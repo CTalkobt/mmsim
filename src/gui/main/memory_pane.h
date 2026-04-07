@@ -13,6 +13,7 @@ private:
     void OnScroll(wxScrollWinEvent& event);
     void OnPaint(wxPaintEvent& event);
     void OnSize(wxSizeEvent& event);
+    void OnContextMenu(wxContextMenuEvent& event);
 
     IBus* m_bus = nullptr;
     uint32_t m_baseAddr = 0;

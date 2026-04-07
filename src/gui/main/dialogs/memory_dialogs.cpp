@@ -68,10 +68,56 @@ CopyMemoryDialog::CopyMemoryDialog(wxWindow* parent)
 }
 void CopyMemoryDialog::OnOK(wxCommandEvent& event) {
     (void)event;
-    m_srcAddr = std::stoul(m_srcAddrCtrl->GetValue().ToStdString(), nullptr, 16);
-    m_length = std::stoul(m_lenCtrl->GetValue().ToStdString(), nullptr, 16);
-    m_dstAddr = std::stoul(m_dstAddrCtrl->GetValue().ToStdString(), nullptr, 16);
-    EndModal(wxID_OK);
+    try {
+        m_srcAddr = std::stoul(m_srcAddrCtrl->GetValue().ToStdString(), nullptr, 16);
+        m_length = std::stoul(m_lenCtrl->GetValue().ToStdString(), nullptr, 16);
+        m_dstAddr = std::stoul(m_dstAddrCtrl->GetValue().ToStdString(), nullptr, 16);
+        EndModal(wxID_OK);
+    } catch (...) {
+        wxMessageBox("Invalid hex input!", "Error", wxOK | wxICON_ERROR);
+    }
+}
+
+// --- SwapMemoryDialog ---
+
+SwapMemoryDialog::SwapMemoryDialog(wxWindow* parent)
+    : wxDialog(parent, wxID_ANY, "Swap Memory", wxDefaultPosition, wxDefaultSize)
+{
+    auto* sizer = new wxBoxSizer(wxVERTICAL);
+    auto* flexSizer = new wxFlexGridSizer(3, 2, 10, 10);
+    
+    flexSizer->Add(new wxStaticText(this, wxID_ANY, "Address 1 (hex):"));
+    m_addr1Ctrl = new wxTextCtrl(this, wxID_ANY, "0000");
+    flexSizer->Add(m_addr1Ctrl, 1, wxEXPAND);
+    
+    flexSizer->Add(new wxStaticText(this, wxID_ANY, "Length (hex):"));
+    m_lenCtrl = new wxTextCtrl(this, wxID_ANY, "100");
+    flexSizer->Add(m_lenCtrl, 1, wxEXPAND);
+    
+    flexSizer->Add(new wxStaticText(this, wxID_ANY, "Address 2 (hex):"));
+    m_addr2Ctrl = new wxTextCtrl(this, wxID_ANY, "0000");
+    flexSizer->Add(m_addr2Ctrl, 1, wxEXPAND);
+    
+    sizer->Add(flexSizer, 1, wxEXPAND | wxALL, 15);
+    
+    auto* btnSizer = CreateButtonSizer(wxOK | wxCANCEL);
+    sizer->Add(btnSizer, 0, wxALIGN_RIGHT | wxALL, 10);
+    
+    SetSizerAndFit(sizer);
+    if (auto* btn = dynamic_cast<wxButton*>(FindWindowById(wxID_OK, this))) btn->SetDefault();
+    Bind(wxEVT_BUTTON, &SwapMemoryDialog::OnOK, this, wxID_OK);
+}
+
+void SwapMemoryDialog::OnOK(wxCommandEvent& event) {
+    (void)event;
+    try {
+        m_addr1 = std::stoul(m_addr1Ctrl->GetValue().ToStdString(), nullptr, 16);
+        m_length = std::stoul(m_lenCtrl->GetValue().ToStdString(), nullptr, 16);
+        m_addr2 = std::stoul(m_addr2Ctrl->GetValue().ToStdString(), nullptr, 16);
+        EndModal(wxID_OK);
+    } catch (...) {
+        wxMessageBox("Invalid hex input!", "Error", wxOK | wxICON_ERROR);
+    }
 }
 
 // --- GotoAddressDialog ---
