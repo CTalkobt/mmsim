@@ -9,17 +9,19 @@ MemoryPane::MemoryPane(wxWindow* parent)
 {
     m_fixedFont = wxFont(10, wxFONTFAMILY_TELETYPE, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL);
     
-    wxClientDC dc(this);
-    dc.SetFont(m_fixedFont);
-    m_lineHeight = dc.GetCharHeight();
-    m_charWidth = dc.GetCharWidth();
+    UpdateMetrics();
     
     SetBackgroundStyle(wxBG_STYLE_PAINT);
     Bind(wxEVT_PAINT, &MemoryPane::OnPaint, this);
     Bind(wxEVT_SIZE, &MemoryPane::OnSize, this);
     Bind(wxEVT_CONTEXT_MENU, &MemoryPane::OnContextMenu, this);
+    Bind(wxEVT_LEFT_DOWN, &MemoryPane::OnMouseLeftDown, this);
     
     auto scrollHandler = [this](wxScrollWinEvent& event) {
+        if (m_editor) {
+            m_editor->Destroy();
+            m_editor = nullptr;
+        }
         Refresh();
         event.Skip();
     };
@@ -47,13 +49,30 @@ void MemoryPane::RefreshValues() {
     Refresh();
 }
 
+void MemoryPane::UpdateMetrics() {
+    wxClientDC dc(this);
+    dc.SetFont(m_fixedFont);
+    m_lineHeight = dc.GetCharHeight();
+    m_charWidth = dc.GetCharWidth();
+    if (m_lineHeight < 1) m_lineHeight = 1;
+    if (m_charWidth < 1) m_charWidth = 1;
+}
+
 void MemoryPane::SetAddress(uint32_t addr) {
+    if (m_editor) {
+        m_editor->Destroy();
+        m_editor = nullptr;
+    }
     int line = addr / 16;
     SetScrollPos(wxVERTICAL, line);
     Refresh();
 }
 
 void MemoryPane::OnScroll(wxScrollWinEvent& event) {
+    if (m_editor) {
+        m_editor->Destroy();
+        m_editor = nullptr;
+    }
     Refresh();
     event.Skip();
 }
@@ -80,12 +99,153 @@ void MemoryPane::OnContextMenu(wxContextMenuEvent& event) {
     PopupMenu(&menu);
 }
 
+void MemoryPane::OnMouseLeftDown(wxMouseEvent& event) {
+    auto logger = LogRegistry::instance().getLogger("gui");
+    if (m_editor) {
+        logger->debug("MemoryPane: Destroying existing editor in OnMouseLeftDown");
+        m_editor->Destroy();
+        m_editor = nullptr;
+    }
+
+    if (!m_bus) {
+        logger->debug("MemoryPane::OnMouseLeftDown: No bus attached.");
+        return;
+    }
+
+    UpdateMetrics();
+
+    uint32_t mask = m_bus->config().addrMask;
+    int addrWidth = (mask > 0xFFFF ? 8 : 4);
+    int prefixChars = addrWidth + 2; // "HHHH: " or "HHHHHHHH: "
+
+    int x = event.GetX() - 5;
+    int y = event.GetY();
+
+    int line = y / m_lineHeight;
+    int col = x / m_charWidth;
+
+    int scrollPos = GetScrollPos(wxVERTICAL);
+    uint32_t lineAddr = (scrollPos + line) * 16;
+    
+    logger->debug("MemoryPane click: x={}, y={}, col={}, line={}, prefix={}, scrollPos={}, lineAddr={:04X}", 
+        x, y, col, line, prefixChars, scrollPos, lineAddr);
+
+    if (lineAddr > mask) {
+        logger->debug("MemoryPane: click beyond mask ({:04X} > {:04X})", lineAddr, mask);
+        return;
+    }
+
+    int hexCol = col - prefixChars;
+    logger->debug("MemoryPane: hexCol={}", hexCol);
+
+    if (hexCol >= 0 && hexCol < 47) { // 16 * 3 - 1
+        int cellIdx = hexCol / 3;
+        int cellOff = hexCol % 3;
+        logger->debug("MemoryPane: cellIdx={}, cellOff={}", cellIdx, cellOff);
+        if (cellOff < 2) {
+            uint32_t editAddr = (lineAddr + cellIdx) & mask;
+            CallAfter([this, editAddr]() { OpenEditorAt(editAddr); });
+        }
+    }
+}
+
+void MemoryPane::OpenEditorAt(uint32_t addr) {
+    auto logger = LogRegistry::instance().getLogger("gui");
+    if (!m_bus) return;
+
+    uint32_t mask = m_bus->config().addrMask;
+    addr &= mask;
+
+    UpdateMetrics();
+    int addrWidth = (mask > 0xFFFF ? 8 : 4);
+    int prefixChars = addrWidth + 2;
+
+    int scrollPos = GetScrollPos(wxVERTICAL);
+    int visibleLines = GetClientSize().y / m_lineHeight;
+    int absLine = (int)(addr / 16);
+
+    // Scroll into view if the target line is off-screen.
+    if (absLine < scrollPos || absLine >= scrollPos + visibleLines) {
+        scrollPos = absLine;
+        SetScrollPos(wxVERTICAL, scrollPos);
+        Refresh();
+    }
+
+    int line = absLine - scrollPos;
+    int cellIdx = (int)(addr % 16);
+    int cellX = 5 + (prefixChars + cellIdx * 3) * m_charWidth;
+    int cellY = line * m_lineHeight;
+
+    if (m_editor) {
+        m_editor->Destroy();
+        m_editor = nullptr;
+    }
+
+    m_editAddr = addr;
+    logger->debug("MemoryPane: Creating editor at {:04X} (x={}, y={})", m_editAddr, cellX, cellY);
+
+    m_editor = new wxTextCtrl(this, wxID_ANY,
+        wxString::Format("%02X", m_bus->peek8(m_editAddr)),
+        wxPoint(cellX - 2, cellY),
+        wxSize(m_charWidth * 3 + 4, m_lineHeight + 4),
+        wxTE_PROCESS_ENTER);
+
+    m_editor->SetMaxLength(2);
+    m_editor->SetFont(m_fixedFont);
+    m_editor->SetBackgroundColour(*wxRED);
+    m_editor->SetForegroundColour(*wxWHITE);
+    m_editor->SetSelection(-1, -1);
+    m_editor->SetFocus();
+    m_editor->Bind(wxEVT_KEY_DOWN, &MemoryPane::OnEditorKeyDown, this);
+}
+
+void MemoryPane::OnEditorKeyDown(wxKeyEvent& event) {
+    auto logger = LogRegistry::instance().getLogger("gui");
+    if (event.GetKeyCode() == WXK_RETURN) {
+        wxString valStr = m_editor->GetValue();
+        uint32_t nextAddr = (m_editAddr + 1) & m_bus->config().addrMask;
+        try {
+            uint8_t val = (uint8_t)std::stoul(valStr.ToStdString(), nullptr, 16);
+            m_bus->write8(m_editAddr, val);
+            logger->debug("MemoryPane: Committed {:02X} to {:04X}", val, m_editAddr);
+            Refresh();
+        } catch (...) {
+            logger->debug("MemoryPane: Invalid hex input '{}'", valStr.ToStdString());
+        }
+        m_editor->Destroy();
+        m_editor = nullptr;
+        CallAfter([this, nextAddr]() { OpenEditorAt(nextAddr); });
+    } else if (event.GetKeyCode() == WXK_ESCAPE) {
+        logger->debug("MemoryPane: Editor cancelled via Escape");
+        m_editor->Destroy();
+        m_editor = nullptr;
+    } else {
+        event.Skip();
+    }
+}
+
+void MemoryPane::OnEditorKillFocus(wxFocusEvent& event) {
+    auto logger = LogRegistry::instance().getLogger("gui");
+    if (m_editor) {
+        logger->debug("MemoryPane: Editor destroyed due to KillFocus");
+        m_editor->Destroy();
+        m_editor = nullptr;
+    }
+}
+
 void MemoryPane::OnPaint(wxPaintEvent& event) {
+    auto logger = LogRegistry::instance().getLogger("gui");
     wxAutoBufferedPaintDC dc(this);
     dc.Clear();
-    dc.SetFont(m_fixedFont);
     
+    if (m_editor) {
+        logger->debug("MemoryPane::OnPaint: Editor exists at pos ({}, {})", m_editor->GetPosition().x, m_editor->GetPosition().y);
+    }
+
     if (!m_bus) return;
+    
+    UpdateMetrics();
+    dc.SetFont(m_fixedFont);
     
     uint32_t mask = m_bus->config().addrMask;
     int scrollPos = GetScrollPos(wxVERTICAL);
@@ -94,6 +254,7 @@ void MemoryPane::OnPaint(wxPaintEvent& event) {
     for (int i = 0; i < visibleLines; ++i) {
         uint32_t lineAddr = (scrollPos + i) * 16;
         if (lineAddr > mask) break;
+        lineAddr &= mask;
         
         std::stringstream ss;
         ss << std::hex << std::uppercase << std::setfill('0') << std::setw(mask > 0xFFFF ? 8 : 4) << lineAddr << ": ";

@@ -108,7 +108,7 @@ TEST_CASE(C64BootScreenContent) {
     // --------------------------------------------------------------------
     // Verify pixels are drawn on screen
     // --------------------------------------------------------------------
-    vic2->exportPng("c64_boot_screen.png"); // Save a screenshot
+    //vic2->exportPng("c64_boot_screen.png"); // Save a screenshot
 
     // Get the frame buffer
     auto dims = vic2->getDimensions();

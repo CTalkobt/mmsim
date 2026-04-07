@@ -95,44 +95,121 @@ The `mmemu-mcp` binary implements the **Model Context Protocol**, allowing AI ag
 
 ---
 
-## 6. GUI Target (Implemented)
+## 6. GUI Target (mmemu-gui)
 
-The `mmemu-gui` binary provides a professional, multi-pane graphical debugging environment.
-
-### Integrated Panes:
-- **Register Pane**: Live view of all CPU registers with automatic change highlighting.
-- **Memory Pane**: High-performance scrollable hex/ASCII dump with side-effect-free reads.
-- **Disassembly Pane**: Real-time disassembly centered on the current program counter.
-- **Console Pane**: Integrated CLI environment with 100% parity with the standalone CLI target.
-
-### Advanced Features:
-- **Asynchronous Refresh**: UI updates at 30-60 Hz for a smooth experience.
-- **Interactive Dialogs**: Easy machine selection, memory filling, and instruction assembly.
-- **Shared Engine**: All core logic is shared between CLI and GUI targets for consistent behavior.
+The `mmemu-gui` binary provides a professional, multi-pane graphical debugging environment built on wxWidgets. The layout consists of a left column (Disassembly + Memory, and a bottom Console), a center notebook, and a right-side Register pane.
 
 ---
 
-## 7. Implementation Roadmap
+### 6.1 Toolbar
 
-- **Phase 10 (Complete)**: VIC-20 machine integration — VIA 6522, VIC-I 6560, keyboard matrix.
-- **Phase 11 (Complete)**: C64 machine implementation — MOS 6510, C64 PLA, CIA 6526, VIC-II, SID 6581.
-- **Phase 12 (Complete)**: PET/CBM machine implementation — MOS 6520 PIA, 6545 CRTC, IEEE-488.
-- **Phase 13 (Partially Completed)**: Runtime Image and Cartridge Loading (`.prg`, `.crt`, `.bin`). CBM formats fully supported; Atari formats in progress.
-- **Phase 26 (Partially Completed)**: Atari 8-bit Family (400/800/XL/XE) — ANTIC, GTIA, and POKEY core logic implemented.
+| Button | Shortcut | Action |
+|---|---|---|
+| Machine | Ctrl+L | Open the machine selector dialog |
+| Step | F11 | Execute one CPU instruction |
+| Run | F5 | Start continuous execution |
+| Pause | F6 | Halt continuous execution |
+| Go to | Ctrl+G | Jump the memory/disasm view to an address |
+| Keyboard Focus | Ctrl+Shift+K | Toggle keyboard capture for the emulated machine |
 
 ---
 
-## 8. Plugin Ecosystem
+### 6.2 Menus
+
+#### File
+| Item | Shortcut | Description |
+|---|---|---|
+| Load Machine… | Ctrl+L | Select and instantiate a machine preset |
+| Exit | | Quit the application |
+
+#### Control
+| Item | Shortcut | Description |
+|---|---|---|
+| Step | F11 | Execute one CPU instruction |
+| Run | F5 | Start continuous execution at ~1 MHz |
+| Pause | F6 | Stop continuous execution |
+| Reset | Ctrl+R | Invoke the machine's reset handler |
+| Load Image… | Ctrl+I | Load a `.prg` or `.bin` file into memory |
+| Attach Cartridge… | | Attach a `.crt` or `.car` cartridge image |
+| Eject Cartridge | | Detach the currently-inserted cartridge and reset |
+
+#### Debug
+| Item | Shortcut | Description |
+|---|---|---|
+| Assemble… | Ctrl+A | Assemble a single instruction at a given address |
+| Go to Address… | Ctrl+G | Navigate memory/disasm views to an address; optionally set PC |
+| Search Memory… | Ctrl+F | Search memory for a hex or ASCII pattern |
+| Find Next | F3 | Jump to the next occurrence of the last search pattern |
+| Find Prior | Shift+F3 | Jump to the previous occurrence |
+| Fill Memory… | | Fill a memory range with a single byte value |
+| Copy Memory… | | Copy a block of memory from one address to another |
+| Swap Memory… | | Swap two equal-length memory blocks |
+| Breakpoints | Ctrl+B | Show the Breakpoints notebook tab |
+| Stack Trace | Ctrl+T | Show the Stack Trace notebook tab |
+| Machine Explorer | Ctrl+M | Show the Machine Explorer notebook tab |
+
+---
+
+### 6.3 Panes
+
+#### Disassembly Pane
+Displays real-time disassembly of the memory visible around the current program counter. The current PC is highlighted. Automatically follows the PC during single-step or on every refresh tick while running. Uses the machine's registered disassembler for accurate ISA decoding.
+
+#### Memory Pane
+A scrollable hex and ASCII dump of the machine's address bus.
+
+- **Navigation**: Use the vertical scroll bar or **Go to Address** (Ctrl+G / Debug menu) to jump to any address.
+- **In-place editing**: Click any hex byte to open an editor cell (red highlight). Type up to two hex digits and press **Enter** to commit and advance to the next byte, or **Escape** to cancel without writing. Clicking another cell while an editor is open commits nothing and opens a new editor at the clicked position.
+- **Context menu** (right-click):
+  - **Go to Address…** — navigate the pane to a specific address.
+  - **Fill Memory…** — fill a range with a constant byte.
+  - **Copy Memory…** — copy a block to another address.
+  - **Swap Memory…** — swap two equal-length blocks.
+  - **Search Memory…** — search for a hex or ASCII pattern.
+
+#### Console Pane
+An embedded interactive REPL with full parity with the `mmemu-cli` standalone binary. Accepts all CLI commands (`step`, `regs`, `m`, `f`, `copy`, `load`, `asm`, etc.) directly in the GUI. Output is displayed in a scrollable text area above the input field.
+
+#### Register Pane
+Displays all CPU registers for the currently-loaded machine. Registers that changed since the last refresh are highlighted. Updates automatically at ~30 Hz while running and after each manual step.
+
+#### Screen Pane (plugin-provided)
+Visible when a machine with a video output device is loaded (e.g., VIC-20, C64). Renders the video frame produced by the VIC-I or VIC-II chip at ~30 Hz. Contains a **Capture Keyboard** button to toggle keyboard routing to the emulated machine (equivalent to Ctrl+Shift+K).
+
+---
+
+### 6.4 Notebook Tabs
+
+#### Machine
+Shows the full machine descriptor: CPU slots, bus slots, and IO device registry. Useful for verifying the hardware composition of the loaded machine preset.
+
+#### Cartridge
+Displays metadata for the currently-attached cartridge image (type, bank layout, ROM regions). Empty when no cartridge is attached.
+
+#### Breakpoints
+Lists all active breakpoints and watchpoints. Breakpoints can be added, removed, enabled, or disabled. Supports address breakpoints and memory watchpoints. When a breakpoint is hit during Run, execution pauses and the pane is automatically brought into focus.
+
+#### Stack
+Displays the call stack trace based on JSR/RTS tracking. Each frame shows the return address. Double-clicking a frame navigates the disassembly pane to that address.
+
+---
+
+### 6.5 Drag and Drop
+Program images (`.prg`, `.bin`) and cartridge files (`.crt`, `.car`) can be dragged and dropped onto the main window. Program images open the Load Image dialog pre-filled with the dropped path. Cartridge files open the Attach Cartridge flow directly.
+
+---
+
+## 7. Plugin Ecosystem
 
 **mmsim** utilizes a modular plugin architecture. For a complete list of available processors, devices, and machine presets, see the **[Plugin Index (doc/README-PLUGINS.md)](doc/README-PLUGINS.md)**.
 
-### 8.1 Machine Types
+### 7.1 Machine Types
 - [Machine Descriptor JSON Format (machines/README-machines.md)](machines/README-machines.md)
 - [VIC-20 Machine Implementation](doc/README-VIC20.md)
 - [C64 Machine Implementation](doc/README-C64.md)
 - [PET Machine Implementation](doc/README-PET.md)
 
-### 8.2 Video
+### 7.2 Video
 - [6560 VIC-I (Video/Sound)](doc/README-6560.md)
 - [6567/6569 VIC-II](doc/README-VIC2.md)
 - [6545 CRTC](doc/README-6545.md)
@@ -140,15 +217,15 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 - [ANTIC Video Subsystem](doc/README-ANTIC.md)
 - [GTIA Color/PMG Subsystem](doc/README-GTIA.md)
 
-### 8.3 Sound
+### 7.3 Sound
 - [6581 SID Implementation](doc/README-SID.md)
 - [POKEY Audio/IO Implementation](doc/README-POKEY.md)
 
-### 8.4 Processors
+### 7.4 Processors
 - [6502/6510 Implementation](doc/README-6502.md)
 - [6510 I/O Port & Banking](doc/README-6510.md)
 
-### 8.5 I/O & Peripherals
+### 7.5 I/O & Peripherals
 - [6520 PIA Implementation](doc/README-6520.md)
 - [6522 VIA Implementation](doc/README-6522.md)
 - [6526 CIA Implementation](doc/README-6526.md)
@@ -158,7 +235,7 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 
 ---
 
-## 9. Getting Started
+## 8. Getting Started
 
 ### Prerequisites
 
@@ -204,6 +281,6 @@ After building, the binaries are located in the `bin/` directory, and plugins in
 
 ---
 
-## 10. Development Standards
+## 9. Development Standards
 - Adhere to the conventions in [STYLEGUIDE.md](STYLEGUIDE.md).
 - Track all significant updates in [CHANGELOG.md](CHANGELOG.md).

@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
     - Implemented **Swap Memory** functionality (`ID_SWAP_MEM`) with a new `SwapMemoryDialog`.
     - Integrated Fill, Copy, and Swap operations into `MmemuFrame` and `MemoryPane`.
     - Added error handling (try-catch) to `CopyMemoryDialog` and `SwapMemoryDialog` for robust hex input validation.
+    - Implemented **in-place editing** of memory cells by clicking on a hex value. Pressing **Return** commits the change, while **Escape** or losing focus cancels it.
 
 ## [0.2.0-dev] - 2026-04-05
 
