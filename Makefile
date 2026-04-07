@@ -125,6 +125,7 @@ GUI_SRCS = src/gui/main/main.cpp \
 	src/gui/main/cartridge_pane.cpp \
 	src/gui/main/breakpoint_pane.cpp \
 	src/gui/main/stack_pane.cpp \
+	src/gui/main/machine_inspector_pane.cpp \
 	src/gui/main/screen_pane.cpp \
 	src/gui/main/dialogs/memory_dialogs.cpp \
 	src/gui/main/dialogs/assemble_dialog.cpp \

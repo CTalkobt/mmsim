@@ -3,6 +3,7 @@
 #include "icore.h"
 #include "libmem/main/ibus.h"
 #include "libdevices/main/io_registry.h"
+#include <nlohmann/json.hpp>
 #include <vector>
 #include <string>
 #include <functional>
@@ -63,6 +64,9 @@ struct MachineDescriptor {
     std::vector<BusSlot> buses;
 
     IORegistry* ioRegistry = nullptr;
+
+    // Original JSON spec used to build this machine
+    nlohmann::json sourceSpec;
 
     // Generic deleters for objects not owned by Registry or Vectors
     std::vector<std::function<void()>> deleters;

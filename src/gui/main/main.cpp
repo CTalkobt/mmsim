@@ -11,6 +11,7 @@
 #include "cartridge_pane.h"
 #include "breakpoint_pane.h"
 #include "stack_pane.h"
+#include "machine_inspector_pane.h"
 #include "libdebug/main/debug_context.h"
 #include "dialogs/memory_dialogs.h"
 #include "dialogs/assemble_dialog.h"
@@ -120,10 +121,12 @@ private:
     void OnKbdFocus(wxCommandEvent& event);
     void OnShowBpPane(wxCommandEvent& event);
     void OnShowStackPane(wxCommandEvent& event);
+    void OnShowMachinePane(wxCommandEvent& event);
     void OnTimer(wxTimerEvent& event);
     void OnCtrlShiftK(wxKeyEvent& event);
     void ShowBreakpointPane();
     void ShowStackPane();
+    void ShowMachineInspectorPane();
 
     MachineDescriptor* m_machine = nullptr;
     ICore* m_cpu = nullptr;
@@ -139,6 +142,7 @@ private:
     CartridgePane*  m_cartPane;
     BreakpointPane* m_bpPane    = nullptr;
     StackPane*      m_stackPane = nullptr;
+    MachineInspectorPane* m_machineInspectorPane = nullptr;
     wxAuiNotebook*  m_notebook  = nullptr;
 
     wxTimer m_timer;
@@ -406,6 +410,7 @@ MmemuFrame::MmemuFrame()
     menuDebug->AppendSeparator();
     menuDebug->Append(ID_SHOW_BP_PANE,    "Breakpoints\tCtrl-B");
     menuDebug->Append(ID_SHOW_STACK_PANE, "Stack Trace\tCtrl-T");
+    menuDebug->Append(ID_SHOW_MACHINE_PANE, "Machine Explorer\tCtrl-M");
     
     auto* menuBar = new wxMenuBar;
     menuBar->Append(menuFile, "&File");
@@ -443,6 +448,8 @@ MmemuFrame::MmemuFrame()
     notebookSplitter->SplitHorizontally(m_disasmPane, m_memPane, 300);
     
     m_notebook = new wxAuiNotebook(centerSplitter, wxID_ANY);
+    m_machineInspectorPane = new MachineInspectorPane(m_notebook);
+    m_notebook->AddPage(m_machineInspectorPane, "Machine");
     m_cartPane = new CartridgePane(m_notebook);
     m_notebook->AddPage(m_cartPane, "Cartridge");
     m_bpPane = new BreakpointPane(m_notebook);
@@ -486,6 +493,7 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_MENU, &MmemuFrame::OnKbdFocus,   this, ID_KBD_FOCUS);
     Bind(wxEVT_MENU, &MmemuFrame::OnShowBpPane,    this, ID_SHOW_BP_PANE);
     Bind(wxEVT_MENU, &MmemuFrame::OnShowStackPane, this, ID_SHOW_STACK_PANE);
+    Bind(wxEVT_MENU, &MmemuFrame::OnShowMachinePane, this, ID_SHOW_MACHINE_PANE);
     Bind(wxEVT_TOOL, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
     Bind(wxEVT_TIMER, &MmemuFrame::OnTimer, this, ID_GUI_TIMER);
     
@@ -525,6 +533,7 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             m_stackPane->SetDebugContext(m_dbg);
             m_stackPane->SetGotoCallback([this](uint32_t addr){ m_disasmPane->GoTo(addr); });
             m_cartPane->SetBus(m_bus);
+            m_machineInspectorPane->setMachine(m_machine);
             
             if (m_machine->onReset) m_machine->onReset(*m_machine);
 
@@ -851,6 +860,20 @@ void MmemuFrame::OnShowStackPane(wxCommandEvent&) {
 
 void MmemuFrame::OnKbdFocus(wxCommandEvent& event) {
     setKeyCapture(event.IsChecked());
+}
+
+void MmemuFrame::ShowMachineInspectorPane() {
+    for (size_t i = 0; i < m_notebook->GetPageCount(); ++i) {
+        if (m_notebook->GetPage(i) == m_machineInspectorPane) {
+            m_notebook->SetSelection(i);
+            return;
+        }
+    }
+    m_notebook->AddPage(m_machineInspectorPane, "Machine", true);
+}
+
+void MmemuFrame::OnShowMachinePane(wxCommandEvent&) {
+    ShowMachineInspectorPane();
 }
 
 void MmemuFrame::OnCtrlShiftK(wxKeyEvent& event) {

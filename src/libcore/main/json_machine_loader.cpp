@@ -153,6 +153,7 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
     desc->machineId    = spec.value("id",          "");
     desc->displayName  = spec.value("displayName",  "");
     desc->licenseClass = spec.value("licenseClass", "");
+    desc->sourceSpec   = spec;
 
     // -----------------------------------------------------------------------
     // Step 3 — Bus
