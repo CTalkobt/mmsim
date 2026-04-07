@@ -39,7 +39,6 @@ private:
 
     /**
      * Build a MachineDescriptor from a single machine spec node.
-     * Currently returns nullptr (Phase 1 stub).
      */
-    struct MachineDescriptor* buildFromSpec(const nlohmann::json& spec);
+    static struct MachineDescriptor* buildFromSpec(const nlohmann::json& spec);
 };

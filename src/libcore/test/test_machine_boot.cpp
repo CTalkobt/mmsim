@@ -14,10 +14,12 @@
 #include "crtc6545.h"
 #include "pet_video.h"
 #include "vic2.h"
+#include "vic6560.h"
 #include "c64_pla.h"
 #include "cia6526.h"
 #include "sid6581.h"
 #include "kbd_c64.h"
+#include "kbd_vic20.h"
 #include "keyboard_matrix_pet.h"
 #include <vector>
 #include <string>
@@ -90,9 +92,37 @@ static void ensureBootTestRegistriesReady() {
     DeviceRegistry::instance().registerDevice("kbd_c64",
         []() -> IOHandler* { return new KbdC64(); });
 
+    // VIC-20 Devices
+    DeviceRegistry::instance().registerDevice("6560",
+        []() -> IOHandler* { return new VIC6560("VIC-I", 0x9000); });
+    DeviceRegistry::instance().registerDevice("kbd_vic20",
+        []() -> IOHandler* {
+            class KbdVic20Wrapper : public IOHandler, public IKeyboardMatrix {
+            public:
+                KbdVic20Wrapper() { m_kbd = new KbdVic20(); }
+                ~KbdVic20Wrapper() { delete m_kbd; }
+                const char* name() const override { return "kbd_vic20"; }
+                uint32_t baseAddr() const override { return 0; }
+                uint32_t addrMask() const override { return 0; }
+                bool ioRead(IBus*, uint32_t, uint8_t*) override { return false; }
+                bool ioWrite(IBus*, uint32_t, uint8_t) override { return false; }
+                void reset() override {}
+                void tick(uint64_t) override {}
+                void keyDown(int r, int c) override { m_kbd->keyDown(r, c); }
+                void keyUp(int r, int c) override { m_kbd->keyUp(r, c); }
+                void clearKeys() override { m_kbd->clearKeys(); }
+                bool pressKeyByName(const std::string& n, bool d) override { return m_kbd->pressKeyByName(n, d); }
+                IPortDevice* getPort(int i) override { return m_kbd->getPort(i); }
+            private:
+                KbdVic20* m_kbd;
+            };
+            return new KbdVic20Wrapper();
+        });
+
     // Load JSONs
     JsonMachineLoader().loadFile("machines/pet.json");
     JsonMachineLoader().loadFile("machines/c64.json");
+    JsonMachineLoader().loadFile("machines/vic20.json");
 }
 
 static void ensureRegistriesAndLoad() {
@@ -166,7 +196,14 @@ static void verifyMachineBoot(const std::string& machineId, uint64_t cyclesToRun
     
     // Check interior display area for unique colors
     std::vector<uint32_t> interiorColors;
-    for (int y = dims.height/2 - 10; y < dims.height/2 + 10; ++y) {
+    int yStart = dims.height/2 - 10;
+    int yEnd   = dims.height/2 + 10;
+    if (machineId.find("vic20") != std::string::npos) {
+        // VIC-20 banner is at the top
+        yStart = 60;
+        yEnd   = 80;
+    }
+    for (int y = yStart; y < yEnd; ++y) {
         for (int x = dims.width/2 - 50; x < dims.width/2 + 50; ++x) {
             uint32_t p = frame[y * dims.width + x];
             bool found = false;
@@ -211,6 +248,13 @@ static void verifyMachineBoot(const std::string& machineId, uint64_t cyclesToRun
                 for (int i=0; i<32; ++i) fprintf(stderr, "%02X ", desc->buses[0].bus->peek8(0xD800 + r*32 + i));
                 fprintf(stderr, "\n");
             }
+        } else if (machineId.find("vic20") != std::string::npos) {
+            fprintf(stderr, "VRAM at $1E00: \n");
+            for (int r=0; r<4; ++r) {
+                fprintf(stderr, "  %04X: ", 0x1E00 + r*22);
+                for (int i=0; i<22; ++i) fprintf(stderr, "%02X ", desc->buses[0].bus->peek8(0x1E00 + r*22 + i));
+                fprintf(stderr, "\n");
+            }
         } else {
             fprintf(stderr, "VRAM at $8000: ");
             for (int i=0; i<16; ++i) fprintf(stderr, "%02X ", desc->buses[0].bus->peek8(0x8000+i));
@@ -225,6 +269,11 @@ static void verifyMachineBoot(const std::string& machineId, uint64_t cyclesToRun
 TEST_CASE(pet2001_boot_screen) {
     // 5 seconds @ 1MHz should be more than enough for PET boot
     verifyMachineBoot("pet2001", 5000000);
+}
+
+TEST_CASE(vic20_boot_screen) {
+    // 5 seconds is ample for VIC-20 boot
+    verifyMachineBoot("vic20", 5000000);
 }
 
 TEST_CASE(c64_boot_screen) {

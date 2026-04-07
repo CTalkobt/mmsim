@@ -135,8 +135,8 @@ int JsonMachineLoader::registerAll(const nlohmann::json& doc) {
 
         nlohmann::json specCopy = spec;
         MachineRegistry::instance().registerMachine(id,
-            [this, specCopy]() -> MachineDescriptor* {
-                return buildFromSpec(specCopy);
+            [specCopy]() -> MachineDescriptor* {
+                return JsonMachineLoader::buildFromSpec(specCopy);
             });
         ++count;
     }

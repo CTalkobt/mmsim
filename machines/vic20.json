@@ -8,10 +8,10 @@
       "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 16 },
       "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
       "devices": [
+        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9600", "size": 1024 },
         { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
         { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
         { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
-        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9400", "size": 1024 },
         { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
       ],
       "roms": [
@@ -30,7 +30,7 @@
         { "name": "BLK5", "base": "0xA000", "size": 8192,  "installed": false }
       ],
       "signals": [
-        { "name": "irq", "type": "simple", "sources": ["VIA1", "VIA2"] }
+        { "name": "irq", "type": "shared", "sources": ["VIA1", "VIA2"] }
       ],
       "kbdWiring": {
         "device": "Keyboard",
@@ -48,10 +48,10 @@
       "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 16 },
       "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
       "devices": [
+        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9600", "size": 1024 },
         { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
         { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
         { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
-        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9400", "size": 1024 },
         { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
       ],
       "roms": [
@@ -70,7 +70,7 @@
         { "name": "BLK5", "base": "0xA000", "size": 8192, "installed": false }
       ],
       "signals": [
-        { "name": "irq", "type": "simple", "sources": ["VIA1", "VIA2"] }
+        { "name": "irq", "type": "shared", "sources": ["VIA1", "VIA2"] }
       ],
       "kbdWiring": {
         "device": "Keyboard",
@@ -88,10 +88,10 @@
       "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 16 },
       "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
       "devices": [
+        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9400", "size": 1024 },
         { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
         { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
         { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
-        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9400", "size": 1024 },
         { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
       ],
       "roms": [
@@ -110,7 +110,7 @@
         { "name": "BLK5", "base": "0xA000", "size": 8192, "installed": false }
       ],
       "signals": [
-        { "name": "irq", "type": "simple", "sources": ["VIA1", "VIA2"] }
+        { "name": "irq", "type": "shared", "sources": ["VIA1", "VIA2"] }
       ],
       "kbdWiring": {
         "device": "Keyboard",
@@ -128,10 +128,10 @@
       "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 16 },
       "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
       "devices": [
+        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9400", "size": 1024 },
         { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
         { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
         { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
-        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9400", "size": 1024 },
         { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
       ],
       "roms": [
@@ -150,7 +150,7 @@
         { "name": "BLK5", "base": "0xA000", "size": 8192, "installed": false }
       ],
       "signals": [
-        { "name": "irq", "type": "simple", "sources": ["VIA1", "VIA2"] }
+        { "name": "irq", "type": "shared", "sources": ["VIA1", "VIA2"] }
       ],
       "kbdWiring": {
         "device": "Keyboard",
@@ -168,10 +168,10 @@
       "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 16 },
       "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
       "devices": [
+        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9400", "size": 1024 },
         { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
         { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
         { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
-        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9400", "size": 1024 },
         { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
       ],
       "roms": [
@@ -190,7 +190,7 @@
         { "name": "BLK5", "base": "0xA000", "size": 8192, "installed": true }
       ],
       "signals": [
-        { "name": "irq", "type": "simple", "sources": ["VIA1", "VIA2"] }
+        { "name": "irq", "type": "shared", "sources": ["VIA1", "VIA2"] }
       ],
       "kbdWiring": {
         "device": "Keyboard",

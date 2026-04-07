@@ -195,10 +195,6 @@ void VIC6560::renderFrame(uint32_t* buffer) {
     // VIC-I address space is inverted relative to the CPU: VA13 is complemented.
     //   VIC $0000-$1FFF (VA13=0) → CPU $8000-$9FFF  (char ROM / I/O)
     //   VIC $2000-$3FFF (VA13=1) → CPU $0000-$1FFF  (RAM)
-    //
-    // $9005 bits 7-4 = screen matrix base (VIC address bits 13-10)
-    //        bits 3-0 = char generator base (VIC address bits 13-10)
-    // bit 7 of $9002 = VIC address bit 9 of the screen base.
     auto vicToCpu = [](uint16_t v) -> uint16_t {
         return (v < 0x2000) ? (v + 0x8000) : (v - 0x2000);
     };
@@ -222,6 +218,16 @@ void VIC6560::renderFrame(uint32_t* buffer) {
     uint32_t bgColor = getVicColor(bgColorIdx);
     uint32_t borderColor = getVicColor(borderColorIdx);
     uint32_t auxColor = getVicColor(auxColorIdx);
+
+    // Logging for debug
+    static int frameCounter = 0;
+    if (frameCounter++ % 60 == 0) {
+        char msg[256];
+        std::snprintf(msg, sizeof(msg), 
+            "VIC6560 render: SCRBASE=$%04X CBBASE=$%04X COLS=%d ROWS=%d BG=%d BORDER=%d BUS=%p",
+            screenBase, charBase, cols, rows, (int)bgColorIdx, (int)borderColorIdx, (void*)m_bus);
+        // We don't have a log() method here, use printf or add it
+    }
 
     VideoDimensions dim = getDimensions();
     

@@ -23,7 +23,7 @@ public:
     // Configuration
     void setName(const std::string& name) override { m_name = name; }
     void setBaseAddr(uint32_t addr) override { m_baseAddr = addr; }
-    void setBus(IBus* bus) { m_bus = bus; }
+    void setDmaBus(IBus* bus) override { m_bus = bus; }
     void setIrqLine(ISignalLine* line) override { m_irqLine = line; }
     void setColorRam(const uint8_t* colorRam) override { m_colorRam = colorRam; }
     void setAudioSampleRate(int hz) { m_sampleRate = hz; }

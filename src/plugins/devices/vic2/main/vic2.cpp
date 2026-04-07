@@ -55,16 +55,6 @@ uint32_t VIC2::palette(uint8_t index) const {
     return s_palette[index & 0x0F];
 }
 
-void VIC2::log(int level, const char* msg) const {
-    if (m_logger && m_logNamed) {
-        m_logNamed(m_logger, level, msg);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// DMA access helpers
-// ---------------------------------------------------------------------------
-
 uint8_t VIC2::dmaPeek(uint32_t offset) const {
     if (!m_dmaBus) return 0xFF;
     offset &= 0x3FFF; // 14-bit internal VIC-II address
@@ -196,20 +186,20 @@ void VIC2::tick(uint64_t cycles) {
             m_rasterLine = 0;
         }
 
-        static int tickLogCounter = 0;
-        if (tickLogCounter++ % 10000 == 0) {
-            char msg[128];
-            std::snprintf(msg, sizeof(msg), "VIC2::tick: raster=%d cycleAccum=%lu", m_rasterLine, m_cycleAccum);
-            log(SIM_LOG_DEBUG, msg);
+        // Check for raster IRQ
+        uint16_t rasterCmp = ((m_regs[SCR1] & SCR1_RASTER8) << 1) | m_regs[RASTER];
+        if (m_rasterLine == rasterCmp) {
+            if (!(m_regs[IRQ] & IRQ_RST)) {
+                m_regs[IRQ] |= IRQ_RST;
+                updateIrq();
+            }
         }
+    }
+}
 
-        // Raster compare: fires when current line matches $D011 bit-8 + $D012.
-        uint16_t compare = (uint16_t)(m_regs[RASTER]) |
-                           ((m_regs[SCR1] & SCR1_RASTER8) ? 0x100 : 0);
-        if (m_rasterLine == compare) {
-            m_regs[IRQ] |= IRQ_RST;
-            updateIrq();
-        }
+void VIC2::log(int level, const char* msg) const {
+    if (m_logger && m_logNamed) {
+        m_logNamed(m_logger, level, msg);
     }
 }
 
@@ -218,30 +208,22 @@ void VIC2::tick(uint64_t cycles) {
 // ---------------------------------------------------------------------------
 
 void VIC2::renderFrame(uint32_t* buf) {
-    if (!buf) return;
-
-    uint32_t borderCol = palette(m_regs[EXTCOL] & 0x0F);
-
-    // Fill the entire frame with the border colour first.
-    for (int i = 0; i < FRAME_W * FRAME_H; ++i)
-        buf[i] = borderCol;
-
-    // Render the background (text/bitmap) into the 320×200 display area.
     renderBackground(buf);
-
-    // Render sprites on top.
     renderSprites(buf);
 }
 
-// ---------------------------------------------------------------------------
-// Background rendering — five video modes
-// ---------------------------------------------------------------------------
-
 void VIC2::renderBackground(uint32_t* buf) {
-    if (!(m_regs[SCR1] & SCR1_DEN)) return; // display disabled
+    uint32_t extCol = palette(m_regs[EXTCOL] & 0x0F);
+    uint32_t bg0    = palette(m_regs[BGCOL0] & 0x0F);
+    uint32_t bg1    = palette(m_regs[BGCOL1] & 0x0F);
+    uint32_t bg2    = palette(m_regs[BGCOL2] & 0x0F);
+    uint32_t bg3    = palette(m_regs[BGCOL3] & 0x0F);
 
-    bool ecm = (m_regs[SCR1] & SCR1_ECM) != 0;
+    // Fill with border color
+    for (int i = 0; i < FRAME_W * FRAME_H; ++i) buf[i] = extCol;
+
     bool bmm = (m_regs[SCR1] & SCR1_BMM) != 0;
+    bool ecm = (m_regs[SCR1] & SCR1_ECM) != 0;
     bool mcm = (m_regs[SCR2] & SCR2_MCM) != 0;
 
     uint32_t scrBase  = screenBase();
@@ -257,45 +239,10 @@ void VIC2::renderBackground(uint32_t* buf) {
     if (frameCounter++ % 60 == 0) {
         char msg[256];
         std::snprintf(msg, sizeof(msg), 
-            "renderBackground: ECM=%d BMM=%d MCM=%d SCRBASE=$%04X CBBASE=$%04X BANK=$%04X CHARROM=%d ROMPTR=%p",
-            (int)ecm, (int)bmm, (int)mcm, scrBase, cbBase, m_bankBase, (int)useCharRom, (void*)m_charRom);
+            "VIC2 render: SCRBASE=$%04X CBBASE=$%04X BANK=$%04X CHARROM=%d ROMPTR=%p",
+            scrBase, cbBase, m_bankBase, (int)useCharRom, (void*)m_charRom);
         log(SIM_LOG_DEBUG, msg);
-        
-        // Sample first few bytes of screen RAM
-        uint8_t s0 = dmaPeek(0 + (scrBase & 0x3FFF));
-        uint8_t s1 = dmaPeek(1 + (scrBase & 0x3FFF));
-        uint8_t c0 = m_colorRam ? (m_colorRam[0] & 0x0F) : 0;
-        std::snprintf(msg, sizeof(msg), "Sample: SCR[0]=$%02X SCR[1]=$%02X COL[0]=$%02X", s0, s1, c0);
-        log(SIM_LOG_DEBUG, msg);
-
-        // Sample screen content: count non-space characters
-        int nonSpace = 0;
-        for (int i = 0; i < 1000; ++i) {
-            if (dmaPeek(scrBase + i) != 0x20) nonSpace++;
-        }
-        std::snprintf(msg, sizeof(msg), "Screen Content: %d / 1000 cells are not space ($20)", nonSpace);
-        log(SIM_LOG_DEBUG, msg);
-
-        // Sample character ROM data for character $20 (space) and $01 (A)
-        if (m_charRom) {
-            uint8_t b20 = charRomByte(0x20 * 8); // first byte of space
-            uint8_t b01 = charRomByte(0x01 * 8); // first byte of 'A'
-            uint8_t b2A = charRomByte(0x2A * 8); // first byte of '*'
-            std::snprintf(msg, sizeof(msg), "CharROM Sample: CHAR[$20][0]=$%02X CHAR[$01][0]=$%02X CHAR[$2A][0]=$%02X", b20, b01, b2A);
-            log(SIM_LOG_DEBUG, msg);
-        } else {
-            log(SIM_LOG_DEBUG, "CharROM is NULL!");
-        }
     }
-
-    uint32_t bg0 = palette(m_regs[BGCOL0] & 0x0F);
-    uint32_t bg1 = palette(m_regs[BGCOL1] & 0x0F);
-    uint32_t bg2 = palette(m_regs[BGCOL2] & 0x0F);
-    uint32_t bg3 = palette(m_regs[BGCOL3] & 0x0F);
-
-    // Color RAM is a separate 4-bit RAM on real C64 hardware, accessed via a
-    // dedicated connection to the VIC-II (not through the DMA bus).  The
-    // machine factory calls setColorRam() to supply the pointer directly.
 
     for (int row = 0; row < 25; ++row) {
         for (int col = 0; col < 40; ++col) {
@@ -389,40 +336,29 @@ void VIC2::renderBackground(uint32_t* buf) {
                     int fy = py + r;
                     if (fy < DISPLAY_Y || fy >= DISPLAY_Y + DISPLAY_H) continue;
 
-                    if (!mcm) {
+                    if (mcm && (colorNibble & 0x08)) {
+                        // Multicolor: 2 bits per pixel → 4 colors, 4×8 resolution
+                        uint32_t mc[4] = {
+                            bgPx,
+                            palette(m_regs[BGCOL1] & 0x0F),
+                            palette(m_regs[BGCOL2] & 0x0F),
+                            palette(colorNibble & 0x07)
+                        };
+                        for (int pair = 0; pair < 4; ++pair) {
+                            uint8_t sel = (bits >> (6 - pair * 2)) & 0x03;
+                            int fx = px + pair * 2;
+                            if (fx >= DISPLAY_X && fx + 1 < DISPLAY_X + DISPLAY_W) {
+                                buf[fy * FRAME_W + fx]     = mc[sel];
+                                buf[fy * FRAME_W + fx + 1] = mc[sel];
+                            }
+                        }
+                    } else {
                         // Standard text: 1 bit per pixel, fg/bg
                         uint32_t fgCol = palette(colorNibble);
                         for (int b = 7; b >= 0; --b) {
                             int fx = px + (7 - b);
                             if (fx < DISPLAY_X || fx >= DISPLAY_X + DISPLAY_W) continue;
                             buf[fy * FRAME_W + fx] = (bits >> b) & 1 ? fgCol : bgPx;
-                        }
-                    } else {
-                        // Multicolor text: high bit of color nibble selects mode
-                        if (colorNibble & 0x08) {
-                            // Multicolor: 2 bits per pixel → 4 colors, 4×8 resolution
-                            uint32_t mc[4] = {
-                                bgPx,
-                                palette(m_regs[BGCOL1] & 0x0F),
-                                palette(m_regs[BGCOL2] & 0x0F),
-                                palette(colorNibble & 0x07)
-                            };
-                            for (int pair = 0; pair < 4; ++pair) {
-                                uint8_t sel = (bits >> (6 - pair * 2)) & 0x03;
-                                int fx = px + pair * 2;
-                                if (fx >= DISPLAY_X && fx + 1 < DISPLAY_X + DISPLAY_W) {
-                                    buf[fy * FRAME_W + fx]     = mc[sel];
-                                    buf[fy * FRAME_W + fx + 1] = mc[sel];
-                                }
-                            }
-                        } else {
-                            // High-res half of multicolor: treated as standard text
-                            uint32_t fgCol = palette(colorNibble);
-                            for (int b = 7; b >= 0; --b) {
-                                int fx = px + (7 - b);
-                                if (fx < DISPLAY_X || fx >= DISPLAY_X + DISPLAY_W) continue;
-                                buf[fy * FRAME_W + fx] = (bits >> b) & 1 ? fgCol : bgPx;
-                            }
                         }
                     }
                 }
@@ -449,108 +385,50 @@ void VIC2::renderSprites(uint32_t* buf) {
 
         bool xExp = (m_regs[XXPAND] & (1 << sp)) != 0;
         bool yExp = (m_regs[YXPAND] & (1 << sp)) != 0;
-        bool mc   = (m_regs[SPMC]   & (1 << sp)) != 0;
-        bool prio = (m_regs[SPBGPR] & (1 << sp)) != 0; // 1 = behind background
 
-        // Sprite data pointer: last 8 bytes of the 1024-byte screen matrix area
-        uint8_t  ptr       = dmaPeek(scrBase + 1016 + sp);
-        uint32_t dataBase  = (uint32_t)ptr * 64; // sprite data offset within VIC bank
+        uint8_t  colorIdx = m_regs[SP0COL + sp] & 0x0F;
+        uint32_t spColor  = palette(colorIdx);
 
-        uint32_t spColor   = palette(m_regs[SP0COL + sp] & 0x0F);
-        uint32_t spMc0     = palette(m_regs[SPMC0]  & 0x0F);
-        uint32_t spMc1     = palette(m_regs[SPMC1]  & 0x0F);
+        // Fetch sprite pointer from end of screen RAM
+        uint32_t ptrAddr = scrBase + 0x03F8 + sp;
+        uint8_t  ptrVal  = dmaPeek(ptrAddr);
+        uint32_t dataAddr = ptrVal * 64;
 
-        int sprH = yExp ? 42 : 21;
-        int sprW = xExp ? 48 : 24;
+        for (int r = 0; r < 21; ++r) {
+            uint32_t rowBits = (dmaPeek(dataAddr + r * 3) << 16) |
+                               (dmaPeek(dataAddr + r * 3 + 1) << 8) |
+                               (dmaPeek(dataAddr + r * 3 + 2));
 
-        for (int r = 0; r < sprH; ++r) {
-            // Which source row? Y expansion doubles each source row.
-            int srcRow = yExp ? r / 2 : r;
-            if (srcRow >= 21) break;
+            int py = spY + (yExp ? r * 2 : r);
+            if (py < 0 || py >= FRAME_H) continue;
 
-            int fy = (int)spY + r - 50; // C64 sprite Y origin offset ≈ 50 (top of display)
-            int screenY = fy + DISPLAY_Y - 50;
-            if (screenY < 0 || screenY >= FRAME_H) continue;
+            for (int b = 0; b < 24; ++b) {
+                bool bit = (rowBits >> (23 - b)) & 1;
+                if (!bit) continue;
 
-            // 3 bytes per sprite row = 24 pixels
-            uint8_t b0 = dmaPeek(dataBase + srcRow * 3 + 0);
-            uint8_t b1 = dmaPeek(dataBase + srcRow * 3 + 1);
-            uint8_t b2 = dmaPeek(dataBase + srcRow * 3 + 2);
-            uint32_t rowBits = ((uint32_t)b0 << 16) | ((uint32_t)b1 << 8) | b2;
+                int pxStart = spX + (xExp ? b * 2 : b);
+                int pxEnd   = xExp ? pxStart + 2 : pxStart + 1;
 
-            for (int c = 0; c < sprW; ++c) {
-                int srcPx = xExp ? c / 2 : c;
-
-                int fx = (int)spX + c - 24; // C64 sprite X origin offset ≈ 24
-                int screenX = fx; // X is relative to the total frame
-                if (screenX < 0 || screenX >= FRAME_W) continue;
-
-                uint32_t pxColor;
-                if (!mc) {
-                    // Monochrome: 1 bit per pixel
-                    uint8_t bit = (rowBits >> (23 - srcPx)) & 1;
-                    if (!bit) continue; // transparent
-                    pxColor = spColor;
-                } else {
-                    // Multicolor: 2 bits per pixel (only even srcPx advances color pair)
-                    int pair = srcPx / 2;
-                    uint8_t sel = (rowBits >> (22 - pair * 2)) & 0x03;
-                    if (sel == 0) continue; // transparent
-                    if      (sel == 1) pxColor = spMc0;
-                    else if (sel == 2) pxColor = spColor;
-                    else               pxColor = spMc1;
+                for (int px = pxStart; px < pxEnd; ++px) {
+                    if (px < 0 || px >= FRAME_W) continue;
+                    buf[py * FRAME_W + px] = spColor;
                 }
-
-                // Priority: if sprite is behind background, only draw over border/BG0
-                if (prio) {
-                    uint32_t existing = buf[screenY * FRAME_W + screenX];
-                    uint32_t borderCol = palette(m_regs[EXTCOL] & 0x0F);
-                    uint32_t bg0Col    = palette(m_regs[BGCOL0] & 0x0F);
-                    if (existing != borderCol && existing != bg0Col) continue;
-                }
-
-                // Sprite-background collision: if a non-transparent pixel would
-                // overwrite a non-border display pixel.
-                {
-                    uint32_t existing = buf[screenY * FRAME_W + screenX];
-                    uint32_t borderCol = palette(m_regs[EXTCOL] & 0x0F);
-                    if (existing != borderCol &&
-                        screenX >= DISPLAY_X && screenX < DISPLAY_X + DISPLAY_W &&
-                        screenY >= DISPLAY_Y && screenY < DISPLAY_Y + DISPLAY_H) {
-                        m_sprBgColl |= (1 << sp);
+            }
+            if (yExp && (py + 1 < FRAME_H)) {
+                // duplicate row for Y expansion
+                for (int b = 0; b < 24; ++b) {
+                    bool bit = (rowBits >> (23 - b)) & 1;
+                    if (!bit) continue;
+                    int pxStart = spX + (xExp ? b * 2 : b);
+                    int pxEnd   = xExp ? pxStart + 2 : pxStart + 1;
+                    for (int px = pxStart; px < pxEnd; ++px) {
+                        if (px < 0 || px >= FRAME_W) continue;
+                        buf[(py+1) * FRAME_W + px] = spColor;
                     }
                 }
-
-                buf[screenY * FRAME_W + screenX] = pxColor;
             }
         }
     }
-
-    // Sprite-sprite collision: detect overlapping sprite pixels.
-    // Simplified: mark pairs by checking if two enabled sprites overlap in bounding box.
-    for (int a = 0; a < 8; ++a) {
-        if (!(m_regs[SPENA] & (1 << a))) continue;
-        for (int b = a + 1; b < 8; ++b) {
-            if (!(m_regs[SPENA] & (1 << b))) continue;
-            uint16_t ax = m_regs[SP0X + a*2] | ((m_regs[MSIGX] & (1<<a)) ? 0x100 : 0);
-            uint16_t bx = m_regs[SP0X + b*2] | ((m_regs[MSIGX] & (1<<b)) ? 0x100 : 0);
-            uint8_t  ay = m_regs[SP0Y + a*2];
-            uint8_t  by = m_regs[SP0Y + b*2];
-            int aw = (m_regs[XXPAND] & (1<<a)) ? 48 : 24;
-            int bw = (m_regs[XXPAND] & (1<<b)) ? 48 : 24;
-            int ah = (m_regs[YXPAND] & (1<<a)) ? 42 : 21;
-            int bh = (m_regs[YXPAND] & (1<<b)) ? 42 : 21;
-            // Bounding box overlap test
-            if ((int)ax < (int)bx + bw && (int)ax + aw > (int)bx &&
-                (int)ay < (int)by + bh && (int)ay + ah > (int)by) {
-                m_sprSprColl |= (1 << a) | (1 << b);
-            }
-        }
-    }
-
-    // Fire collision IRQs if enabled and collisions occurred.
-    if (m_sprSprColl) { m_regs[IRQ] |= IRQ_MMC; updateIrq(); }
-    if (m_sprBgColl)  { m_regs[IRQ] |= IRQ_MBC; updateIrq(); }
 }
 
 // ---------------------------------------------------------------------------
