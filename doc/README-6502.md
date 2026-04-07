@@ -126,6 +126,8 @@ These instructions are not part of the official specification but exist due to t
 - **ARR**: ANDs Accumulator with immediate value, then performs ROR on the result.
 - **XAA**: Transfers X to A, then ANDs A with immediate value (result can be unstable on real hardware).
 - **AXS**: ANDs A and X, then subtracts immediate value from the result and stores it in X.
+- **LAS**: ANDs memory with stack pointer, then stores result in A, X, and SP.
+- **AHX/TAS/SHY/SHX**: Highly unstable opcodes that perform complex AND/Store operations (implemented as stubs).
 - **KIL**: Crashes the CPU (Jam).
 
 ---

@@ -117,8 +117,8 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 - **Phase 10 (Complete)**: VIC-20 machine integration — VIA 6522, VIC-I 6560, keyboard matrix.
 - **Phase 11 (Complete)**: C64 machine implementation — MOS 6510, C64 PLA, CIA 6526, VIC-II, SID 6581.
 - **Phase 12 (Complete)**: PET/CBM machine implementation — MOS 6520 PIA, 6545 CRTC, IEEE-488.
-- **Phase 13 (In Progress)**: Runtime Image and Cartridge Loading (`.prg`, `.crt`, `.bin`).
-- **Phase 26 (In Progress)**: Atari 8-bit Family (400/800/XL/XE) — ANTIC, GTIA, POKEY.
+- **Phase 13 (Partially Completed)**: Runtime Image and Cartridge Loading (`.prg`, `.crt`, `.bin`). CBM formats fully supported; Atari formats in progress.
+- **Phase 26 (Partially Completed)**: Atari 8-bit Family (400/800/XL/XE) — ANTIC, GTIA, and POKEY core logic implemented.
 
 ---
 
@@ -137,9 +137,12 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 - [6567/6569 VIC-II](doc/README-VIC2.md)
 - [6545 CRTC](doc/README-6545.md)
 - [PET Video Subsystem](doc/README-PET-VIDEO.md)
+- [ANTIC Video Subsystem](doc/README-ANTIC.md)
+- [GTIA Color/PMG Subsystem](doc/README-GTIA.md)
 
 ### 8.3 Sound
 - [6581 SID Implementation](doc/README-SID.md)
+- [POKEY Audio/IO Implementation](doc/README-POKEY.md)
 
 ### 8.4 Processors
 - [6502/6510 Implementation](doc/README-6502.md)

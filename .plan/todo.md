@@ -93,7 +93,7 @@ descriptor table and disassembler stub. See arch.md §3.2.*
    - [x] `ExecutionObserver* observer` member (linked to `libdebug`; initially `nullptr`).
 - [x] **`MOS6502` CPU** (`src/libcore/cpu6502.h/cpp`)
    - [x] Internal state: `A`, `X`, `Y`, `SP`, `PC`, `P` (NV-BDIZC), `cycles`.
-   - [x] Full NMOS 6502 opcode table (all official opcodes; illegal opcodes marked NOP for now).
+   - [x] Full NMOS 6502 opcode table (all official opcodes; common illegal opcodes mostly implemented).
    - [x] Register descriptor table: 8 entries — A, X, Y, SP, PC, P, cycles (REGFLAG_INTERNAL), plus a 9th placeholder for future B/Z extension.
    - [x] `step()` — fetch-decode-execute one instruction, return cycle count; fires `observer->onStep()` if set.
    - [x] `isCallAt()` — checks for `$20` (JSR abs); returns 3 (instruction size) or 0.
@@ -324,7 +324,7 @@ devices. No concrete chips yet — those come in Phases 10 and 11.*
 
 ---
 
-## Phase 10: VIC-20 Machine
+## Phase 10: VIC-20 Machine [COMPLETED]
 
 *Goal: A fully bootable VIC-20 simulation. This is the first machine where all
 five libraries are exercised together.*
@@ -673,7 +673,7 @@ The PLA maps the 6510 port bits to ROM/IO visibility in the upper address space.
 - [x] CIA6526 gained `setPortAWriteCallback()` for VIC bank switching.
 - [x] Plugin: `mmemu-plugin-c64.so`; machine registered as `"c64"`.
 - [x] GUI screen pane registered (reuses `VicDisplayPane` from VIC-20 plugin).
-- [x] Integration test: 7 test cases (setup, CPU variant, RAM write, 6510 I/O port, CIA timer, PLA banking, VIC-II raster). 60/60 tests pass.
+- [x] Integration test: 9 test cases (setup, CPU variant, RAM write, 6510 I/O port, CIA timer, PLA banking, VIC-II raster, boot screen content, and color updates). 100% tests pass.
 
 ---
 
@@ -1703,7 +1703,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
 
 ---
 
-## Phase 26: Atari 8-bit Family (400/800/XL/XE) [IN PROGRESS]
+## Phase 26: Atari 8-bit Family (400/800/XL/XE) [PARTIALLY COMPLETED]
 
 *Goal: Cycle-accurate emulation of the ANTIC, GTIA, and POKEY trio.*
 
