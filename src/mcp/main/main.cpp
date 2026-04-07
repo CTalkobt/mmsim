@@ -310,6 +310,17 @@ Json handleToolsList() {
     cpSchema.oVal["required"] = cpReq;
     addTool("copy_memory", "Copy a memory range to another address", cpSchema);
 
+    // swap_memory
+    Json swmSchema(Json::OBJ); swmSchema.oVal["type"] = Json("object");
+    Json swmProps(Json::OBJ); swmProps.oVal["machine_id"] = midProp;
+    Json addr1Prop(Json::OBJ); addr1Prop.oVal["type"] = Json("integer");
+    Json addr2Prop(Json::OBJ); addr2Prop.oVal["type"] = Json("integer");
+    swmProps.oVal["addr1"] = addr1Prop; swmProps.oVal["addr2"] = addr2Prop; swmProps.oVal["size"] = sizeProp;
+    swmSchema.oVal["properties"] = swmProps;
+    Json swmReq(Json::ARR); swmReq.push_back(Json("machine_id")); swmReq.push_back(Json("addr1")); swmReq.push_back(Json("addr2")); swmReq.push_back(Json("size"));
+    swmSchema.oVal["required"] = swmReq;
+    addTool("swap_memory", "Swap two memory ranges of equal size", swmSchema);
+
     // set_breakpoint
     Json sbpSchema(Json::OBJ); sbpSchema.oVal["type"] = Json("object");
     Json sbpProps(Json::OBJ); sbpProps.oVal["machine_id"] = midProp; sbpProps.oVal["addr"] = addrProp;
@@ -748,6 +759,26 @@ Json handleToolsCall(const Json& params) {
             for (uint32_t i = 0; i < size; ++i) buf[i] = ms->bus->peek8(src + i);
             for (uint32_t i = 0; i < size; ++i) ms->bus->write8(dst + i, buf[i]);
             textItem.oVal["text"] = Json("Copied " + std::to_string(size) + " bytes from $" + toHex(src) + " to $" + toHex(dst));
+        }
+    } else if (name == "swap_memory") {
+        std::string mid = args["machine_id"].sVal;
+        uint32_t addr1 = (uint32_t)args["addr1"].nVal;
+        uint32_t addr2 = (uint32_t)args["addr2"].nVal;
+        uint32_t size  = (uint32_t)args["size"].nVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            std::vector<uint8_t> tmp(size);
+            for (uint32_t i = 0; i < size; ++i) {
+                uint8_t v1 = ms->bus->read8(addr1 + i);
+                uint8_t v2 = ms->bus->read8(addr2 + i);
+                tmp[i] = v1;
+                ms->bus->write8(addr1 + i, v2);
+            }
+            for (uint32_t i = 0; i < size; ++i) ms->bus->write8(addr2 + i, tmp[i]);
+            textItem.oVal["text"] = Json("Swapped " + std::to_string(size) + " bytes between $" + toHex(addr1) + " and $" + toHex(addr2));
         }
     } else if (name == "set_breakpoint") {
         std::string mid = args["machine_id"].sVal;

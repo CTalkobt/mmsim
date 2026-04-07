@@ -42,4 +42,7 @@ private:
     OutputFn m_output;
     bool m_asmMode = false;
     uint32_t m_asmAddr = 0;
+
+    std::vector<uint8_t> m_lastSearchPattern;
+    uint32_t m_lastSearchFoundAddr = 0xFFFFFFFF;
 };

@@ -78,6 +78,10 @@ The `mmemu-cli` binary provides an interactive REPL for low-level machine contro
     - `m <addr> [len]`: Hex and ASCII memory dump.
     - `f <addr> <val> [len]`: Direct memory modification (supports ranges).
     - `copy <src> <dst> <len>`: Copy memory blocks.
+    - `swap <addr1> <addr2> <len>`: Swap two equal-length memory blocks.
+    - `search <hex...>`: Search for a hex byte pattern (all matches; use `findnext`/`findprior` to navigate).
+    - `searcha <str>`: Search for an ASCII string (all matches; use `findnext`/`findprior` to navigate).
+    - `findnext` / `findprior`: Jump to the next or previous occurrence of the last search pattern.
     - `load <path> <addr>`: Binary file injection into the simulation space.
 - **Disassembly**: Multi-ISA disassembly with integrated symbol resolution.
 
@@ -89,9 +93,24 @@ The `mmemu-mcp` binary implements the **Model Context Protocol**, allowing AI ag
 
 ### Available Tools:
 - `step_cpu(machine_id, count)`: Execute instructions.
+- `run_cpu(machine_id, max_steps)`: Run until breakpoint, program end, or step limit.
 - `read_memory(machine_id, addr, size)`: Inspect memory states.
 - `write_memory(machine_id, addr, bytes)`: Inject code or data.
+- `fill_memory(machine_id, addr, value, size)`: Fill a memory range with a byte value.
+- `copy_memory(machine_id, src_addr, dst_addr, size)`: Copy a memory block.
+- `swap_memory(machine_id, addr1, addr2, size)`: Swap two equal-length memory blocks.
+- `search_memory(machine_id, pattern, is_hex, start_addr)`: Find a byte or ASCII pattern in memory.
 - `read_registers(machine_id)`: Inspect CPU state.
+- `set_pc(machine_id, addr)`: Set the program counter.
+- `disassemble(machine_id, addr, count)`: Disassemble instructions.
+- `set_breakpoint` / `set_watchpoint` / `delete_breakpoint` / `enable_breakpoint` / `disable_breakpoint` / `list_breakpoints`: Full breakpoint management.
+- `get_stack(machine_id, count)`: Show the call stack trace.
+- `load_image(machine_id, path, addr, auto_start)`: Load a program or binary file.
+- `attach_cartridge` / `eject_cartridge`: Cartridge management.
+- `reset_machine(machine_id)`: Reset to power-on state.
+- `press_key(machine_id, key, down)`: Inject a keystroke.
+- `list_machines` / `create_machine`: Machine enumeration and creation.
+- `list_loggers` / `set_log_level`: Logging control.
 
 ---
 

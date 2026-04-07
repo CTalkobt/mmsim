@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0-dev] - 2026-04-07 (2)
+
+### Added
+- **CLI/MCP parity with GUI memory operations**:
+    - CLI: Added `swap <addr1> <addr2> <len>` command to swap two equal-length memory regions.
+    - CLI: Added `findnext` / `findprior` commands to navigate forward and backward through occurrences of the last `search`/`searcha` pattern (wraps around the full address space).
+    - CLI: `search` and `searcha` now report **all** matches, save state for `findnext`/`findprior`, and use the bus address mask instead of the hardcoded `0x10000` range.
+    - MCP: Added `swap_memory(machine_id, addr1, addr2, size)` tool, matching the GUI Swap Memory operation.
+
+---
+
 ## [0.2.0-dev] - 2026-04-07
 
 ### Added

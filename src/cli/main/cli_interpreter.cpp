@@ -404,8 +404,28 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
             for (uint32_t i = 0; i < len; ++i) tmp[i] = m_ctx.bus->read8(src + i);
             for (uint32_t i = 0; i < len; ++i) m_ctx.bus->write8(dst + i, tmp[i]);
         }
+    } else if (cmd == "swap") {
+        if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
+        std::string addr1Str, addr2Str, lenStr;
+        if (ss >> addr1Str >> addr2Str >> lenStr) {
+            uint32_t addr1 = std::stoul(addr1Str, nullptr, 16);
+            uint32_t addr2 = std::stoul(addr2Str, nullptr, 16);
+            uint32_t len   = std::stoul(lenStr, nullptr, 16);
+            std::vector<uint8_t> tmp(len);
+            for (uint32_t i = 0; i < len; ++i) {
+                uint8_t v1 = m_ctx.bus->read8(addr1 + i);
+                uint8_t v2 = m_ctx.bus->read8(addr2 + i);
+                tmp[i] = v1;
+                m_ctx.bus->write8(addr1 + i, v2);
+            }
+            for (uint32_t i = 0; i < len; ++i) m_ctx.bus->write8(addr2 + i, tmp[i]);
+            m_output("Swapped.\n");
+        } else {
+            m_output("Syntax: swap <addr1> <addr2> <len>\n");
+        }
     } else if (cmd == "search") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
+        uint32_t mask = m_ctx.bus->config().addrMask;
         std::string patternStr;
         std::vector<uint8_t> pattern;
         while (ss >> patternStr) {
@@ -417,10 +437,12 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
             m_output("Syntax: search <hex1> [hex2] ...\n");
             return;
         }
-        for (uint32_t i = 0; i < 0x10000 - pattern.size(); ++i) {
+        m_lastSearchPattern = pattern;
+        m_lastSearchFoundAddr = 0xFFFFFFFF;
+        for (uint32_t i = 0; i + pattern.size() <= mask + 1; ++i) {
             bool match = true;
             for (size_t j = 0; j < pattern.size(); ++j) {
-                if (m_ctx.bus->peek8(i + j) != pattern[j]) {
+                if (m_ctx.bus->peek8((i + j) & mask) != pattern[j]) {
                     match = false;
                     break;
                 }
@@ -429,10 +451,13 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
                 char buf[16];
                 snprintf(buf, sizeof(buf), "%04X", i);
                 m_output("Found at $" + std::string(buf) + "\n");
+                if (m_lastSearchFoundAddr == 0xFFFFFFFF) m_lastSearchFoundAddr = i;
             }
         }
+        if (m_lastSearchFoundAddr == 0xFFFFFFFF) m_output("Pattern not found.\n");
     } else if (cmd == "searcha") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
+        uint32_t mask = m_ctx.bus->config().addrMask;
         std::string pattern;
         std::getline(ss, pattern);
         if (!pattern.empty() && pattern[0] == ' ') pattern = pattern.substr(1);
@@ -440,10 +465,12 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
             m_output("Syntax: searcha <ascii_string>\n");
             return;
         }
-        for (uint32_t i = 0; i < 0x10000 - pattern.size(); ++i) {
+        m_lastSearchPattern.assign(pattern.begin(), pattern.end());
+        m_lastSearchFoundAddr = 0xFFFFFFFF;
+        for (uint32_t i = 0; i + pattern.size() <= mask + 1; ++i) {
             bool match = true;
             for (size_t j = 0; j < pattern.size(); ++j) {
-                if (m_ctx.bus->peek8(i + j) != (uint8_t)pattern[j]) {
+                if (m_ctx.bus->peek8((i + j) & mask) != (uint8_t)pattern[j]) {
                     match = false;
                     break;
                 }
@@ -452,8 +479,58 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
                 char buf[16];
                 snprintf(buf, sizeof(buf), "%04X", i);
                 m_output("Found at $" + std::string(buf) + "\n");
+                if (m_lastSearchFoundAddr == 0xFFFFFFFF) m_lastSearchFoundAddr = i;
             }
         }
+        if (m_lastSearchFoundAddr == 0xFFFFFFFF) m_output("Pattern not found.\n");
+    } else if (cmd == "findnext") {
+        if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
+        if (m_lastSearchPattern.empty()) { m_output("No previous search.\n"); return; }
+        uint32_t mask = m_ctx.bus->config().addrMask;
+        uint32_t start = (m_lastSearchFoundAddr == 0xFFFFFFFF) ? 0 : (m_lastSearchFoundAddr + 1) & mask;
+        for (uint32_t i = 0; i <= mask; ++i) {
+            uint32_t curr = (start + i) & mask;
+            if (curr + m_lastSearchPattern.size() > mask + 1) continue;
+            bool match = true;
+            for (size_t j = 0; j < m_lastSearchPattern.size(); ++j) {
+                if (m_ctx.bus->peek8((curr + j) & mask) != m_lastSearchPattern[j]) {
+                    match = false; break;
+                }
+            }
+            if (match) {
+                m_lastSearchFoundAddr = curr;
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%04X", curr);
+                m_output("Found at $" + std::string(buf) + "\n");
+                break;
+            }
+            if (i == mask) m_output("No further occurrences found.\n");
+        }
+    } else if (cmd == "findprior") {
+        if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
+        if (m_lastSearchPattern.empty()) { m_output("No previous search.\n"); return; }
+        uint32_t mask = m_ctx.bus->config().addrMask;
+        uint32_t start = (m_lastSearchFoundAddr == 0xFFFFFFFF) ? mask : (m_lastSearchFoundAddr - 1) & mask;
+        bool found = false;
+        for (uint32_t i = 0; i <= mask; ++i) {
+            uint32_t curr = (start - i) & mask;
+            if (curr + m_lastSearchPattern.size() > mask + 1) continue;
+            bool match = true;
+            for (size_t j = 0; j < m_lastSearchPattern.size(); ++j) {
+                if (m_ctx.bus->peek8((curr + j) & mask) != m_lastSearchPattern[j]) {
+                    match = false; break;
+                }
+            }
+            if (match) {
+                m_lastSearchFoundAddr = curr;
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%04X", curr);
+                m_output("Found at $" + std::string(buf) + "\n");
+                found = true;
+                break;
+            }
+        }
+        if (!found) m_output("No prior occurrences found.\n");
     } else if (cmd == "disasm") {
         if (!m_ctx.cpu || !m_ctx.disasm) { m_output("No machine created.\n"); return; }
         std::string addrStr;
@@ -542,8 +619,11 @@ void CliInterpreter::printHelp() {
              "  m <addr> [len]   - Dump memory\n"
              "  f <addr> <val> [len] - Fill memory range\n"
              "  copy <src> <dst> <len> - Copy memory range\n"
-             "  search <hex1>... - Search for hex pattern in memory\n"
-             "  searcha <str>    - Search for ASCII string in memory\n"
+             "  swap <addr1> <addr2> <len> - Swap two memory ranges\n"
+             "  search <hex1>... - Search for hex pattern in memory (all matches)\n"
+             "  searcha <str>    - Search for ASCII string in memory (all matches)\n"
+             "  findnext         - Find next occurrence of last search pattern\n"
+             "  findprior        - Find prior occurrence of last search pattern\n"
              "  disasm <addr> [n]- Disassemble N instructions\n"
              "  asm <addr>       - Interactive assembly mode (end with '.')\n"
              "  key <name> <state>- Press/release a key (state: 1/0 or down/up)\n"
