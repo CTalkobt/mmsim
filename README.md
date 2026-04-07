@@ -127,6 +127,7 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 **mmsim** utilizes a modular plugin architecture. For a complete list of available processors, devices, and machine presets, see the **[Plugin Index (doc/README-PLUGINS.md)](doc/README-PLUGINS.md)**.
 
 ### 8.1 Machine Types
+- [Machine Descriptor JSON Format (machines/README-machines.md)](machines/README-machines.md)
 - [VIC-20 Machine Implementation](doc/README-VIC20.md)
 - [C64 Machine Implementation](doc/README-C64.md)
 - [PET Machine Implementation](doc/README-PET.md)
