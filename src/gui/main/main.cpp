@@ -650,9 +650,12 @@ void MmemuFrame::OnPause(wxCommandEvent& event) {
 void MmemuFrame::OnReset(wxCommandEvent& event) {
     (void)event;
     if (m_machine && m_machine->onReset) {
+        m_running = false;
         m_machine->onReset(*m_machine);
+        if (m_dbg) m_dbg->resume();
         m_regPane->RefreshValues();
         m_disasmPane->RefreshValues(m_cpu->pc());
+        SetStatusText("Reset.");
     }
 }
 

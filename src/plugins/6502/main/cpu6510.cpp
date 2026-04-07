@@ -19,10 +19,17 @@ int MOS6510::step() {
 }
 
 void MOS6510::reset() {
-    MOS6502::reset();
+    // Restore power-on port state BEFORE base reset reads the reset vector.
+    // The base reset reads $FFFC/$FFFD through the bus, which goes through the
+    // C64 PLA.  The PLA decides whether to serve KERNAL ROM based on the
+    // HIRAM/LORAM/CHAREN signal lines, which are driven by the 6510 I/O port.
+    // If we update signals after the base reset, the PLA may see a stale (post-
+    // program) port state and route $FFFC to RAM instead of the KERNAL, giving
+    // the wrong reset vector.
     m_ddr  = 0x00;
     m_data = 0x3F;
     updateSignals();
+    MOS6502::reset();
 }
 
 uint8_t MOS6510::portRead() const {
