@@ -147,6 +147,8 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 | Breakpoints | Ctrl+B | Show the Breakpoints notebook tab |
 | Stack Trace | Ctrl+T | Show the Stack Trace notebook tab |
 | Machine Explorer | Ctrl+M | Show the Machine Explorer notebook tab |
+| New Memory View | Ctrl+Shift+M | Open a new memory view tab |
+| Rename Memory View… | | Rename the currently-selected memory view tab |
 
 ---
 
@@ -156,9 +158,11 @@ The `mmemu-gui` binary provides a professional, multi-pane graphical debugging e
 Displays real-time disassembly of the memory visible around the current program counter. The current PC is highlighted. Automatically follows the PC during single-step or on every refresh tick while running. Uses the machine's registered disassembler for accurate ISA decoding.
 
 #### Memory Pane
-A scrollable hex and ASCII dump of the machine's address bus.
+A tabbed set of scrollable hex and ASCII dump views of the machine's address bus. Multiple independent memory views can be open simultaneously, each positioned at a different address. Views are displayed as tabs below the Disassembly pane.
 
-- **Navigation**: Use the vertical scroll bar or **Go to Address** (Ctrl+G / Debug menu) to jump to any address.
+- **Navigation**: Use the vertical scroll bar or **Go to Address** (Ctrl+G / Debug menu) to jump to any address in the active view.
+- **Multiple views**: Use **Debug → New Memory View** (Ctrl+Shift+M) to open an additional memory view tab. Each tab tracks its own scroll position and address independently. Close any tab with its × button; the last tab cannot be closed.
+- **Renaming**: Use **Debug → Rename Memory View…** to give the active tab a descriptive name (e.g. "Stack", "ROM", "Zero Page").
 - **In-place editing**: Click any hex byte to open an editor cell (red highlight). Type up to two hex digits and press **Enter** to commit and advance to the next byte, or **Escape** to cancel without writing. Clicking another cell while an editor is open commits nothing and opens a new editor at the clicked position.
 - **Context menu** (right-click):
   - **Go to Address…** — navigate the pane to a specific address.

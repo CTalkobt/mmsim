@@ -30,6 +30,7 @@
 #include "screen_pane.h"
 #include "include/util/logging.h"
 #include <fstream>
+#include <vector>
 #include <cstdio>
 
 // mmemu - Multi Machine Emulator
@@ -125,11 +126,28 @@ private:
     void OnShowBpPane(wxCommandEvent& event);
     void OnShowStackPane(wxCommandEvent& event);
     void OnShowMachinePane(wxCommandEvent& event);
+    void OnNewMemView(wxCommandEvent& event);
+    void OnRenameMemView(wxCommandEvent& event);
     void OnTimer(wxTimerEvent& event);
     void OnCtrlShiftK(wxKeyEvent& event);
     void ShowBreakpointPane();
     void ShowStackPane();
     void ShowMachineInspectorPane();
+
+    // Returns the currently-selected MemoryPane, or nullptr if none exist.
+    MemoryPane* activeMemPane() const {
+        if (m_memPanes.empty()) return nullptr;
+        int sel = m_memNotebook->GetSelection();
+        if (sel == wxNOT_FOUND) return nullptr;
+        return m_memPanes[sel];
+    }
+    // Adds a new named memory pane tab and wires the current bus.
+    void addMemView(const wxString& label) {
+        auto* pane = new MemoryPane(m_memNotebook);
+        if (m_bus) pane->SetBus(m_bus);
+        m_memPanes.push_back(pane);
+        m_memNotebook->AddPage(pane, label, true);
+    }
 
     MachineDescriptor* m_machine = nullptr;
     ICore* m_cpu = nullptr;
@@ -139,7 +157,8 @@ private:
     AudioOutput* m_audio = nullptr;
 
     RegisterPane*   m_regPane;
-    MemoryPane*     m_memPane;
+    wxAuiNotebook*  m_memNotebook = nullptr;
+    std::vector<MemoryPane*> m_memPanes;
     DisasmPane*     m_disasmPane;
     ConsolePane*    m_consolePane;
     CartridgePane*  m_cartPane;
@@ -421,6 +440,9 @@ MmemuFrame::MmemuFrame()
     menuDebug->Append(ID_SHOW_BP_PANE,    "Breakpoints\tCtrl-B");
     menuDebug->Append(ID_SHOW_STACK_PANE, "Stack Trace\tCtrl-T");
     menuDebug->Append(ID_SHOW_MACHINE_PANE, "Machine Explorer\tCtrl-M");
+    menuDebug->AppendSeparator();
+    menuDebug->Append(ID_NEW_MEM_VIEW,    "New Memory View\tCtrl-Shift-M");
+    menuDebug->Append(ID_RENAME_MEM_VIEW, "Rename Memory View...");
     
     auto* menuBar = new wxMenuBar;
     menuBar->Append(menuFile, "&File");
@@ -454,8 +476,16 @@ MmemuFrame::MmemuFrame()
     
     auto* notebookSplitter = new wxSplitterWindow(centerSplitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
     m_disasmPane = new DisasmPane(notebookSplitter);
-    m_memPane = new MemoryPane(notebookSplitter);
-    notebookSplitter->SplitHorizontally(m_disasmPane, m_memPane, 300);
+    m_memNotebook = new wxAuiNotebook(notebookSplitter, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+        wxAUI_NB_TOP | wxAUI_NB_SCROLL_BUTTONS | wxAUI_NB_CLOSE_ON_ALL_TABS | wxAUI_NB_TAB_MOVE);
+    addMemView("Memory 1");
+    m_memNotebook->Bind(wxEVT_AUINOTEBOOK_PAGE_CLOSE, [this](wxAuiNotebookEvent& event) {
+        if (m_memPanes.size() <= 1) { event.Veto(); return; }
+        int page = event.GetSelection();
+        if (page != wxNOT_FOUND && page < (int)m_memPanes.size())
+            m_memPanes.erase(m_memPanes.begin() + page);
+    });
+    notebookSplitter->SplitHorizontally(m_disasmPane, m_memNotebook, 300);
     
     m_notebook = new wxAuiNotebook(centerSplitter, wxID_ANY);
     m_machineInspectorPane = new MachineInspectorPane(m_notebook);
@@ -507,6 +537,8 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_MENU, &MmemuFrame::OnShowBpPane,    this, ID_SHOW_BP_PANE);
     Bind(wxEVT_MENU, &MmemuFrame::OnShowStackPane, this, ID_SHOW_STACK_PANE);
     Bind(wxEVT_MENU, &MmemuFrame::OnShowMachinePane, this, ID_SHOW_MACHINE_PANE);
+    Bind(wxEVT_MENU, &MmemuFrame::OnNewMemView,    this, ID_NEW_MEM_VIEW);
+    Bind(wxEVT_MENU, &MmemuFrame::OnRenameMemView, this, ID_RENAME_MEM_VIEW);
     Bind(wxEVT_TOOL, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
     Bind(wxEVT_TIMER, &MmemuFrame::OnTimer, this, ID_GUI_TIMER);
     
@@ -537,7 +569,7 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             m_machine->buses[0].bus->setObserver(m_dbg);
 
             m_regPane->SetCPU(m_cpu);
-            m_memPane->SetBus(m_bus);
+            for (auto* p : m_memPanes) p->SetBus(m_bus);
             m_disasmPane->SetBus(m_bus);
             m_disasmPane->SetDisassembler(m_disasm);
             m_consolePane->SetContext(m_cpu, m_bus);
@@ -598,6 +630,7 @@ void MmemuFrame::OnStep(wxCommandEvent& event) {
         m_regPane->RefreshValues();
         m_disasmPane->RefreshValues(m_cpu->pc());
         m_stackPane->RefreshValues();
+        for (auto* p : m_memPanes) p->UpdatePc(m_cpu->pc());
     }
 }
 
@@ -632,7 +665,7 @@ void MmemuFrame::OnFillMem(wxCommandEvent& event) {
         uint32_t len = dialog.GetLength();
         uint8_t val = dialog.GetValue();
         for (uint32_t i = 0; i < len; ++i) m_bus->write8(addr + i, val);
-        m_memPane->RefreshValues();
+        for (auto* p : m_memPanes) p->RefreshValues();
     }
 }
 
@@ -647,7 +680,7 @@ void MmemuFrame::OnCopyMem(wxCommandEvent& event) {
         std::vector<uint8_t> tmp(len);
         for (uint32_t i = 0; i < len; ++i) tmp[i] = m_bus->read8(src + i);
         for (uint32_t i = 0; i < len; ++i) m_bus->write8(dst + i, tmp[i]);
-        m_memPane->RefreshValues();
+        for (auto* p : m_memPanes) p->RefreshValues();
     }
 }
 
@@ -665,7 +698,7 @@ void MmemuFrame::OnSwapMem(wxCommandEvent& event) {
             m_bus->write8(addr1 + i, v2);
             m_bus->write8(addr2 + i, v1);
         }
-        m_memPane->RefreshValues();
+        for (auto* p : m_memPanes) p->RefreshValues();
     }
 }
 
@@ -683,7 +716,7 @@ void MmemuFrame::OnAssemble(wxCommandEvent& event) {
             int sz = assem->assembleLine(instr, opcodes, sizeof(opcodes));
             if (sz > 0) {
                 for (int i = 0; i < sz; ++i) m_bus->write8(addr + i, opcodes[i]);
-                m_memPane->RefreshValues();
+                for (auto* p : m_memPanes) p->RefreshValues();
                 m_disasmPane->RefreshValues(m_cpu->pc());
             } else {
                 wxMessageBox("Assembly failed!", "Error", wxOK | wxICON_ERROR);
@@ -703,8 +736,8 @@ void MmemuFrame::OnGotoAddr(wxCommandEvent& event) {
             m_cpu->setPc(addr);
             m_disasmPane->RefreshValues(m_cpu->pc());
         }
-        m_memPane->SetAddress(addr);
-        m_memPane->RefreshValues();
+        if (auto* _mp = activeMemPane()) _mp->SetAddress(addr);
+        for (auto* p : m_memPanes) p->RefreshValues();
     }
 }
 
@@ -751,8 +784,8 @@ void MmemuFrame::OnSearchMem(wxCommandEvent& event) {
         
         m_lastSearchFoundAddr = foundAddr;
         if (foundAddr != 0xFFFFFFFF) {
-            m_memPane->SetAddress(foundAddr);
-            m_memPane->RefreshValues();
+            if (auto* _mp = activeMemPane()) _mp->SetAddress(foundAddr);
+            for (auto* p : m_memPanes) p->RefreshValues();
             SetStatusText(wxString::Format("Pattern found at $%X", foundAddr));
         } else {
             wxMessageBox("Pattern not found", "Search", wxOK | wxICON_INFORMATION);
@@ -782,8 +815,8 @@ void MmemuFrame::OnFindNext(wxCommandEvent& event) {
 
     if (foundAddr != 0xFFFFFFFF) {
         m_lastSearchFoundAddr = foundAddr;
-        m_memPane->SetAddress(foundAddr);
-        m_memPane->RefreshValues();
+        if (auto* _mp = activeMemPane()) _mp->SetAddress(foundAddr);
+        for (auto* p : m_memPanes) p->RefreshValues();
         SetStatusText(wxString::Format("Next pattern found at $%X", foundAddr));
     } else {
         SetStatusText("No further occurrences found.");
@@ -812,8 +845,8 @@ void MmemuFrame::OnFindPrior(wxCommandEvent& event) {
 
     if (foundAddr != 0xFFFFFFFF) {
         m_lastSearchFoundAddr = foundAddr;
-        m_memPane->SetAddress(foundAddr);
-        m_memPane->RefreshValues();
+        if (auto* _mp = activeMemPane()) _mp->SetAddress(foundAddr);
+        for (auto* p : m_memPanes) p->RefreshValues();
         SetStatusText(wxString::Format("Prior pattern found at $%X", foundAddr));
     } else {
         SetStatusText("No prior occurrences found.");
@@ -844,7 +877,7 @@ void MmemuFrame::OnLoadImage(wxCommandEvent& event) {
                     m_regPane->RefreshValues();
                     m_disasmPane->RefreshValues(m_cpu->pc());
                 }
-                m_memPane->RefreshValues();
+                for (auto* p : m_memPanes) p->RefreshValues();
             } else {
                 wxMessageBox("Failed to load image.", "Error", wxICON_ERROR);
             }
@@ -875,7 +908,7 @@ void MmemuFrame::OnAttachCart(wxCommandEvent& event) {
             if (m_machine->onReset) m_machine->onReset(*m_machine);
             m_regPane->RefreshValues();
             m_disasmPane->RefreshValues(m_cpu->pc());
-            m_memPane->RefreshValues();
+            for (auto* p : m_memPanes) p->RefreshValues();
             SetStatusText("Attached cartridge " + path);
         } else {
             wxMessageBox("Failed to attach cartridge.", "Error", wxICON_ERROR);
@@ -895,7 +928,7 @@ void MmemuFrame::OnEjectCart(wxCommandEvent&) {
         if (m_machine->onReset) m_machine->onReset(*m_machine);
         m_regPane->RefreshValues();
         m_disasmPane->RefreshValues(m_cpu->pc());
-        m_memPane->RefreshValues();
+        for (auto* p : m_memPanes) p->RefreshValues();
         SetStatusText("Cartridge ejected.");
     }
 }
@@ -977,6 +1010,20 @@ void MmemuFrame::OnCtrlShiftK(wxKeyEvent& event) {
     event.Skip();
 }
 
+void MmemuFrame::OnNewMemView(wxCommandEvent&) {
+    wxString label = wxString::Format("Memory %zu", m_memPanes.size() + 1);
+    addMemView(label);
+}
+
+void MmemuFrame::OnRenameMemView(wxCommandEvent&) {
+    int sel = m_memNotebook->GetSelection();
+    if (sel == wxNOT_FOUND) return;
+    wxString current = m_memNotebook->GetPageText(sel);
+    wxString name = wxGetTextFromUser("Enter a name for this memory view:", "Rename Memory View", current, this);
+    if (!name.IsEmpty())
+        m_memNotebook->SetPageText(sel, name);
+}
+
 void MmemuFrame::OnTimer(wxTimerEvent& event) {
     (void)event;
     if (m_running && m_machine && m_machine->schedulerStep) {
@@ -998,7 +1045,8 @@ void MmemuFrame::OnTimer(wxTimerEvent& event) {
     if (m_cpu) {
         m_regPane->RefreshValues();
         m_disasmPane->RefreshValues(m_cpu->pc());
-        m_memPane->RefreshValues();
+        for (auto* p : m_memPanes) p->RefreshValues();
+        for (auto* p : m_memPanes) p->UpdatePc(m_cpu->pc());
         m_stackPane->RefreshValues();
         PluginPaneManager::instance().tickAll(m_cpu->cycles());
     }

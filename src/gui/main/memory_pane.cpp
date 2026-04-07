@@ -11,6 +11,13 @@ MemoryPane::MemoryPane(wxWindow* parent)
     
     UpdateMetrics();
     
+    m_trackPcBtn = new wxToggleButton(this, wxID_ANY, "Track PC");
+    m_toolbarHeight = m_trackPcBtn->GetBestSize().GetHeight() + 2;
+    m_trackPcBtn->SetSize(0, 0, GetClientSize().GetWidth(), m_toolbarHeight);
+    m_trackPcBtn->Bind(wxEVT_TOGGLEBUTTON, [this](wxCommandEvent& e) {
+        m_trackPc = e.IsChecked();
+    });
+
     SetBackgroundStyle(wxBG_STYLE_PAINT);
     Bind(wxEVT_PAINT, &MemoryPane::OnPaint, this);
     Bind(wxEVT_SIZE, &MemoryPane::OnSize, this);
@@ -40,7 +47,7 @@ void MemoryPane::SetBus(IBus* bus) {
     m_bus = bus;
     if (m_bus) {
         int lines = (m_bus->config().addrMask + 1) / 16;
-        SetScrollbar(wxVERTICAL, 0, GetClientSize().y / m_lineHeight, lines);
+        SetScrollbar(wxVERTICAL, 0, (GetClientSize().y - m_toolbarHeight) / m_lineHeight, lines);
     }
     RefreshValues();
 }
@@ -78,9 +85,11 @@ void MemoryPane::OnScroll(wxScrollWinEvent& event) {
 }
 
 void MemoryPane::OnSize(wxSizeEvent& event) {
+    if (m_trackPcBtn)
+        m_trackPcBtn->SetSize(0, 0, GetClientSize().GetWidth(), m_toolbarHeight);
     if (m_bus) {
         int lines = (m_bus->config().addrMask + 1) / 16;
-        SetScrollbar(wxVERTICAL, GetScrollPos(wxVERTICAL), GetClientSize().y / m_lineHeight, lines);
+        SetScrollbar(wxVERTICAL, GetScrollPos(wxVERTICAL), (GetClientSize().y - m_toolbarHeight) / m_lineHeight, lines);
     }
     Refresh();
     event.Skip();
@@ -95,8 +104,19 @@ void MemoryPane::OnContextMenu(wxContextMenuEvent& event) {
     menu.Append(ID_SWAP_MEM, "Swap Memory...");
     menu.AppendSeparator();
     menu.Append(ID_SEARCH_MEM, "Search Memory...");
-    
+
     PopupMenu(&menu);
+}
+
+void MemoryPane::UpdatePc(uint32_t pc) {
+    if (!m_trackPc || !m_bus) return;
+    int pcLine = (int)(pc / 16);
+    int scrollPos = GetScrollPos(wxVERTICAL);
+    int visibleLines = (GetClientSize().y - m_toolbarHeight) / m_lineHeight;
+    if (pcLine < scrollPos || pcLine >= scrollPos + visibleLines) {
+        SetScrollPos(wxVERTICAL, pcLine);
+        Refresh();
+    }
 }
 
 void MemoryPane::OnMouseLeftDown(wxMouseEvent& event) {
@@ -119,7 +139,8 @@ void MemoryPane::OnMouseLeftDown(wxMouseEvent& event) {
     int prefixChars = addrWidth + 2; // "HHHH: " or "HHHHHHHH: "
 
     int x = event.GetX() - 5;
-    int y = event.GetY();
+    int y = event.GetY() - m_toolbarHeight;
+    if (y < 0) { event.Skip(); return; }
 
     int line = y / m_lineHeight;
     int col = x / m_charWidth;
@@ -161,7 +182,7 @@ void MemoryPane::OpenEditorAt(uint32_t addr) {
     int prefixChars = addrWidth + 2;
 
     int scrollPos = GetScrollPos(wxVERTICAL);
-    int visibleLines = GetClientSize().y / m_lineHeight;
+    int visibleLines = (GetClientSize().y - m_toolbarHeight) / m_lineHeight;
     int absLine = (int)(addr / 16);
 
     // Scroll into view if the target line is off-screen.
@@ -174,7 +195,7 @@ void MemoryPane::OpenEditorAt(uint32_t addr) {
     int line = absLine - scrollPos;
     int cellIdx = (int)(addr % 16);
     int cellX = 5 + (prefixChars + cellIdx * 3) * m_charWidth;
-    int cellY = line * m_lineHeight;
+    int cellY = m_toolbarHeight + line * m_lineHeight;
 
     if (m_editor) {
         m_editor->Destroy();
@@ -249,8 +270,8 @@ void MemoryPane::OnPaint(wxPaintEvent& event) {
     
     uint32_t mask = m_bus->config().addrMask;
     int scrollPos = GetScrollPos(wxVERTICAL);
-    int visibleLines = GetClientSize().y / m_lineHeight + 1;
-    
+    int visibleLines = (GetClientSize().y - m_toolbarHeight) / m_lineHeight + 1;
+
     for (int i = 0; i < visibleLines; ++i) {
         uint32_t lineAddr = (scrollPos + i) * 16;
         if (lineAddr > mask) break;
@@ -274,6 +295,6 @@ void MemoryPane::OnPaint(wxPaintEvent& event) {
             else ss << ".";
         }
         
-        dc.DrawText(ss.str(), 5, i * m_lineHeight);
+        dc.DrawText(ss.str(), 5, m_toolbarHeight + i * m_lineHeight);
     }
 }
