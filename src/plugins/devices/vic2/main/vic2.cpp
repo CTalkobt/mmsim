@@ -82,7 +82,6 @@ uint8_t VIC2::dmaPeek(uint32_t offset) const {
 }
 
 uint8_t VIC2::charRomByte(uint32_t offset) const {
-    // The 4 KB char ROM image is indexed mod 4096.
     if (!m_charRom || m_charRomSize == 0) return 0xFF;
     return m_charRom[offset & 0x0FFF];
 }
@@ -248,18 +247,18 @@ void VIC2::renderBackground(uint32_t* buf) {
     uint32_t scrBase  = screenBase();
     uint32_t cbBase   = charBitmapBase();
 
-    // The character ROM is accessible at VIC bank offsets $1000–$1FFF and
-    // $9000–$9FFF.  When the char base falls in those windows, we read from
-    // the ROM image rather than from the DMA bus.
-    bool useCharRom = !bmm && (cbBase == 0x1000 || cbBase == 0x9000);
+    // On C64, character generator ROM is always seen by the VIC at bank 
+    // offsets $1000-$1FFF and $9000-$9FFF BUT only in Banks 0 and 2.
+    bool isBank0or2 = (m_bankBase == 0x0000 || m_bankBase == 0x8000);
+    bool useCharRom = !bmm && isBank0or2 && (cbBase == 0x1000);
 
     // Logging for debug
     static int frameCounter = 0;
     if (frameCounter++ % 60 == 0) {
         char msg[256];
         std::snprintf(msg, sizeof(msg), 
-            "renderBackground: ECM=%d BMM=%d MCM=%d SCRBASE=$%04X CBBASE=$%04X BANK=$%04X CHARROM=%d",
-            (int)ecm, (int)bmm, (int)mcm, scrBase, cbBase, m_bankBase, (int)useCharRom);
+            "renderBackground: ECM=%d BMM=%d MCM=%d SCRBASE=$%04X CBBASE=$%04X BANK=$%04X CHARROM=%d ROMPTR=%p",
+            (int)ecm, (int)bmm, (int)mcm, scrBase, cbBase, m_bankBase, (int)useCharRom, (void*)m_charRom);
         log(SIM_LOG_DEBUG, msg);
         
         // Sample first few bytes of screen RAM
@@ -278,16 +277,14 @@ void VIC2::renderBackground(uint32_t* buf) {
         log(SIM_LOG_DEBUG, msg);
 
         // Sample character ROM data for character $20 (space) and $01 (A)
-        if (useCharRom) {
+        if (m_charRom) {
             uint8_t b20 = charRomByte(0x20 * 8); // first byte of space
             uint8_t b01 = charRomByte(0x01 * 8); // first byte of 'A'
-            std::snprintf(msg, sizeof(msg), "CharROM Sample: CHAR[$20][0]=$%02X CHAR[$01][0]=$%02X", b20, b01);
+            uint8_t b2A = charRomByte(0x2A * 8); // first byte of '*'
+            std::snprintf(msg, sizeof(msg), "CharROM Sample: CHAR[$20][0]=$%02X CHAR[$01][0]=$%02X CHAR[$2A][0]=$%02X", b20, b01, b2A);
             log(SIM_LOG_DEBUG, msg);
         } else {
-            uint8_t b20 = dmaPeek(cbBase + 0x20 * 8);
-            uint8_t b01 = dmaPeek(cbBase + 0x01 * 8);
-            std::snprintf(msg, sizeof(msg), "CharRAM Sample: CHAR[$20][0]=$%02X CHAR[$01][0]=$%02X", b20, b01);
-            log(SIM_LOG_DEBUG, msg);
+            log(SIM_LOG_DEBUG, "CharROM is NULL!");
         }
     }
 

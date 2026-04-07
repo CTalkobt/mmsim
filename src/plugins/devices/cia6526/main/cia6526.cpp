@@ -49,6 +49,7 @@ void CIA6526::reset() {
     if (m_irqLine) m_irqLine->set(false);
     if (m_portADevice) m_portADevice->setDdr(0x00);
     if (m_portBDevice) m_portBDevice->setDdr(0x00);
+    if (m_portAWriteCallback) m_portAWriteCallback(m_pra, m_ddra);
 }
 
 // ---------------------------------------------------------------------------

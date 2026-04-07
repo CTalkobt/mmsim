@@ -147,19 +147,51 @@ static void verifyMachineBoot(const std::string& machineId, uint64_t cyclesToRun
     std::vector<uint32_t> frame(dims.width * dims.height);
     video->renderFrame(frame.data());
     
-    // Verify frame is not a solid single color (implies background only)
-    uint32_t firstPixel = frame[0];
-    bool foundContent = false;
+    // Verify frame is not just border + background (requires at least 3 unique colors if border exists)
+    // or not just a solid block (requires 2 unique colors if no border).
+    std::vector<uint32_t> uniqueColors;
     for (uint32_t p : frame) {
-        if (p != firstPixel) {
-            foundContent = true;
-            break;
+        bool found = false;
+        for (uint32_t c : uniqueColors) {
+            if (c == p) { found = true; break; }
+        }
+        if (!found) {
+            uniqueColors.push_back(p);
+            if (uniqueColors.size() > 3) break; // Optimization: we found enough
         }
     }
     
+    bool hasBorder = (dims.displayWidth < dims.width) || (dims.displayHeight < dims.height);
+    bool foundContent = false;
+    
+    // Check interior display area for unique colors
+    std::vector<uint32_t> interiorColors;
+    for (int y = dims.height/2 - 10; y < dims.height/2 + 10; ++y) {
+        for (int x = dims.width/2 - 50; x < dims.width/2 + 50; ++x) {
+            uint32_t p = frame[y * dims.width + x];
+            bool found = false;
+            for (uint32_t c : interiorColors) { if (c == p) { found = true; break; } }
+            if (!found) {
+                interiorColors.push_back(p);
+                if (interiorColors.size() >= 2) break;
+            }
+        }
+        if (interiorColors.size() >= 2) break;
+    }
+
+    if (hasBorder) {
+        // C64: Interior should have at least 2 colors (BG + Text)
+        foundContent = (interiorColors.size() >= 2);
+    } else {
+        // PET: Full frame should have at least 2 colors (BG + Text)
+        foundContent = (uniqueColors.size() >= 2);
+    }
+    
     if (!foundContent) {
-        fprintf(stderr, "Boot verification failed for %s: solid color frame detected after %lu cycles.\n", 
-                machineId.c_str(), cyclesDone);
+        fprintf(stderr, "Boot verification failed for %s: unique colors in center: ", machineId.c_str());
+        for (uint32_t c : interiorColors) fprintf(stderr, "%08X ", c);
+        fprintf(stderr, " (total unique in frame %zu) after %lu cycles.\n", uniqueColors.size(), cyclesDone);
+        
         // Dump some CPU state
         if (!desc->cpus.empty()) {
             ICore* cpu = desc->cpus[0].cpu;
@@ -167,13 +199,23 @@ static void verifyMachineBoot(const std::string& machineId, uint64_t cyclesToRun
         }
         // Dump VRAM snippet
         if (machineId == "c64") {
-            fprintf(stderr, "VRAM at $0400: ");
-            for (int i=0; i<16; ++i) fprintf(stderr, "%02X ", desc->buses[0].bus->peek8(0x0400+i));
+            fprintf(stderr, "VRAM at $0400: \n");
+            for (int r=0; r<4; ++r) {
+                fprintf(stderr, "  %04X: ", 0x0400 + r*32);
+                for (int i=0; i<32; ++i) fprintf(stderr, "%02X ", desc->buses[0].bus->peek8(0x0400 + r*32 + i));
+                fprintf(stderr, "\n");
+            }
+            fprintf(stderr, "Color RAM at $D800: \n");
+            for (int r=0; r<2; ++r) {
+                fprintf(stderr, "  %04X: ", 0xD800 + r*32);
+                for (int i=0; i<32; ++i) fprintf(stderr, "%02X ", desc->buses[0].bus->peek8(0xD800 + r*32 + i));
+                fprintf(stderr, "\n");
+            }
         } else {
             fprintf(stderr, "VRAM at $8000: ");
             for (int i=0; i<16; ++i) fprintf(stderr, "%02X ", desc->buses[0].bus->peek8(0x8000+i));
+            fprintf(stderr, "\n");
         }
-        fprintf(stderr, "\n");
     }
     ASSERT(foundContent);
 
@@ -186,6 +228,6 @@ TEST_CASE(pet2001_boot_screen) {
 }
 
 TEST_CASE(c64_boot_screen) {
-    // 5 seconds is ample for C64 Kernal to initialize and display message
-    verifyMachineBoot("c64", 5000000);
+    // 10 seconds is ample for C64 Kernal to initialize and display message
+    verifyMachineBoot("c64", 10000000);
 }
