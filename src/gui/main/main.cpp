@@ -115,6 +115,8 @@ private:
     void OnAssemble(wxCommandEvent& event);
     void OnGotoAddr(wxCommandEvent& event);
     void OnSearchMem(wxCommandEvent& event);
+    void OnFindNext(wxCommandEvent& event);
+    void OnFindPrior(wxCommandEvent& event);
     void OnLoadImage(wxCommandEvent& event);
     void OnAttachCart(wxCommandEvent& event);
     void OnEjectCart(wxCommandEvent& event);
@@ -149,6 +151,10 @@ private:
     bool m_running = false;
     bool m_kbdFocus = false;
     IKeyboardCapturePane* m_capturePane = nullptr;
+
+    // Search state
+    std::vector<uint8_t> m_lastSearchPattern;
+    uint32_t             m_lastSearchFoundAddr = 0xFFFFFFFF;
 };
 
 /**
@@ -404,6 +410,8 @@ MmemuFrame::MmemuFrame()
     menuDebug->AppendSeparator();
     menuDebug->Append(ID_GOTO_ADDR, "Go to Address...\tCtrl-G");
     menuDebug->Append(ID_SEARCH_MEM, "Search Memory...\tCtrl-F");
+    menuDebug->Append(ID_FIND_NEXT,  "Find Next\tF3");
+    menuDebug->Append(ID_FIND_PRIOR, "Find Prior\tShift-F3");
     menuDebug->AppendSeparator();
     menuDebug->Append(ID_FILL_MEM, "Fill Memory...");
     menuDebug->Append(ID_COPY_MEM, "Copy Memory...");
@@ -487,6 +495,8 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_MENU, &MmemuFrame::OnGotoAddr, this, ID_GOTO_ADDR);
     Bind(wxEVT_TOOL, &MmemuFrame::OnGotoAddr, this, ID_GOTO_ADDR);
     Bind(wxEVT_MENU, &MmemuFrame::OnSearchMem, this, ID_SEARCH_MEM);
+    Bind(wxEVT_MENU, &MmemuFrame::OnFindNext,  this, ID_FIND_NEXT);
+    Bind(wxEVT_MENU, &MmemuFrame::OnFindPrior, this, ID_FIND_PRIOR);
     Bind(wxEVT_MENU, &MmemuFrame::OnLoadImage, this, ID_LOAD_IMAGE);
     Bind(wxEVT_MENU, &MmemuFrame::OnAttachCart, this, ID_ATTACH_CART);
     Bind(wxEVT_MENU, &MmemuFrame::OnEjectCart, this, ID_EJECT_CART);
@@ -680,50 +690,112 @@ void MmemuFrame::OnGotoAddr(wxCommandEvent& event) {
 void MmemuFrame::OnSearchMem(wxCommandEvent& event) {
     (void)event;
     if (!m_bus) return;
-    SearchMemoryDialog dialog(this);
+    uint32_t mask = m_bus->config().addrMask;
+    SearchMemoryDialog dialog(this, mask);
     if (dialog.ShowModal() == wxID_OK) {
         std::string pattern = dialog.GetPattern();
         bool isHex = dialog.IsHex();
-        uint32_t startAddr = dialog.GetStartAddress();
+        uint32_t startAddr = dialog.GetStartAddress() & mask;
+        uint32_t length = dialog.GetLength();
         
-        std::vector<uint8_t> bytes;
+        m_lastSearchPattern.clear();
         if (isHex) {
-            std::stringstream ss(pattern);
-            std::string byteStr;
-            while (ss >> byteStr) {
+            std::string cleanHex;
+            for (char c : pattern) { if (isxdigit(c)) cleanHex += c; }
+            for (size_t i = 0; i + 1 < cleanHex.length(); i += 2) {
                 try {
-                    bytes.push_back((uint8_t)std::stoul(byteStr, nullptr, 16));
+                    m_lastSearchPattern.push_back((uint8_t)std::stoul(cleanHex.substr(i, 2), nullptr, 16));
                 } catch (...) {}
             }
         } else {
-            for (char c : pattern) bytes.push_back((uint8_t)c);
+            for (char c : pattern) m_lastSearchPattern.push_back((uint8_t)c);
         }
         
-        if (bytes.empty()) return;
+        if (m_lastSearchPattern.empty()) return;
         
-        // Simple search (64KB max for now as per VIC-20/C64)
+        uint32_t endAddr = (startAddr + length > mask + 1) ? (mask + 1) : (startAddr + length);
         uint32_t foundAddr = 0xFFFFFFFF;
-        for (uint32_t i = startAddr; i < 0x10000 - bytes.size(); ++i) {
-            bool match = true;
-            for (size_t j = 0; j < bytes.size(); ++j) {
-                if (m_bus->peek8(i + j) != bytes[j]) {
-                    match = false;
-                    break;
+        
+        if (endAddr >= m_lastSearchPattern.size()) {
+            for (uint32_t i = startAddr; i <= endAddr - m_lastSearchPattern.size(); ++i) {
+                bool match = true;
+                for (size_t j = 0; j < m_lastSearchPattern.size(); ++j) {
+                    if (m_bus->peek8((i + j) & mask) != m_lastSearchPattern[j]) {
+                        match = false; break;
+                    }
                 }
-            }
-            if (match) {
-                foundAddr = i;
-                break;
+                if (match) { foundAddr = i; break; }
             }
         }
         
+        m_lastSearchFoundAddr = foundAddr;
         if (foundAddr != 0xFFFFFFFF) {
             m_memPane->SetAddress(foundAddr);
             m_memPane->RefreshValues();
-            SetStatusText(wxString::Format("Pattern found at $%04X", foundAddr));
+            SetStatusText(wxString::Format("Pattern found at $%X", foundAddr));
         } else {
             wxMessageBox("Pattern not found", "Search", wxOK | wxICON_INFORMATION);
         }
+    }
+}
+
+void MmemuFrame::OnFindNext(wxCommandEvent& event) {
+    if (!m_bus || m_lastSearchPattern.empty()) return;
+    uint32_t mask = m_bus->config().addrMask;
+    uint32_t startAddr = (m_lastSearchFoundAddr == 0xFFFFFFFF) ? 0 : (m_lastSearchFoundAddr + 1) & mask;
+    
+    uint32_t foundAddr = 0xFFFFFFFF;
+    // Search forward from startAddr to end of memory, then wrap around once
+    for (uint32_t i = 0; i < mask + 1; ++i) {
+        uint32_t curr = (startAddr + i) & mask;
+        if (curr + m_lastSearchPattern.size() > mask + 1) continue;
+        
+        bool match = true;
+        for (size_t j = 0; j < m_lastSearchPattern.size(); ++j) {
+            if (m_bus->peek8((curr + j) & mask) != m_lastSearchPattern[j]) {
+                match = false; break;
+            }
+        }
+        if (match) { foundAddr = curr; break; }
+    }
+
+    if (foundAddr != 0xFFFFFFFF) {
+        m_lastSearchFoundAddr = foundAddr;
+        m_memPane->SetAddress(foundAddr);
+        m_memPane->RefreshValues();
+        SetStatusText(wxString::Format("Next pattern found at $%X", foundAddr));
+    } else {
+        SetStatusText("No further occurrences found.");
+    }
+}
+
+void MmemuFrame::OnFindPrior(wxCommandEvent& event) {
+    if (!m_bus || m_lastSearchPattern.empty()) return;
+    uint32_t mask = m_bus->config().addrMask;
+    uint32_t startAddr = (m_lastSearchFoundAddr == 0xFFFFFFFF) ? mask : (m_lastSearchFoundAddr - 1) & mask;
+    
+    uint32_t foundAddr = 0xFFFFFFFF;
+    // Search backward from startAddr
+    for (uint32_t i = 0; i < mask + 1; ++i) {
+        uint32_t curr = (startAddr - i) & mask;
+        if (curr + m_lastSearchPattern.size() > mask + 1) continue;
+        
+        bool match = true;
+        for (size_t j = 0; j < m_lastSearchPattern.size(); ++j) {
+            if (m_bus->peek8((curr + j) & mask) != m_lastSearchPattern[j]) {
+                match = false; break;
+            }
+        }
+        if (match) { foundAddr = curr; break; }
+    }
+
+    if (foundAddr != 0xFFFFFFFF) {
+        m_lastSearchFoundAddr = foundAddr;
+        m_memPane->SetAddress(foundAddr);
+        m_memPane->RefreshValues();
+        SetStatusText(wxString::Format("Prior pattern found at $%X", foundAddr));
+    } else {
+        SetStatusText("No prior occurrences found.");
     }
 }
 

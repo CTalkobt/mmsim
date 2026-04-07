@@ -112,12 +112,12 @@ void GotoAddressDialog::OnOK(wxCommandEvent& event) {
 
 // --- SearchMemoryDialog ---
 
-SearchMemoryDialog::SearchMemoryDialog(wxWindow* parent)
+SearchMemoryDialog::SearchMemoryDialog(wxWindow* parent, uint32_t maxAddr)
     : wxDialog(parent, wxID_ANY, "Search Memory")
 {
     auto* sizer = new wxBoxSizer(wxVERTICAL);
 
-    auto* grid = new wxFlexGridSizer(2, 2, 5, 5);
+    auto* grid = new wxFlexGridSizer(3, 2, 5, 5);
     grid->Add(new wxStaticText(this, wxID_ANY, "Pattern:"), 0, wxALIGN_CENTER_VERTICAL);
     m_patternCtrl = new wxTextCtrl(this, wxID_ANY, "");
     grid->Add(m_patternCtrl, 1, wxEXPAND);
@@ -125,6 +125,10 @@ SearchMemoryDialog::SearchMemoryDialog(wxWindow* parent)
     grid->Add(new wxStaticText(this, wxID_ANY, "Start Address ($hex):"), 0, wxALIGN_CENTER_VERTICAL);
     m_startAddrCtrl = new wxTextCtrl(this, wxID_ANY, "0000");
     grid->Add(m_startAddrCtrl, 1, wxEXPAND);
+
+    grid->Add(new wxStaticText(this, wxID_ANY, "Length ($hex):"), 0, wxALIGN_CENTER_VERTICAL);
+    m_lenCtrl = new wxTextCtrl(this, wxID_ANY, wxString::Format("%X", maxAddr + 1));
+    grid->Add(m_lenCtrl, 1, wxEXPAND);
 
     sizer->Add(grid, 0, wxEXPAND | wxALL, 10);
 
@@ -149,8 +153,9 @@ void SearchMemoryDialog::OnOK(wxCommandEvent& event) {
     m_isHex = m_hexRadio->GetValue();
     try {
         m_startAddr = std::stoul(m_startAddrCtrl->GetValue().ToStdString(), nullptr, 16);
+        m_length = std::stoul(m_lenCtrl->GetValue().ToStdString(), nullptr, 16);
         EndModal(wxID_OK);
     } catch (...) {
-        wxMessageBox("Invalid start address", "Error", wxOK | wxICON_ERROR);
+        wxMessageBox("Invalid hex input!", "Error", wxOK | wxICON_ERROR);
     }
 }

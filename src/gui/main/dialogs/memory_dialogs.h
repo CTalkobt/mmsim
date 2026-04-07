@@ -53,10 +53,11 @@ private:
 
 class SearchMemoryDialog : public wxDialog {
 public:
-    SearchMemoryDialog(wxWindow* parent);
+    SearchMemoryDialog(wxWindow* parent, uint32_t maxAddr = 0xFFFF);
     std::string GetPattern() const { return m_pattern; }
     bool IsHex() const { return m_isHex; }
     uint32_t GetStartAddress() const { return m_startAddr; }
+    uint32_t GetLength() const { return m_length; }
 
 private:
     void OnOK(wxCommandEvent& event);
@@ -65,8 +66,10 @@ private:
     wxRadioButton* m_hexRadio;
     wxRadioButton* m_asciiRadio;
     wxTextCtrl* m_startAddrCtrl;
+    wxTextCtrl* m_lenCtrl;
     
     std::string m_pattern;
     bool m_isHex = true;
     uint32_t m_startAddr = 0;
+    uint32_t m_length = 0;
 };

@@ -35,7 +35,7 @@ MemoryPane::MemoryPane(wxWindow* parent)
 void MemoryPane::SetBus(IBus* bus) {
     m_bus = bus;
     if (m_bus) {
-        int lines = 65536 / 16;
+        int lines = (m_bus->config().addrMask + 1) / 16;
         SetScrollbar(wxVERTICAL, 0, GetClientSize().y / m_lineHeight, lines);
     }
     RefreshValues();
@@ -58,7 +58,7 @@ void MemoryPane::OnScroll(wxScrollWinEvent& event) {
 
 void MemoryPane::OnSize(wxSizeEvent& event) {
     if (m_bus) {
-        int lines = 65536 / 16;
+        int lines = (m_bus->config().addrMask + 1) / 16;
         SetScrollbar(wxVERTICAL, GetScrollPos(wxVERTICAL), GetClientSize().y / m_lineHeight, lines);
     }
     Refresh();
@@ -72,25 +72,28 @@ void MemoryPane::OnPaint(wxPaintEvent& event) {
     
     if (!m_bus) return;
     
+    uint32_t mask = m_bus->config().addrMask;
     int scrollPos = GetScrollPos(wxVERTICAL);
     int visibleLines = GetClientSize().y / m_lineHeight + 1;
     
     for (int i = 0; i < visibleLines; ++i) {
         uint32_t lineAddr = (scrollPos + i) * 16;
-        if (lineAddr >= 65536) break;
+        if (lineAddr > mask) break;
         
         std::stringstream ss;
-        ss << std::hex << std::uppercase << std::setfill('0') << std::setw(4) << lineAddr << ": ";
+        ss << std::hex << std::uppercase << std::setfill('0') << std::setw(mask > 0xFFFF ? 8 : 4) << lineAddr << ": ";
         
         // Hex part
         for (int j = 0; j < 16; ++j) {
-            ss << std::setw(2) << (int)m_bus->peek8(lineAddr + j) << " ";
+            uint32_t addr = (lineAddr + j) & mask;
+            ss << std::setw(2) << (int)m_bus->peek8(addr) << " ";
         }
         
         // ASCII part
         ss << "  ";
         for (int j = 0; j < 16; ++j) {
-            uint8_t c = m_bus->peek8(lineAddr + j);
+            uint32_t addr = (lineAddr + j) & mask;
+            uint8_t c = m_bus->peek8(addr);
             if (c >= 32 && c <= 126) ss << (char)c;
             else ss << ".";
         }
