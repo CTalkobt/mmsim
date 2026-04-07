@@ -19,6 +19,8 @@ static SimPluginManifest s_manifest = {
     0, nullptr,
     0, nullptr,
     1, s_devices,
+    0, nullptr,
+    0, nullptr,
     0, nullptr
 };
 

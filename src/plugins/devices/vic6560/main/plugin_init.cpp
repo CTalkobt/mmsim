@@ -16,10 +16,12 @@ static SimPluginManifest s_manifest = {
     "1.0.0",
     nullptr,        // deps
     nullptr,        // supportedMachineIds
-    0, nullptr,
-    0, nullptr,
-    1, s_devices,
-    0, nullptr
+    0, nullptr,     // cores
+    0, nullptr,     // toolchains
+    1, s_devices,   // devices
+    0, nullptr,     // machines
+    0, nullptr,     // loaders
+    0, nullptr      // cartridges
 };
 
 #include "libdevices/main/device_registry.h"

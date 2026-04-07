@@ -1,6 +1,7 @@
 #include "test_harness.h"
 #include "libcore/main/core_registry.h"
 #include "libcore/main/machines/machine_registry.h"
+#include "libcore/main/json_machine_loader.h"
 #include "libdevices/main/device_registry.h"
 #include "libdevices/main/io_registry.h"
 #include "libmem/main/memory_bus.h"
@@ -11,9 +12,6 @@
 #include "cli/main/plugin_command_registry.h"
 #include <vector>
 #include <string>
-
-// Linked directly into the test binary — no dlopen for core machine components.
-MachineDescriptor* createMachineVic20();
 
 // ---------------------------------------------------------------------------
 #include "kbd_vic20.h"
@@ -54,7 +52,7 @@ static void ensureRegistriesReady() {
         []() -> IOHandler* { return new VIA6522("6522", 0); });
     DeviceRegistry::instance().registerDevice("kbd_vic20",
         []() -> IOHandler* { return new TestKeyboardWrapper(); });
-    MachineRegistry::instance().registerMachine("vic20", createMachineVic20);
+    JsonMachineLoader().loadFile("machines/vic20.json");
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +73,7 @@ static void destroyDesc(MachineDescriptor* desc) {
 
 TEST_CASE(vic20_setup) {
     ensureRegistriesReady();
-    auto* desc = createMachineVic20();
+    auto* desc = MachineRegistry::instance().createMachine("vic20");
     ASSERT(desc != nullptr);
     ASSERT(desc->machineId == "vic20");
     ASSERT(!desc->cpus.empty());
@@ -94,7 +92,7 @@ TEST_CASE(vic20_setup) {
 
 TEST_CASE(vic20_execute_screen_write) {
     ensureRegistriesReady();
-    auto* desc = createMachineVic20();
+    auto* desc = MachineRegistry::instance().createMachine("vic20");
     ASSERT(desc != nullptr);
     auto* bus = getBus(desc);
     ICore* cpu = desc->cpus[0].cpu;
@@ -129,7 +127,7 @@ TEST_CASE(vic20_execute_screen_write) {
 
 TEST_CASE(vic20_raster_frame) {
     ensureRegistriesReady();
-    auto* desc = createMachineVic20();
+    auto* desc = MachineRegistry::instance().createMachine("vic20");
     ASSERT(desc != nullptr);
     auto* bus = getBus(desc);
 
@@ -155,7 +153,7 @@ TEST_CASE(vic20_raster_frame) {
 
 TEST_CASE(vic20_via_timer) {
     ensureRegistriesReady();
-    auto* desc = createMachineVic20();
+    auto* desc = MachineRegistry::instance().createMachine("vic20");
     ASSERT(desc != nullptr);
     auto* bus = getBus(desc);
     desc->onReset(*desc);
@@ -180,7 +178,7 @@ TEST_CASE(vic20_via_timer) {
 
 TEST_CASE(vic20_machine_id_pane_match) {
     ensureRegistriesReady();
-    auto* desc = createMachineVic20();
+    auto* desc = MachineRegistry::instance().createMachine("vic20");
     ASSERT(desc != nullptr);
     ASSERT(desc->machineId == "vic20");
     destroyDesc(desc);

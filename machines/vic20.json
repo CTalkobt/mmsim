@@ -1,0 +1,205 @@
+{
+  "machines": [
+
+    {
+      "id": "vic20",
+      "displayName": "Commodore VIC-20",
+      "licenseClass": "proprietary",
+      "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 16 },
+      "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
+      "devices": [
+        { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
+        { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
+        { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
+        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9400", "size": 1024 },
+        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
+      ],
+      "roms": [
+        { "label": "char",   "path": "roms/vic20/char.bin",   "size": 4096,
+          "overlayAddr": "0x8000", "writable": false },
+        { "label": "basic",  "path": "roms/vic20/basic.bin",  "size": 8192,
+          "overlayAddr": "0xC000", "writable": false },
+        { "label": "kernal", "path": "roms/vic20/kernal.bin", "size": 8192,
+          "overlayAddr": "0xE000", "writable": false }
+      ],
+      "ramExpansions": [
+        { "name": "BLK0", "base": "0x0400", "size": 3072,  "installed": false },
+        { "name": "BLK1", "base": "0x2000", "size": 8192,  "installed": false },
+        { "name": "BLK2", "base": "0x4000", "size": 8192,  "installed": false },
+        { "name": "BLK3", "base": "0x6000", "size": 8192,  "installed": false },
+        { "name": "BLK5", "base": "0xA000", "size": 8192,  "installed": false }
+      ],
+      "signals": [
+        { "name": "irq", "type": "simple", "sources": ["VIA1", "VIA2"] }
+      ],
+      "kbdWiring": {
+        "device": "Keyboard",
+        "colPort": { "device": "VIA2", "port": "B" },
+        "rowPort": { "device": "VIA2", "port": "A" }
+      },
+      "joystick": { "device": "VIA1", "port": "B" },
+      "scheduler": { "type": "step_tick", "frameAccumulator": null }
+    },
+
+    {
+      "id": "vic20+3k",
+      "displayName": "Commodore VIC-20 +3K",
+      "licenseClass": "proprietary",
+      "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 16 },
+      "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
+      "devices": [
+        { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
+        { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
+        { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
+        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9400", "size": 1024 },
+        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
+      ],
+      "roms": [
+        { "label": "char",   "path": "roms/vic20/char.bin",   "size": 4096,
+          "overlayAddr": "0x8000", "writable": false },
+        { "label": "basic",  "path": "roms/vic20/basic.bin",  "size": 8192,
+          "overlayAddr": "0xC000", "writable": false },
+        { "label": "kernal", "path": "roms/vic20/kernal.bin", "size": 8192,
+          "overlayAddr": "0xE000", "writable": false }
+      ],
+      "ramExpansions": [
+        { "name": "BLK0", "base": "0x0400", "size": 3072, "installed": true },
+        { "name": "BLK1", "base": "0x2000", "size": 8192, "installed": false },
+        { "name": "BLK2", "base": "0x4000", "size": 8192, "installed": false },
+        { "name": "BLK3", "base": "0x6000", "size": 8192, "installed": false },
+        { "name": "BLK5", "base": "0xA000", "size": 8192, "installed": false }
+      ],
+      "signals": [
+        { "name": "irq", "type": "simple", "sources": ["VIA1", "VIA2"] }
+      ],
+      "kbdWiring": {
+        "device": "Keyboard",
+        "colPort": { "device": "VIA2", "port": "B" },
+        "rowPort": { "device": "VIA2", "port": "A" }
+      },
+      "joystick": { "device": "VIA1", "port": "B" },
+      "scheduler": { "type": "step_tick", "frameAccumulator": null }
+    },
+
+    {
+      "id": "vic20+8k",
+      "displayName": "Commodore VIC-20 +8K",
+      "licenseClass": "proprietary",
+      "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 16 },
+      "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
+      "devices": [
+        { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
+        { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
+        { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
+        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9400", "size": 1024 },
+        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
+      ],
+      "roms": [
+        { "label": "char",   "path": "roms/vic20/char.bin",   "size": 4096,
+          "overlayAddr": "0x8000", "writable": false },
+        { "label": "basic",  "path": "roms/vic20/basic.bin",  "size": 8192,
+          "overlayAddr": "0xC000", "writable": false },
+        { "label": "kernal", "path": "roms/vic20/kernal.bin", "size": 8192,
+          "overlayAddr": "0xE000", "writable": false }
+      ],
+      "ramExpansions": [
+        { "name": "BLK0", "base": "0x0400", "size": 3072, "installed": false },
+        { "name": "BLK1", "base": "0x2000", "size": 8192, "installed": true },
+        { "name": "BLK2", "base": "0x4000", "size": 8192, "installed": false },
+        { "name": "BLK3", "base": "0x6000", "size": 8192, "installed": false },
+        { "name": "BLK5", "base": "0xA000", "size": 8192, "installed": false }
+      ],
+      "signals": [
+        { "name": "irq", "type": "simple", "sources": ["VIA1", "VIA2"] }
+      ],
+      "kbdWiring": {
+        "device": "Keyboard",
+        "colPort": { "device": "VIA2", "port": "B" },
+        "rowPort": { "device": "VIA2", "port": "A" }
+      },
+      "joystick": { "device": "VIA1", "port": "B" },
+      "scheduler": { "type": "step_tick", "frameAccumulator": null }
+    },
+
+    {
+      "id": "vic20+16k",
+      "displayName": "Commodore VIC-20 +16K",
+      "licenseClass": "proprietary",
+      "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 16 },
+      "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
+      "devices": [
+        { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
+        { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
+        { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
+        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9400", "size": 1024 },
+        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
+      ],
+      "roms": [
+        { "label": "char",   "path": "roms/vic20/char.bin",   "size": 4096,
+          "overlayAddr": "0x8000", "writable": false },
+        { "label": "basic",  "path": "roms/vic20/basic.bin",  "size": 8192,
+          "overlayAddr": "0xC000", "writable": false },
+        { "label": "kernal", "path": "roms/vic20/kernal.bin", "size": 8192,
+          "overlayAddr": "0xE000", "writable": false }
+      ],
+      "ramExpansions": [
+        { "name": "BLK0", "base": "0x0400", "size": 3072, "installed": false },
+        { "name": "BLK1", "base": "0x2000", "size": 8192, "installed": true },
+        { "name": "BLK2", "base": "0x4000", "size": 8192, "installed": true },
+        { "name": "BLK3", "base": "0x6000", "size": 8192, "installed": false },
+        { "name": "BLK5", "base": "0xA000", "size": 8192, "installed": false }
+      ],
+      "signals": [
+        { "name": "irq", "type": "simple", "sources": ["VIA1", "VIA2"] }
+      ],
+      "kbdWiring": {
+        "device": "Keyboard",
+        "colPort": { "device": "VIA2", "port": "B" },
+        "rowPort": { "device": "VIA2", "port": "A" }
+      },
+      "joystick": { "device": "VIA1", "port": "B" },
+      "scheduler": { "type": "step_tick", "frameAccumulator": null }
+    },
+
+    {
+      "id": "vic20+32k",
+      "displayName": "Commodore VIC-20 +32K",
+      "licenseClass": "proprietary",
+      "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 16 },
+      "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
+      "devices": [
+        { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
+        { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
+        { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
+        { "type": "inline_color_ram","name": "ColorRAM","baseAddr": "0x9400", "size": 1024 },
+        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
+      ],
+      "roms": [
+        { "label": "char",   "path": "roms/vic20/char.bin",   "size": 4096,
+          "overlayAddr": "0x8000", "writable": false },
+        { "label": "basic",  "path": "roms/vic20/basic.bin",  "size": 8192,
+          "overlayAddr": "0xC000", "writable": false },
+        { "label": "kernal", "path": "roms/vic20/kernal.bin", "size": 8192,
+          "overlayAddr": "0xE000", "writable": false }
+      ],
+      "ramExpansions": [
+        { "name": "BLK0", "base": "0x0400", "size": 3072, "installed": false },
+        { "name": "BLK1", "base": "0x2000", "size": 8192, "installed": true },
+        { "name": "BLK2", "base": "0x4000", "size": 8192, "installed": true },
+        { "name": "BLK3", "base": "0x6000", "size": 8192, "installed": true },
+        { "name": "BLK5", "base": "0xA000", "size": 8192, "installed": true }
+      ],
+      "signals": [
+        { "name": "irq", "type": "simple", "sources": ["VIA1", "VIA2"] }
+      ],
+      "kbdWiring": {
+        "device": "Keyboard",
+        "colPort": { "device": "VIA2", "port": "B" },
+        "rowPort": { "device": "VIA2", "port": "A" }
+      },
+      "joystick": { "device": "VIA1", "port": "B" },
+      "scheduler": { "type": "step_tick", "frameAccumulator": null }
+    }
+
+  ]
+}

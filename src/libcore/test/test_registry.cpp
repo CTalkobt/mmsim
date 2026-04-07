@@ -34,6 +34,9 @@ TEST_CASE(core_registry_basic) {
         void setDataBus(IBus*) override {}
         void setCodeBus(IBus*) override {}
         void setIoBus(IBus*) override {}
+        IBus* getDataBus() const override { return nullptr; }
+        IBus* getCodeBus() const override { return nullptr; }
+        IBus* getIoBus()   const override { return nullptr; }
         uint64_t cycles() const override { return 0; }
     };
     

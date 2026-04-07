@@ -81,8 +81,10 @@ static SimPluginManifest s_manifest = {
     nullptr,        // supportedMachineIds
     2, s_cores,
     1, s_toolchains,
-    0, nullptr,
-    2, s_machines
+    0, nullptr,     // devices
+    2, s_machines,  // machines
+    0, nullptr,     // loaders
+    0, nullptr      // cartridges
 };
 
 #include "libcore/main/core_registry.h"

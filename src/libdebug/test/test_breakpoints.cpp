@@ -3,6 +3,7 @@
 #include "libcore/main/machine_desc.h"
 #include "libcore/main/core_registry.h"
 #include "libcore/main/machines/machine_registry.h"
+#include "libcore/main/json_machine_loader.h"
 #include "libdevices/main/device_registry.h"
 #include "libdebug/main/debug_context.h"
 #include "cpu6502.h"
@@ -11,8 +12,6 @@
 #include "kbd_vic20.h"
 #include <vector>
 #include <string>
-
-MachineDescriptor* createMachineVic20();
 
 static bool s_bpRegistriesReady = false;
 static void setupBreakpointTestRegistries() {
@@ -39,7 +38,7 @@ static void setupBreakpointTestRegistries() {
     };
     DeviceRegistry::instance().registerDevice("kbd_vic20",
         []() -> IOHandler* { return new KbdWrapper(); });
-    MachineRegistry::instance().registerMachine("vic20", createMachineVic20);
+    JsonMachineLoader().loadFile("machines/vic20.json");
 }
 
 TEST_CASE(TestBasicExecBreakpoint) {

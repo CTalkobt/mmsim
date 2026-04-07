@@ -1,5 +1,11 @@
 #include "pet_video.h"
 #include <cstring>
+#include <string>
+
+void PetVideo::setLinkedDevice(const char* role, IOHandler* dev) {
+    if (std::string(role) == "crtc")
+        m_crtc = dynamic_cast<CRTC6545*>(dev);
+}
 
 PetVideo::PetVideo(Model model) : m_model(model) {
     reset();

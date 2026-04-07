@@ -36,6 +36,8 @@ public:
     // Override bus attachment to install the port proxy.
     void setDataBus(IBus* bus) override;
     void setCodeBus(IBus* bus) override;
+    IBus* getDataBus() const override { return m_portBus; }
+    IBus* getCodeBus() const override { return m_portBus; }
 
     // Banking signal outputs.
     ISignalLine* signalLoram()  { return &m_loram; }
@@ -58,7 +60,9 @@ public:
     /** Returns the internal proxy bus that intercepts $00/$01. */
     IBus* getPortBus() const { return m_portBus; }
 
-    int step() override;
+    // Execution
+    int  step()  override;
+    void reset() override;
 
 private:
     uint64_t     m_stepCounter = 0;
@@ -131,13 +135,8 @@ private:
     PortBus*    m_portBus = nullptr;
     IBus*       m_realBus = nullptr;
 
-    // -----------------------------------------------------------------------
     // Internal helpers (called from PortBus)
-    // -----------------------------------------------------------------------
-    uint8_t portRead() const {
-        // Input bits float high (pull-up); output bits return DATA.
-        return (m_data & m_ddr) | (~m_ddr & 0xFF);
-    }
+    uint8_t portRead() const;
 
     void ddrWrite(uint8_t val);
     void dataWrite(uint8_t val);

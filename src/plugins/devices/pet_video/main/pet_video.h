@@ -37,6 +37,7 @@ public:
 
     void setCharRom(const uint8_t* data, uint32_t size) override { m_charRom = data; m_charRomSize = (size_t)size; }
     void setCRTC(CRTC6545* crtc) { m_crtc = crtc; }
+    void setLinkedDevice(const char* role, IOHandler* dev) override;
 
 private:
     Model m_model;

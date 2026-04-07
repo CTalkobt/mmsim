@@ -319,9 +319,26 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
                 dev->setRamData(bus->rawData());
             }
 
-            // CIA2/VIA2-style portAWriteCallback for VIC-II bank select
-            // TODO: add generic 2-arg setPortAWriteCallback to IOHandler if
-            // CIA6526-based bank switching is needed in JSON machines.
+            // CIA2 VIC-II bank-select callback
+            if (devSpec.value("portAWriteCallback", "") == "vic2_bank_select") {
+                std::string tgtName = devSpec.value("bankSelectTarget", "VIC-II");
+                if (devPtrs.count(tgtName)) {
+                    IOHandler* tgt = devPtrs[tgtName];
+                    dev->setPortAWriteCallback([tgt](uint8_t pra, uint8_t ddra) {
+                        uint8_t eff = (pra & ddra) | (~ddra & 0xFF);
+                        tgt->setBankBase((uint32_t)(~eff & 0x03) * 0x4000);
+                    });
+                }
+            }
+
+            // Generic device-to-device links (e.g. PetVideo → CRTC6545)
+            if (devSpec.contains("linkedDevices") && devSpec["linkedDevices"].is_object()) {
+                for (auto& [role, tgtVal] : devSpec["linkedDevices"].items()) {
+                    std::string tgtName = tgtVal.get<std::string>();
+                    if (devPtrs.count(tgtName))
+                        dev->setLinkedDevice(role.c_str(), devPtrs[tgtName]);
+                }
+            }
         }
     }
 

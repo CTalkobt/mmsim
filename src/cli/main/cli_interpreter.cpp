@@ -3,6 +3,7 @@
 #include "libcore/main/machines/machine_registry.h"
 #include "libtoolchain/main/toolchain_registry.h"
 #include "libcore/main/image_loader.h"
+#include "libdevices/main/ivideo_output.h"
 #include "plugin_command_registry.h"
 #include <iostream>
 #include <fstream>
@@ -96,7 +97,9 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
                 if (m_ctx.machine) delete m_ctx.machine;
                 m_ctx.machine = md;
                 m_ctx.cpu = md->cpus[0].cpu;
-                m_ctx.bus = md->buses[0].bus;
+                // Use CPU data bus if available, otherwise fallback to machine bus
+                m_ctx.bus = m_ctx.cpu->getDataBus() ? m_ctx.cpu->getDataBus() : md->buses[0].bus;
+                
                 if (m_ctx.disasm) delete m_ctx.disasm;
                 if (m_ctx.assem) delete m_ctx.assem;
                 m_ctx.disasm = ToolchainRegistry::instance().createDisassembler(m_ctx.cpu->isaName());
@@ -122,6 +125,8 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
             m_ctx.machine->onReset(*m_ctx.machine);
             m_output("Machine reset.\n");
         }
+        // Refresh bus reference in case it changed during reset
+        m_ctx.bus = m_ctx.cpu->getDataBus() ? m_ctx.cpu->getDataBus() : m_ctx.machine->buses[0].bus;
         showRegisters();
     } else if (cmd == "step") {
         if (!m_ctx.cpu) { m_output("No machine created.\n"); return; }
@@ -331,6 +336,31 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         } else {
             m_output("No cartridge attached.\n");
         }
+    } else if (cmd == "screenshot") {
+        if (!m_ctx.machine) { m_output("No machine created.\n"); return; }
+        std::string filename;
+        if (ss >> filename) {
+            IVideoOutput* video = nullptr;
+            if (m_ctx.machine->ioRegistry) {
+                std::vector<IOHandler*> handlers;
+                m_ctx.machine->ioRegistry->enumerate(handlers);
+                for (auto* handler : handlers) {
+                    video = dynamic_cast<IVideoOutput*>(handler);
+                    if (video) break;
+                }
+            }
+            if (video) {
+                if (video->exportPng(filename)) {
+                    m_output("Screenshot saved to " + filename + "\n");
+                } else {
+                    m_output("Failed to save screenshot to " + filename + "\n");
+                }
+            } else {
+                m_output("No video output device found for this machine.\n");
+            }
+        } else {
+            m_output("Syntax: screenshot <filename.png>\n");
+        }
     } else if (cmd == "setpc") {
         if (!m_ctx.cpu) { m_output("No machine created.\n"); return; }
         std::string addrStr;
@@ -518,6 +548,7 @@ void CliInterpreter::printHelp() {
              "  asm <addr>       - Interactive assembly mode (end with '.')\n"
              "  key <name> <state>- Press/release a key (state: 1/0 or down/up)\n"
              "  load <path> [addr]- Load a program/binary file\n"
+             "  screenshot <file>  - Save current screen to a PNG file\n"
              "  cart <path>      - Attach a cartridge image\n"
              "  eject            - Eject currently attached cartridge\n"
              "  run [addr]       - Run from address (or last loaded address)\n"
@@ -546,7 +577,7 @@ void CliInterpreter::dumpMemory(uint32_t addr, uint32_t len) {
     for (uint32_t i = 0; i < len; i += 16) {
         res << std::hex << std::uppercase << std::setfill('0') << std::setw(4) << (addr + i) << ": ";
         for (uint32_t j = 0; j < 16 && (i + j) < len; ++j) {
-            res << std::setw(2) << (int)m_ctx.bus->read8(addr + i + j) << " ";
+            res << std::setw(2) << (int)m_ctx.bus->peek8(addr + i + j) << " ";
         }
         res << "\n";
     }

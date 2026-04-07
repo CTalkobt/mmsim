@@ -61,6 +61,10 @@ public:
     virtual void setKernalRom(const uint8_t*, uint32_t) {}
     virtual void setRamData  (const uint8_t*)           {}
 
+    // Generic device-to-device link by role name (e.g. "crtc" → CRTC6545*).
+    // Allows the JSON loader to wire companion devices without machine-specific casts.
+    virtual void setLinkedDevice(const char*, IOHandler*) {}
+
     // -----------------------------------------------------------------------
     // Identity (pure virtual — every device must provide these)
     // -----------------------------------------------------------------------

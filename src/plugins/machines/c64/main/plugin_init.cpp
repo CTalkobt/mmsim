@@ -1,39 +1,32 @@
 #include "mmemu_plugin_api.h"
-#include "libcore/main/machine_desc.h"
-#include "libcore/main/core_registry.h"
-#include "libcore/main/machines/machine_registry.h"
+#include "libcore/main/json_machine_loader.h"
 #include "libdevices/main/device_registry.h"
-#include "libtoolchain/main/toolchain_registry.h"
-#include <vector>
+#include "kbd_c64.h"
 
-// Forward declarations
-MachineDescriptor* createMachineC64();
-
-static MachinePluginInfo s_machines[] = {
-    {"c64", createMachineC64}
-};
+static const SimPluginHostAPI* g_host = nullptr;
 
 static const char* s_c64Deps[] = { "6502", "c64-pla", "cia6526", "vic2", "sid6581", "cbm-loader", nullptr };
 
 static SimPluginManifest s_manifest = {
     MMEMU_PLUGIN_API_VERSION,
     "c64",
-    nullptr,
+    "Commodore 64",
     "1.0.0",
     s_c64Deps,
     nullptr,
     0, nullptr,
     0, nullptr,
     0, nullptr,
-    1, s_machines,
+    0, nullptr,
     0, nullptr,
     0, nullptr
 };
 
-extern const SimPluginHostAPI* g_c64Host;
-
 extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host) {
-    auto** ptr = const_cast<const SimPluginHostAPI**>(&g_c64Host);
-    *ptr = host;
+    g_host = host;
+    DeviceRegistry::instance().registerDevice("kbd_c64",
+        []() -> IOHandler* { return new KbdC64(); });
+    JsonMachineLoader loader;
+    loader.loadFile("machines/c64.json");
     return &s_manifest;
 }

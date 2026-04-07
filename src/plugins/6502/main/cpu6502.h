@@ -90,6 +90,11 @@ public:
     void setCodeBus(IBus* bus) override { m_bus = bus; }
     void setIoBus  (IBus* bus) override { (void)bus; }
 
+    IBus* getDataBus() const override { return m_bus; }
+    IBus* getCodeBus() const override { return m_bus; }
+    IBus* getIoBus()   const override { return nullptr; }
+    bool isHalted() const override { return m_state.haltLine; }
+
     uint64_t cycles() const override { return m_state.cycles; }
 
 private:

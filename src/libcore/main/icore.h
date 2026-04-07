@@ -105,6 +105,7 @@ public:
     virtual void setIrqLine(bool asserted) { if (asserted) triggerIrq(); }
     virtual void setNmiLine(bool asserted) { if (asserted) triggerNmi(); }
     virtual void setHaltLine(bool asserted) { (void)asserted; }
+    virtual bool isHalted() const { return false; }
 
     /** Return a named signal line output (e.g. "loram"/"hiram"/"charen" for MOS6510). */
     virtual ISignalLine* getSignalLine(const char*) { return nullptr; }
@@ -121,6 +122,10 @@ public:
     virtual void setDataBus(IBus* bus) = 0;
     virtual void setCodeBus(IBus* bus) = 0;
     virtual void setIoBus  (IBus* bus) = 0;
+
+    virtual IBus* getDataBus() const = 0;
+    virtual IBus* getCodeBus() const = 0;
+    virtual IBus* getIoBus()   const = 0;
 
     virtual uint64_t cycles() const = 0;
 

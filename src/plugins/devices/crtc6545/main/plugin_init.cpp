@@ -19,7 +19,9 @@ static SimPluginManifest s_manifest = {
     0, nullptr,       // cores
     0, nullptr,       // toolchains
     1, s_devices,
-    0, nullptr        // machines
+    0, nullptr,       // machines
+    0, nullptr,       // loaders
+    0, nullptr        // cartridges
 };
 
 extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host) {

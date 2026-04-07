@@ -78,7 +78,7 @@ public:
 
     bool ioRead (IBus* bus, uint32_t addr, uint8_t* val) override;
     bool ioWrite(IBus* bus, uint32_t addr, uint8_t  val) override;
-    void reset() override {}
+    void reset() override;
     void tick(uint64_t) override {}
 
 private:

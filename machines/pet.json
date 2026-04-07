@@ -1,0 +1,159 @@
+{
+  "machines": [
+
+    {
+      "id": "pet2001",
+      "displayName": "Commodore PET 2001",
+      "licenseClass": "proprietary",
+      "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 16 },
+      "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
+      "devices": [
+        { "type": "6520", "name": "PIA1", "baseAddr": "0xE810",
+          "lines": { "ca1": "vsync", "cb1": "vsync" } },
+        { "type": "6520", "name": "PIA2", "baseAddr": "0xE820" },
+        { "type": "6522", "name": "VIA",  "baseAddr": "0xE840",
+          "lines": { "cb1": "vsync" } },
+        { "type": "pet_video_2001", "name": "PetVideo", "baseAddr": null },
+        { "type": "kbd_pet_graphics", "name": "Keyboard", "baseAddr": null }
+      ],
+      "roms": [
+        { "label": "basic",  "path": "roms/pet2001/basic.bin",  "size": 8192,
+          "overlayAddr": "0xC000", "writable": false },
+        { "label": "kernal", "path": "roms/pet2001/kernal.bin", "size": 4096,
+          "overlayAddr": "0xF000", "writable": false },
+        { "label": "editor", "path": "roms/pet2001/editor.bin", "size": 2048,
+          "overlayAddr": "0xE000", "writable": false },
+        { "label": "char",   "path": "roms/pet2001/char.bin",   "size": 2048,
+          "overlayAddr": null, "writable": false,
+          "passToDevice": ["PetVideo"] }
+      ],
+      "signals": [
+        { "name": "vsync", "type": "latch" },
+        { "name": "irq",   "type": "shared",
+          "sources": ["PIA1.irqA", "PIA1.irqB", "PIA2.irqA", "PIA2.irqB", "VIA.irq"] }
+      ],
+      "kbdWiring": {
+        "device": "Keyboard",
+        "colPort": { "device": "PIA1", "port": "B" },
+        "rowPort": { "device": "PIA1", "port": "A" }
+      },
+      "ioHook": {
+        "mirrorRanges": [
+          { "from": "0xE800", "to": "0xE80F", "target": "PIA1", "targetBase": "0xE810" }
+        ]
+      },
+      "scheduler": {
+        "type": "step_tick",
+        "frameAccumulator": {
+          "cycles": 20000,
+          "signal": "vsync"
+        }
+      }
+    },
+
+    {
+      "id": "pet4032",
+      "displayName": "Commodore PET 4032",
+      "licenseClass": "proprietary",
+      "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 16 },
+      "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
+      "devices": [
+        { "type": "6520", "name": "PIA1", "baseAddr": "0xE810",
+          "lines": { "ca1": "vsync", "cb1": "vsync" } },
+        { "type": "6520", "name": "PIA2", "baseAddr": "0xE820" },
+        { "type": "6522", "name": "VIA",  "baseAddr": "0xE840",
+          "lines": { "cb1": "vsync" } },
+        { "type": "6545", "name": "CRTC", "baseAddr": null },
+        { "type": "pet_video_4000", "name": "PetVideo", "baseAddr": null,
+          "linkedDevices": { "crtc": "CRTC" } },
+        { "type": "kbd_pet_business", "name": "Keyboard", "baseAddr": null }
+      ],
+      "roms": [
+        { "label": "basic",  "path": "roms/pet4032/basic.bin",  "size": 12288,
+          "overlayAddr": "0xB000", "writable": false },
+        { "label": "kernal", "path": "roms/pet4032/kernal.bin", "size": 4096,
+          "overlayAddr": "0xF000", "writable": false },
+        { "label": "editor", "path": "roms/pet4032/editor.bin", "size": 2048,
+          "overlayAddr": "0xE000", "writable": false },
+        { "label": "char",   "path": "roms/pet4032/char.bin",   "size": 2048,
+          "overlayAddr": null, "writable": false,
+          "passToDevice": ["PetVideo"] }
+      ],
+      "signals": [
+        { "name": "vsync", "type": "latch" },
+        { "name": "irq",   "type": "shared",
+          "sources": ["PIA1.irqA", "PIA1.irqB", "PIA2.irqA", "PIA2.irqB", "VIA.irq"] }
+      ],
+      "kbdWiring": {
+        "device": "Keyboard",
+        "colPort": { "device": "PIA1", "port": "B" },
+        "rowPort": { "device": "PIA1", "port": "A" }
+      },
+      "ioHook": {
+        "mirrorRanges": [
+          { "from": "0xE800", "to": "0xE80F", "target": "PIA1", "targetBase": "0xE810" }
+        ]
+      },
+      "scheduler": {
+        "type": "step_tick",
+        "frameAccumulator": {
+          "cycles": 20000,
+          "signal": "vsync"
+        }
+      }
+    },
+
+    {
+      "id": "pet8032",
+      "displayName": "Commodore PET 8032",
+      "licenseClass": "proprietary",
+      "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 16 },
+      "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
+      "devices": [
+        { "type": "6520", "name": "PIA1", "baseAddr": "0xE810",
+          "lines": { "ca1": "vsync", "cb1": "vsync" } },
+        { "type": "6520", "name": "PIA2", "baseAddr": "0xE820" },
+        { "type": "6522", "name": "VIA",  "baseAddr": "0xE840",
+          "lines": { "cb1": "vsync" } },
+        { "type": "6545", "name": "CRTC", "baseAddr": null },
+        { "type": "pet_video_8000", "name": "PetVideo", "baseAddr": null,
+          "linkedDevices": { "crtc": "CRTC" } },
+        { "type": "kbd_pet_business", "name": "Keyboard", "baseAddr": null }
+      ],
+      "roms": [
+        { "label": "basic",  "path": "roms/pet8032/basic.bin",  "size": 12288,
+          "overlayAddr": "0xB000", "writable": false },
+        { "label": "kernal", "path": "roms/pet8032/kernal.bin", "size": 4096,
+          "overlayAddr": "0xF000", "writable": false },
+        { "label": "editor", "path": "roms/pet8032/editor.bin", "size": 2048,
+          "overlayAddr": "0xE000", "writable": false },
+        { "label": "char",   "path": "roms/pet8032/char.bin",   "size": 2048,
+          "overlayAddr": null, "writable": false,
+          "passToDevice": ["PetVideo"] }
+      ],
+      "signals": [
+        { "name": "vsync", "type": "latch" },
+        { "name": "irq",   "type": "shared",
+          "sources": ["PIA1.irqA", "PIA1.irqB", "PIA2.irqA", "PIA2.irqB", "VIA.irq"] }
+      ],
+      "kbdWiring": {
+        "device": "Keyboard",
+        "colPort": { "device": "PIA1", "port": "B" },
+        "rowPort": { "device": "PIA1", "port": "A" }
+      },
+      "ioHook": {
+        "mirrorRanges": [
+          { "from": "0xE800", "to": "0xE80F", "target": "PIA1", "targetBase": "0xE810" }
+        ]
+      },
+      "scheduler": {
+        "type": "step_tick",
+        "frameAccumulator": {
+          "cycles": 20000,
+          "signal": "vsync"
+        }
+      }
+    }
+
+  ]
+}

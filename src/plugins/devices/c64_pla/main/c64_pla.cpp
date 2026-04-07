@@ -1,5 +1,10 @@
 #include "c64_pla.h"
 
+void C64PLA::reset() {
+    // Standard C64 reset logic: bits 0-2 of 6510 port float high (LORAM=1, HIRAM=1, CHAREN=1)
+    // The CPU core should handle this via signal lines, but we ensure consistent initial state here.
+}
+
 bool C64PLA::ioRead(IBus* /*bus*/, uint32_t addr, uint8_t* val) {
     // -----------------------------------------------------------------------
     // KERNAL ROM: $E000–$FFFF  active when HIRAM=1

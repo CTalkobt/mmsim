@@ -1,6 +1,7 @@
 #include "test_harness.h"
 #include "libcore/main/core_registry.h"
 #include "libcore/main/machines/machine_registry.h"
+#include "libcore/main/json_machine_loader.h"
 #include "libdevices/main/device_registry.h"
 #include "libdevices/main/io_registry.h"
 #include "libmem/main/memory_bus.h"
@@ -9,12 +10,10 @@
 #include "cia6526.h"
 #include "vic2.h"
 #include "sid6581.h"
+#include "kbd_c64.h"
 #include <vector>
 #include <string>
 #include <cstring>
-
-// Linked directly into the test binary — no dlopen for core machine components.
-MachineDescriptor* createMachineC64();
 
 // ---------------------------------------------------------------------------
 // Registry setup — called once; singletons persist across all test cases.
@@ -26,13 +25,17 @@ static void ensureRegistriesReady() {
     s_registriesReady = true;
     CoreRegistry::instance().registerCore("6510", "MOS6510", "open",
         []() -> ICore* { return new MOS6510(); });
+    DeviceRegistry::instance().registerDevice("c64_pla",
+        []() -> IOHandler* { return new C64PLA(); });
     DeviceRegistry::instance().registerDevice("6567",
         []() -> IOHandler* { return new VIC2("VIC-II", 0xD000); });
     DeviceRegistry::instance().registerDevice("6581",
         []() -> IOHandler* { return new SID6581("SID", 0xD400); });
     DeviceRegistry::instance().registerDevice("6526",
         []() -> IOHandler* { return new CIA6526("CIA", 0); });
-    MachineRegistry::instance().registerMachine("c64", createMachineC64);
+    DeviceRegistry::instance().registerDevice("kbd_c64",
+        []() -> IOHandler* { return new KbdC64(); });
+    JsonMachineLoader().loadFile("machines/c64.json");
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +56,7 @@ static void destroyDesc(MachineDescriptor* desc) {
 
 TEST_CASE(c64_setup) {
     ensureRegistriesReady();
-    auto* desc = createMachineC64();
+    auto* desc = MachineRegistry::instance().createMachine("c64");
     ASSERT(desc != nullptr);
     ASSERT(desc->machineId == std::string("c64"));
     ASSERT(!desc->cpus.empty());
@@ -72,7 +75,7 @@ TEST_CASE(c64_setup) {
 
 TEST_CASE(c64_cpu_is_6510) {
     ensureRegistriesReady();
-    auto* desc = createMachineC64();
+    auto* desc = MachineRegistry::instance().createMachine("c64");
     ASSERT(desc != nullptr);
     ICore* cpu = desc->cpus[0].cpu;
     ASSERT(cpu != nullptr);
@@ -86,7 +89,7 @@ TEST_CASE(c64_cpu_is_6510) {
 
 TEST_CASE(c64_execute_ram_write) {
     ensureRegistriesReady();
-    auto* desc = createMachineC64();
+    auto* desc = MachineRegistry::instance().createMachine("c64");
     ASSERT(desc != nullptr);
     auto* bus = getBus(desc);
     ICore* cpu = desc->cpus[0].cpu;
@@ -117,7 +120,7 @@ TEST_CASE(c64_execute_ram_write) {
 
 TEST_CASE(c64_6510_io_port) {
     ensureRegistriesReady();
-    auto* desc = createMachineC64();
+    auto* desc = MachineRegistry::instance().createMachine("c64");
     ASSERT(desc != nullptr);
     auto* bus = getBus(desc);
     ICore* cpu = desc->cpus[0].cpu;
@@ -156,7 +159,7 @@ TEST_CASE(c64_6510_io_port) {
 
 TEST_CASE(c64_cia1_timer) {
     ensureRegistriesReady();
-    auto* desc = createMachineC64();
+    auto* desc = MachineRegistry::instance().createMachine("c64");
     ASSERT(desc != nullptr);
     auto* bus = getBus(desc);
     desc->onReset(*desc);
@@ -183,7 +186,7 @@ TEST_CASE(c64_cia1_timer) {
 
 TEST_CASE(c64_pla_kernal_routing) {
     ensureRegistriesReady();
-    auto* desc = createMachineC64();
+    auto* desc = MachineRegistry::instance().createMachine("c64");
     ASSERT(desc != nullptr);
     auto* bus = getBus(desc);
     desc->onReset(*desc);
@@ -213,7 +216,7 @@ TEST_CASE(c64_pla_kernal_routing) {
 
 TEST_CASE(c64_vic2_raster_advance) {
     ensureRegistriesReady();
-    auto* desc = createMachineC64();
+    auto* desc = MachineRegistry::instance().createMachine("c64");
     ASSERT(desc != nullptr);
     auto* bus = getBus(desc);
 
@@ -241,7 +244,7 @@ TEST_CASE(c64_vic2_raster_advance) {
 
 TEST_CASE(c64_color_ram) {
     ensureRegistriesReady();
-    auto* desc = createMachineC64();
+    auto* desc = MachineRegistry::instance().createMachine("c64");
     ASSERT(desc != nullptr);
     auto* bus = getBus(desc);
     desc->onReset(*desc);
@@ -277,25 +280,25 @@ TEST_CASE(c64_color_ram) {
 
 TEST_CASE(c64_keyboard_scan) {
     ensureRegistriesReady();
-    auto* desc = createMachineC64();
+    auto* desc = MachineRegistry::instance().createMachine("c64");
     ASSERT(desc != nullptr);
     auto* bus = getBus(desc);
     desc->onReset(*desc);
     ASSERT(desc->onKey != nullptr);
 
-    // Press "a" — PA1 column (PB2 row): pair {pb=2, pa=1}.
+    // Press "a" — PA2 column (PB1 row): keymap {col=2, row=1}.
     bool found = desc->onKey("a", true);
     ASSERT(found);
 
     // Simulate KERNAL scan: set DDRA=0xFF (all outputs), write col-select to PA.
     desc->ioRegistry->dispatchWrite(bus, 0xDC02, 0xFF); // DDRA = all outputs
-    desc->ioRegistry->dispatchWrite(bus, 0xDC00, ~0x02 & 0xFF); // select PA1 low
+    desc->ioRegistry->dispatchWrite(bus, 0xDC00, ~0x04 & 0xFF); // select PA2 low
 
-    // Read PB ($DC01): PB2 (bit 2) must be low (key pressed).
+    // Read PB ($DC01): PB1 (bit 1) must be low (key pressed).
     uint8_t pb = 0xFF;
     bool ok = desc->ioRegistry->dispatchRead(bus, 0xDC01, &pb);
     ASSERT(ok);
-    ASSERT(!(pb & 0x04)); // PB2 = bit 2 must be 0 (pressed)
+    ASSERT(!(pb & 0x02)); // PB1 = bit 1 must be 0 (pressed)
 
     // All other columns: select a column where "a" is NOT present → all rows high.
     desc->ioRegistry->dispatchWrite(bus, 0xDC00, ~0x01 & 0xFF); // select PA0
@@ -313,7 +316,7 @@ TEST_CASE(c64_keyboard_scan) {
 
 TEST_CASE(c64_vic2_character_map_visibility) {
     ensureRegistriesReady();
-    auto* desc = createMachineC64();
+    auto* desc = MachineRegistry::instance().createMachine("c64");
     ASSERT(desc != nullptr);
     auto* bus = getBus(desc);
 
