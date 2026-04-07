@@ -286,19 +286,19 @@ TEST_CASE(c64_keyboard_scan) {
     desc->onReset(*desc);
     ASSERT(desc->onKey != nullptr);
 
-    // Press "a" — PA2 column (PB1 row): keymap {col=2, row=1}.
+    // Press "a" — PA1 column (PB2 row): keymap {col=1, row=2}.
     bool found = desc->onKey("a", true);
     ASSERT(found);
 
     // Simulate KERNAL scan: set DDRA=0xFF (all outputs), write col-select to PA.
     desc->ioRegistry->dispatchWrite(bus, 0xDC02, 0xFF); // DDRA = all outputs
-    desc->ioRegistry->dispatchWrite(bus, 0xDC00, ~0x04 & 0xFF); // select PA2 low
+    desc->ioRegistry->dispatchWrite(bus, 0xDC00, ~0x02 & 0xFF); // select PA1 low
 
-    // Read PB ($DC01): PB1 (bit 1) must be low (key pressed).
+    // Read PB ($DC01): PB2 (bit 2) must be low (key pressed).
     uint8_t pb = 0xFF;
     bool ok = desc->ioRegistry->dispatchRead(bus, 0xDC01, &pb);
     ASSERT(ok);
-    ASSERT(!(pb & 0x02)); // PB1 = bit 1 must be 0 (pressed)
+    ASSERT(!(pb & 0x04)); // PB2 = bit 2 must be 0 (pressed)
 
     // All other columns: select a column where "a" is NOT present → all rows high.
     desc->ioRegistry->dispatchWrite(bus, 0xDC00, ~0x01 & 0xFF); // select PA0

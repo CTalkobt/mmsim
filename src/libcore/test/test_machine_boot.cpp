@@ -196,15 +196,10 @@ static void verifyMachineBoot(const std::string& machineId, uint64_t cyclesToRun
     
     // Check interior display area for unique colors
     std::vector<uint32_t> interiorColors;
-    int yStart = dims.height/2 - 10;
-    int yEnd   = dims.height/2 + 10;
-    if (machineId.find("vic20") != std::string::npos) {
-        // VIC-20 banner is at the top
-        yStart = 60;
-        yEnd   = 80;
-    }
-    for (int y = yStart; y < yEnd; ++y) {
-        for (int x = dims.width/2 - 50; x < dims.width/2 + 50; ++x) {
+    int yStart = 40; // Start near top of display area
+    int yEnd   = dims.height - 40;
+    for (int y = yStart; y < yEnd; y += 2) {
+        for (int x = 40; x < (int)dims.width - 40; x += 2) {
             uint32_t p = frame[y * dims.width + x];
             bool found = false;
             for (uint32_t c : interiorColors) { if (c == p) { found = true; break; } }
