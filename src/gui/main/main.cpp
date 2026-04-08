@@ -549,6 +549,10 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             for (auto* p : m_memPanes) p->SetBus(m_bus);
             m_disasmPane->SetBus(m_bus);
             m_disasmPane->SetDisassembler(m_disasm);
+            m_disasmPane->SetDebugContext(m_dbg);
+            m_disasmPane->SetMemoryPaneCallback([this](uint32_t addr) {
+                if (!m_memPanes.empty()) m_memPanes[0]->SetAddress(addr);
+            });
             m_consolePane->SetContext(m_cpu, m_bus);
             m_consolePane->SetDebugContext(m_dbg);
             m_bpPane->SetDebugContext(m_dbg);

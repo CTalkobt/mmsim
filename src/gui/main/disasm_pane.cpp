@@ -1,5 +1,7 @@
 #include "disasm_pane.h"
 #include <wx/dcbuffer.h>
+#include <wx/clipbrd.h>
+#include <wx/numdlg.h>
 #include <iomanip>
 #include <sstream>
 #include <climits>
@@ -149,6 +151,7 @@ DisasmPane::DisasmPane(wxWindow* parent)
 
     m_drawPanel->Bind(wxEVT_PAINT,      &DisasmPane::OnPaint,      this);
     m_drawPanel->Bind(wxEVT_MOUSEWHEEL, &DisasmPane::OnMouseWheel, this);
+    m_drawPanel->Bind(wxEVT_RIGHT_DOWN, &DisasmPane::OnContextMenu, this);
 
     // Click on draw panel gives it keyboard focus
     m_drawPanel->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& e) {
@@ -227,6 +230,190 @@ void DisasmPane::SetBus(IBus* bus) {
 void DisasmPane::SetDisassembler(IDisassembler* disasm) {
     m_disasm = disasm;
     m_drawPanel->Refresh();
+}
+
+void DisasmPane::SetDebugContext(DebugContext* dbg) {
+    m_dbg = dbg;
+}
+
+void DisasmPane::SetMemoryPaneCallback(std::function<void(uint32_t)> cb) {
+    m_memCallback = cb;
+}
+
+uint32_t DisasmPane::getAddrAtY(int y) const {
+    if (!m_bus || !m_disasm) return 0;
+    int line = y / m_lineHeight;
+    uint32_t addr = m_viewAddr;
+    for (int i = 0; i < line; ++i) {
+        DisasmEntry entry;
+        int bytes = m_disasm->disasmEntry(m_bus, addr, entry);
+        if (bytes <= 0) bytes = 1;
+        addr += bytes;
+        if (addr >= 65536) break;
+    }
+    return addr;
+}
+
+void DisasmPane::OnContextMenu(wxMouseEvent& e) {
+    if (!m_bus || !m_disasm) return;
+
+    uint32_t addr = getAddrAtY(e.GetPosition().y);
+    m_highlightAddr = addr;
+    m_hasHighlight = true;
+    m_drawPanel->Refresh();
+
+    wxMenu menu;
+    
+    // Breakpoint section
+    wxMenu* bpMenu = new wxMenu();
+    bool hasBp = false;
+    bool bpEnabled = false;
+    int bpId = -1;
+    if (m_dbg) {
+        for (const auto& bp : m_dbg->breakpoints().breakpoints()) {
+            if (bp.addr == addr) {
+                hasBp = true;
+                bpEnabled = bp.enabled;
+                bpId = bp.id;
+                break;
+            }
+        }
+    }
+
+    bpMenu->Append(1001, "Toggle Active (EXEC)");
+    bpMenu->Append(1002, "Add EXEC Breakpoint");
+    bpMenu->Append(1003, "Add READ Watchpoint");
+    bpMenu->Append(1004, "Add WRITE Watchpoint");
+    bpMenu->AppendSeparator();
+    bpMenu->Append(1005, "Enable Breakpoint")->Enable(hasBp && !bpEnabled);
+    bpMenu->Append(1006, "Disable Breakpoint")->Enable(hasBp && bpEnabled);
+    menu.AppendSubMenu(bpMenu, "Breakpoint");
+
+    // Navigate section
+    wxMenu* navMenu = new wxMenu();
+    navMenu->Append(2001, "Go to Address...\tCtrl-G");
+    navMenu->Append(2002, "Go to PC");
+    
+    DisasmEntry entry;
+    m_disasm->disasmEntry(m_bus, addr, entry);
+    bool hasTarget = (entry.targetAddr != 0xFFFFFFFF && entry.targetAddr != 0);
+    navMenu->Append(2003, wxString::Format("Follow Operand ($%04X)", entry.targetAddr))->Enable(hasTarget);
+    navMenu->Append(2004, "Set PC here");
+    
+    bool canGoUp = (m_dbg && m_dbg->stackTrace().depth() > 0);
+    navMenu->Append(2005, "Go up one stack frame")->Enable(canGoUp);
+    menu.AppendSubMenu(navMenu, "Navigate");
+
+    // Watch section
+    menu.Append(3001, "Toggle Watch at address (R/W)");
+
+    menu.AppendSeparator();
+    menu.Append(4001, "Show address in memory pane");
+
+    menu.AppendSeparator();
+    wxMenu* clipMenu = new wxMenu();
+    clipMenu->Append(5001, "Copy Address");
+    clipMenu->Append(5002, "Copy Disassembly (next <n> lines)...");
+    menu.AppendSubMenu(clipMenu, "Clipboard");
+
+    int id = GetPopupMenuSelectionFromUser(menu);
+    if (id == wxID_NONE) return;
+
+    switch (id) {
+        case 1001: // Toggle Active
+            if (m_dbg) {
+                if (hasBp) m_dbg->breakpoints().remove(bpId);
+                else m_dbg->breakpoints().add(addr, BreakpointType::EXEC);
+            }
+            break;
+        case 1002: // Add EXEC
+            if (m_dbg) m_dbg->breakpoints().add(addr, BreakpointType::EXEC);
+            break;
+        case 1003: // Add READ
+            if (m_dbg) m_dbg->breakpoints().add(addr, BreakpointType::READ_WATCH);
+            break;
+        case 1004: // Add WRITE
+            if (m_dbg) m_dbg->breakpoints().add(addr, BreakpointType::WRITE_WATCH);
+            break;
+        case 1005: // Enable
+            if (m_dbg && hasBp) m_dbg->breakpoints().setEnabled(bpId, true);
+            break;
+        case 1006: // Disable
+            if (m_dbg && hasBp) m_dbg->breakpoints().setEnabled(bpId, false);
+            break;
+
+        case 2001: OnGoto(); break;
+        case 2002: {
+            m_trackPc = true;
+            m_btnTrack->SetValue(true);
+            int half = m_drawPanel->GetClientSize().y / m_lineHeight / 3;
+            if (half < 4) half = 4;
+            m_viewAddr = findStartAddr(m_pc, half);
+            updateScrollBar();
+            m_drawPanel->Refresh();
+            break;
+        }
+        case 2003: GoTo(entry.targetAddr); break;
+        case 2004: if (m_dbg) m_dbg->cpu()->setPc(addr); break;
+        case 2005: if (m_dbg) {
+            auto recent = m_dbg->stackTrace().recent();
+            for (const auto& se : recent) {
+                if (se.type == StackPushType::CALL) {
+                    GoTo(se.pushedByPc);
+                    break;
+                }
+            }
+        } break;
+
+        case 3001: // Toggle Watch (R/W)
+            if (m_dbg) {
+                bool hasWatch = false;
+                int watchId = -1;
+                for (const auto& bp : m_dbg->breakpoints().breakpoints()) {
+                    if (bp.addr == addr && (bp.type == BreakpointType::READ_WATCH || bp.type == BreakpointType::WRITE_WATCH)) {
+                        hasWatch = true; watchId = bp.id; break;
+                    }
+                }
+                if (hasWatch) m_dbg->breakpoints().remove(watchId);
+                else m_dbg->breakpoints().add(addr, BreakpointType::WRITE_WATCH); // Default to write
+            }
+            break;
+
+        case 4001: if (m_memCallback) m_memCallback(addr); break;
+
+        case 5001: // Copy Address
+            if (wxTheClipboard->Open()) {
+                wxTheClipboard->SetData(new wxTextDataObject(wxString::Format("%04X", addr)));
+                wxTheClipboard->Close();
+            }
+            break;
+        case 5002: { // Copy Disassembly
+            long n = wxGetNumberFromUser("Number of lines to copy:", "Lines:", "Copy Disassembly", 10, 1, 1000, this);
+            if (n > 0) {
+                wxString text;
+                uint32_t a = addr;
+                for (int i = 0; i < (int)n; ++i) {
+                    DisasmEntry de;
+                    int b = m_disasm->disasmEntry(m_bus, a, de);
+                    if (b <= 0) b = 1;
+                    
+                    text << wxString::Format("%04X: ", a);
+                    for (int j = 0; j < 3; ++j) {
+                        if (j < b) text << wxString::Format("%02X ", (int)m_bus->peek8(a + j));
+                        else text << "   ";
+                    }
+                    text << "  " << de.mnemonic << " " << de.operands << "\n";
+                    a += b;
+                    if (a >= 65536) break;
+                }
+                if (wxTheClipboard->Open()) {
+                    wxTheClipboard->SetData(new wxTextDataObject(text));
+                    wxTheClipboard->Close();
+                }
+            }
+            break;
+        }
+    }
 }
 
 void DisasmPane::RefreshValues(uint32_t pc) {

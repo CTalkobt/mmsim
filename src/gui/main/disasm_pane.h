@@ -4,27 +4,37 @@
 #include <wx/scrolbar.h>
 #include "libmem/main/ibus.h"
 #include "libtoolchain/main/idisasm.h"
+#include "libdebug/main/debug_context.h"
+#include <functional>
 
 class DisasmPane : public wxPanel {
 public:
     DisasmPane(wxWindow* parent);
     void SetBus(IBus* bus);
     void SetDisassembler(IDisassembler* disasm);
+    void SetDebugContext(DebugContext* dbg);
+    void SetMemoryPaneCallback(std::function<void(uint32_t)> cb);
+
     void RefreshValues(uint32_t pc);
     void GoTo(uint32_t addr);   // sets highlight cursor and scrolls into view
 
 private:
     void OnPaint(wxPaintEvent&);
     void OnMouseWheel(wxMouseEvent&);
+    void OnContextMenu(wxMouseEvent&);
     void OnGoto();
     void scrollByLines(int delta);
     void updateScrollBar();
     uint32_t findPrevAddr(uint32_t addr) const;
     uint32_t findStartAddr(uint32_t addr, int linesAbove) const;
+    uint32_t getAddrAtY(int y) const;
     static bool isIllegal(const DisasmEntry& entry, int bytes);
 
     IBus*            m_bus           = nullptr;
     IDisassembler*   m_disasm        = nullptr;
+    DebugContext*    m_dbg           = nullptr;
+    std::function<void(uint32_t)> m_memCallback;
+
     uint32_t         m_pc            = 0;
     uint32_t         m_viewAddr      = 0;    // address of first instruction shown
     uint32_t         m_highlightAddr = 0;    // cursor / GoTo destination
