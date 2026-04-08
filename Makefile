@@ -223,7 +223,7 @@ PLUGIN_ANTIC_TEST_SRCS = src/plugins/devices/antic/test/test_atari_boot.cpp \
 REGISTRY_OBJS = src/cli/main/cli_interpreter.o \
 	src/cli/main/plugin_command_registry.o \
 	src/mcp/main/plugin_tool_registry.o \
-	src/mcp/main/main.o \
+	src/mcp/main/main_test.o \
 	src/gui/main/gui_utils.o \
 	src/gui/main/plugin_pane_manager.o
 
@@ -429,7 +429,7 @@ $(TEST_BIN): $(TEST_OBJS) $(LIBS) | $(BINDIR)
 src/%/test/%.o: src/%/test/%.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -DTEST_BUILD -c -o $@ $<
 
-src/mcp/main/main.o: src/mcp/main/main.cpp
+src/mcp/main/main_test.o: src/mcp/main/main.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -DTEST_BUILD -c -o $@ $<
 
 %.o: %.c
