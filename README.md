@@ -71,13 +71,27 @@ A single plugin module can provide multiple resources, which are automatically r
 
 ### 4.1 Expression Evaluator
 Anywhere an address or value is required (CLI, GUI dialogs, MCP), you can use complex expressions:
-- **Formats**:
-    - **Hex**: `$1000` or `0x1000`.
-    - **Binary**: `%10101010`.
+- **Literal Formats**:
+    - **Hex**: `$1000` or `0x1000`. (No space allowed after prefix)
+    - **Binary**: `%10101010`. (No space allowed after prefix)
     - **Decimal**: `4096`.
+    - **Character**: `'a'` (returns ASCII 97). Supports escape sequences: `\n`, `\r`, `\t`, `\\`, `\'`.
 - **Symbols**: Use any defined label (e.g., `CHROUT`, `start_vector`).
-- **Registers**: Use current CPU register names (e.g., `PC + 2`, `SP`).
-- **Arithmetic**: Basic addition (`+`) and subtraction (`-`) are supported.
+- **Registers**: Use current CPU register names (e.g., `PC + 2`, `A`, `X`, `Y`, `P`).
+- **Unary Operators**:
+    - `<`: High byte of result (e.g., `<$1234` is `$12`).
+    - `>`: Low byte of result (e.g., `>$1234` is `$34`).
+    - `!`: Logical negation (0 if non-zero, 1 if zero).
+- **Binary Operators** (in order of precedence):
+    - `*`, `/`, `%`: Multiplication, Division, Modulus.
+        - *Note*: Modulus `%` requires a space or parenthesis if the following operand starts with `0` or `1` (to distinguish from a binary literal).
+    - `+`, `-`: Addition, Subtraction.
+    - `&`: Bitwise AND.
+    - `|`: Bitwise OR.
+    - `==`, `!=`, `<`, `>`, `<=`, `>=`: Comparisons (return 1 for true, 0 for false).
+- **Parentheses**: Use `(` and `)` to override precedence (e.g., `(PC + 2) & $FF00`).
+
+> **Note on Conditions**: When used in a breakpoint or watchpoint condition, any **non-zero** result is treated as `true` (trigger), while a **zero** result is treated as `false`. An empty condition always defaults to `true`.
 
 ### 4.2 Symbol Management
 Manage symbols via the CLI `sym` command or the GUI **Symbols** pane:

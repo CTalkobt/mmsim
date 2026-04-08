@@ -15,6 +15,7 @@ private:
     void OnEnable(wxCommandEvent&);
     void OnDisable(wxCommandEvent&);
     void OnItemActivated(wxListEvent&);
+    void OnContextMenu(wxListEvent&);
     void OnItemSelected(wxListEvent&);
     void OnItemDeselected(wxListEvent&);
     void UpdateButtonStates();

@@ -26,6 +26,8 @@ public:
     int  add(uint32_t addr, BreakpointType type);
     void remove(int id);
     void setEnabled(int id, bool enabled);
+    void setCondition(int id, const std::string& condition);
+    void clearHitCounts();
 
     Breakpoint* checkExec(uint32_t addr, DebugContext* dbg);
     Breakpoint* checkWrite(uint32_t addr, DebugContext* dbg);

@@ -32,6 +32,11 @@ public:
         m_type->SetSelection(0);
         form->Add(m_type, 1, wxEXPAND);
 
+        form->Add(new wxStaticText(this, wxID_ANY, "Condition:"),
+                  0, wxALIGN_CENTER_VERTICAL);
+        m_cond = new wxTextCtrl(this, wxID_ANY, "");
+        form->Add(m_cond, 1, wxEXPAND);
+
         sizer->Add(form, 0, wxEXPAND | wxALL, 10);
         sizer->Add(CreateButtonSizer(wxOK | wxCANCEL), 0, wxEXPAND | wxBOTTOM | wxLEFT | wxRIGHT, 8);
         SetSizerAndFit(sizer);
@@ -43,12 +48,15 @@ public:
     uint32_t GetAddress() const { return m_addressVal; }
 
     BreakpointType GetBreakpointType() const {
+        enum { SEL_EXEC = 0, SEL_READ, SEL_WRITE };
         switch (m_type->GetSelection()) {
-            case 1:  return BreakpointType::READ_WATCH;
-            case 2:  return BreakpointType::WRITE_WATCH;
-            default: return BreakpointType::EXEC;
+            case SEL_READ:  return BreakpointType::READ_WATCH;
+            case SEL_WRITE: return BreakpointType::WRITE_WATCH;
+            default:        return BreakpointType::EXEC;
         }
     }
+
+    std::string GetCondition() const { return m_cond->GetValue().ToStdString(); }
 
 private:
     void OnOK(wxCommandEvent& event) {
@@ -61,6 +69,7 @@ private:
 
     wxTextCtrl* m_addr;
     wxChoice*   m_type;
+    wxTextCtrl* m_cond;
     DebugContext* m_dbg;
     uint32_t    m_addressVal = 0;
 };
@@ -80,6 +89,7 @@ BreakpointPane::BreakpointPane(wxWindow* parent)
     m_list->InsertColumn(2, "Address", wxLIST_FORMAT_LEFT,   72);
     m_list->InsertColumn(3, "En",      wxLIST_FORMAT_CENTER, 36);
     m_list->InsertColumn(4, "Hits",    wxLIST_FORMAT_RIGHT,  48);
+    m_list->InsertColumn(5, "Condition", wxLIST_FORMAT_LEFT, 150);
     sizer->Add(m_list, 1, wxEXPAND | wxALL, 4);
 
     auto* btnSizer  = new wxBoxSizer(wxHORIZONTAL);
@@ -103,6 +113,7 @@ BreakpointPane::BreakpointPane(wxWindow* parent)
     m_list->Bind(wxEVT_LIST_ITEM_SELECTED,   &BreakpointPane::OnItemSelected,   this);
     m_list->Bind(wxEVT_LIST_ITEM_DESELECTED, &BreakpointPane::OnItemDeselected, this);
     m_list->Bind(wxEVT_LIST_ITEM_ACTIVATED,  &BreakpointPane::OnItemActivated,  this);
+    m_list->Bind(wxEVT_LIST_ITEM_RIGHT_CLICK, &BreakpointPane::OnContextMenu,   this);
 }
 
 void BreakpointPane::SetDebugContext(DebugContext* dbg) {
@@ -132,6 +143,7 @@ void BreakpointPane::RefreshValues() {
         m_list->SetItem(row, 2, ss.str());
         m_list->SetItem(row, 3, bp.enabled ? "y" : "n");
         m_list->SetItem(row, 4, std::to_string(bp.hitCount));
+        m_list->SetItem(row, 5, bp.condition);
         m_list->SetItemData(row, bp.id);
 
         if (bp.id == selId)
@@ -146,8 +158,12 @@ void BreakpointPane::OnAdd(wxCommandEvent&) {
         return;
     }
     AddBreakpointDialog dlg(this, m_dbg);
-    if (dlg.ShowModal() == wxID_OK)
-        m_dbg->breakpoints().add(dlg.GetAddress(), dlg.GetBreakpointType());
+    if (dlg.ShowModal() == wxID_OK) {
+        int id = m_dbg->breakpoints().add(dlg.GetAddress(), dlg.GetBreakpointType());
+        if (!dlg.GetCondition().empty()) {
+            m_dbg->breakpoints().setCondition(id, dlg.GetCondition());
+        }
+    }
     RefreshValues();
 }
 
@@ -185,6 +201,58 @@ void BreakpointPane::OnItemActivated(wxListEvent&) {
             RefreshValues();
             return;
         }
+    }
+}
+
+void BreakpointPane::OnContextMenu(wxListEvent& event) {
+    int id = (int)event.GetData();
+    if (!m_dbg) return;
+
+    enum {
+        MENU_EDIT_CONDITION = 1000,
+        MENU_TOGGLE_ENABLED,
+        MENU_DELETE,
+        MENU_CLEAR_HITS
+    };
+
+    wxMenu menu;
+    menu.Append(MENU_EDIT_CONDITION, "Edit Condition...");
+    menu.Append(MENU_TOGGLE_ENABLED, "Toggle Enabled");
+    menu.Append(MENU_DELETE, "Delete");
+    menu.AppendSeparator();
+    menu.Append(MENU_CLEAR_HITS, "Clear All Hit Counts");
+
+    int sel = m_list->GetPopupMenuSelectionFromUser(menu);
+    if (sel == wxID_NONE) return;
+
+    switch (sel) {
+        case MENU_EDIT_CONDITION: {
+            std::string current;
+            for (const auto& bp : m_dbg->breakpoints().breakpoints()) {
+                if (bp.id == id) { current = bp.condition; break; }
+            }
+            wxString cond = wxGetTextFromUser("Edit Condition:", "Breakpoint Condition", current, this);
+            m_dbg->breakpoints().setCondition(id, cond.ToStdString());
+            RefreshValues();
+            break;
+        }
+        case MENU_TOGGLE_ENABLED:
+            for (const auto& bp : m_dbg->breakpoints().breakpoints()) {
+                if (bp.id == id) {
+                    m_dbg->breakpoints().setEnabled(id, !bp.enabled);
+                    RefreshValues();
+                    break;
+                }
+            }
+            break;
+        case MENU_DELETE:
+            m_dbg->breakpoints().remove(id);
+            RefreshValues();
+            break;
+        case MENU_CLEAR_HITS:
+            m_dbg->breakpoints().clearHitCounts();
+            RefreshValues();
+            break;
     }
 }
 

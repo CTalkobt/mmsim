@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0-dev] - 2026-04-08
+
+### Added
+- **Advanced Expression Evaluator**:
+    - Support for high byte (`<`) and low byte (`>`) unary operators.
+    - Support for logical negation (`!`).
+    - Support for multiplication (`*`), division (`/`), and modulus (`%`).
+    - Support for comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`).
+    - Support for parentheses `( )` to control evaluation order and precedence.
+    - Support for character literals (e.g., `'a'`, `'\n'`) returning ASCII values.
+    - Disambiguation between modulus `%` and binary literal prefix.
+- **Enhanced Debugger GUI**:
+    - **DisasmPane Context Menu**: Added a comprehensive right-click menu for breakpoint management, navigation (Go to Address/PC, Follow Operand, Set PC, Go up stack frame), and clipboard operations (Copy Address/Disassembly).
+    - **Conditional Breakpoints**: Integrated condition support into the Breakpoint Pane, allowing users to set and edit expressions that must be non-zero to trigger a break.
+    - **Breakpoint Management**: Added right-click menu to Breakpoint Pane for toggling, editing conditions, and clearing hit counts.
+    - **Memory Sync**: "Show address in memory pane" feature to instantly jump the primary memory view to a specific address from the disassembler.
+- **Improved Symbol Support**:
+    - Enhanced address-entry dialogs and `Ctrl-G` to resolve machine symbols and complex expressions (e.g., `CHROUT`, `start + 5`).
+
+### Changed
+- **UI Refactoring**: Replaced magic numbers in GUI event handlers with structured enums for better maintainability.
+- **Expression Parsing**: Enforced strict rules for literal prefixes (`$`, `%`) to prevent ambiguity with whitespace.
+
 ## [0.3.0-dev] - 2026-04-07
 
 ### Added

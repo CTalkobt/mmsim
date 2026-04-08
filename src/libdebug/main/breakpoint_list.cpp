@@ -25,6 +25,21 @@ void BreakpointList::setEnabled(int id, bool enabled) {
     }
 }
 
+void BreakpointList::setCondition(int id, const std::string& condition) {
+    for (auto& b : m_breakpoints) {
+        if (b.id == id) {
+            b.condition = condition;
+            return;
+        }
+    }
+}
+
+void BreakpointList::clearHitCounts() {
+    for (auto& b : m_breakpoints) {
+        b.hitCount = 0;
+    }
+}
+
 Breakpoint* BreakpointList::checkExec(uint32_t addr, DebugContext* dbg) {
     for (auto& b : m_breakpoints) {
         if (b.enabled && b.type == BreakpointType::EXEC && b.addr == addr) {
