@@ -36,7 +36,9 @@ uint8_t MOS6510::portRead() const {
     // Standard 6510: bits 6-7 of the I/O port don't exist and usually read as 1.
     // Bits 0-5: Output bits (DDR=1) return the register value (DATA).
     //           Input bits (DDR=0) return the logic level on the pins (float high).
-    return (m_data & m_ddr) | (~m_ddr & 0x3F) | 0xC0;
+    uint8_t level = (m_data & m_ddr) | (~m_ddr & 0x3F);
+    if (!(m_ddr & 0x10)) { if (!m_cassetteSense.get()) level &= ~0x10; else level |= 0x10; }
+    return level | 0xC0;
 }
 
 void MOS6510::ddrWrite(uint8_t val) {
@@ -81,4 +83,6 @@ void MOS6510::updateSignals() {
     m_loram .set((level >> 0) & 1);
     m_hiram .set((level >> 1) & 1);
     m_charen.set((level >> 2) & 1);
+    m_cassetteWrite.set((level >> 3) & 1);
+    m_cassetteMotor.set((level >> 5) & 1);
 }

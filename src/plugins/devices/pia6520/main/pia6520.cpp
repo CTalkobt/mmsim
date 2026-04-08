@@ -4,10 +4,14 @@
 #include <cstdio>
 
 PIA6520::PIA6520() : m_name("6520"), m_baseAddr(0xE810) {
+    m_ca1Line = &m_ca1Conduit;
+    m_cb1Line = &m_cb1Conduit;
     reset();
 }
 
 PIA6520::PIA6520(const std::string& name, uint32_t baseAddr) : m_name(name), m_baseAddr(baseAddr) {
+    m_ca1Line = &m_ca1Conduit;
+    m_cb1Line = &m_cb1Conduit;
     reset();
 }
 

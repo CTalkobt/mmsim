@@ -4,6 +4,7 @@
 #include "breakpoint_list.h"
 #include "trace_buffer.h"
 #include "stack_trace.h"
+#include "libtoolchain/main/symbol_table.h"
 #include <vector>
 #include <memory>
 
@@ -25,6 +26,7 @@ public:
     BreakpointList& breakpoints() { return m_breakpoints; }
     TraceBuffer&    trace()       { return m_trace; }
     StackTrace&     stackTrace()  { return m_stackTrace; }
+    SymbolTable&    symbols()     { return m_symbols; }
 
     int  saveSnapshot(const std::string& label);
     bool restoreSnapshot(int index);
@@ -50,6 +52,7 @@ private:
     BreakpointList m_breakpoints;
     TraceBuffer    m_trace;
     StackTrace     m_stackTrace;
+    SymbolTable    m_symbols;
     std::vector<SystemSnapshot> m_snapshots;
     bool        m_paused          = false;
     uint32_t    m_lastPausedAddr  = ~0u;

@@ -35,6 +35,7 @@ public:
     // -----------------------------------------------------------------------
 
     const char* name()     const override { return m_name.c_str(); }
+    void        setName(const std::string& name) override { m_name = name; }
     uint32_t    baseAddr() const override { return m_baseAddr; }
     uint32_t    addrMask() const override { return 0x000F; } // 16 registers
 

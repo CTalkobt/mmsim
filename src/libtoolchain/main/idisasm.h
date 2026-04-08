@@ -21,6 +21,8 @@ struct DisasmEntry {
     uint32_t targetAddr;
 };
 
+class SymbolTable;
+
 /**
  * Abstract interface for a disassembler.
  */
@@ -41,4 +43,9 @@ public:
      * @return Number of bytes consumed.
      */
     virtual int disasmEntry(IBus* bus, uint32_t addr, DisasmEntry& entry) = 0;
+
+    /**
+     * Associate a symbol table with the disassembler for label resolution.
+     */
+    virtual void setSymbolTable(SymbolTable* symbols) = 0;
 };

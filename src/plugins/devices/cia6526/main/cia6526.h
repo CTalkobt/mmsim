@@ -48,6 +48,8 @@ public:
     void setPortADevice(IPortDevice* d) override { m_portADevice = d; }
     void setPortBDevice(IPortDevice* d) override { m_portBDevice = d; }
     void setIrqLine(ISignalLine* line)  override { m_irqLine = line; }
+    ISignalLine* signalFlag() { return &m_flagLine; }
+    ISignalLine* getSignalLine(const char* name) override { if (std::string(name) == "flag") return &m_flagLine; return nullptr; }
 
     /** Called after every write to PRA or DDRA with the new (pra, ddra) values.
      *  Useful for CIA2 VIC-II bank switching in the C64 machine factory. */
@@ -106,6 +108,7 @@ public:
     static constexpr uint8_t ICR_INT = 0x80; // any interrupt active
 
 private:
+    void flagTrigger();
     void updateIrq();
     void tickTimerA(uint64_t cycles);
     void tickTimerB(uint64_t cycles, uint32_t taUnderflows);
@@ -165,6 +168,19 @@ private:
     uint64_t m_todAccum  = 0; // accumulated cycles for TOD
 
     IPortDevice* m_portADevice = nullptr;
+    struct SignalLine : public ISignalLine {
+        CIA6526* m_owner;
+        uint8_t  m_bit;
+        bool     m_level = true;
+        SignalLine(CIA6526* owner, uint8_t bit) : m_owner(owner), m_bit(bit) {}
+        bool get() const override { return m_level; }
+        void set(bool level) override {
+            if (m_level && !level) m_owner->flagTrigger();
+            m_level = level;
+        }
+        void pulse() override { set(false); set(true); }
+    };
+    SignalLine m_flagLine{this, 0x10};
     IPortDevice* m_portBDevice = nullptr;
     ISignalLine* m_irqLine     = nullptr;
 

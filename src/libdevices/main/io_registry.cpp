@@ -56,6 +56,15 @@ void IORegistry::enumerate(std::vector<IOHandler*>& list) {
     }
 }
 
+IOHandler* IORegistry::findHandler(const std::string& name) {
+    for (auto* handler : m_handlers) {
+        if (name == handler->name()) {
+            return handler;
+        }
+    }
+    return nullptr;
+}
+
 void IORegistry::clear() {
     m_handlers.clear();
 }

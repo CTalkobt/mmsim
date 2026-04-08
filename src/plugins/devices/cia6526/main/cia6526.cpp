@@ -354,6 +354,11 @@ void CIA6526::tickTOD(uint64_t cycles) {
 // Helpers
 // ---------------------------------------------------------------------------
 
+void CIA6526::flagTrigger() {
+    m_icrPending |= 0x10;
+    updateIrq();
+}
+
 void CIA6526::updateIrq() {
     bool assert = (m_icrPending & m_icrMask) != 0;
     if (m_irqLine) m_irqLine->set(assert);

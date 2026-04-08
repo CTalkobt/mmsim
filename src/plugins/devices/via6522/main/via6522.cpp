@@ -4,6 +4,10 @@
 VIA6522::VIA6522(const std::string& name, uint32_t baseAddr)
     : m_name(name), m_baseAddr(baseAddr)
 {
+    m_ca1Line = &m_ca1Conduit;
+    m_ca2Line = &m_ca2Conduit;
+    m_cb1Line = &m_cb1Conduit;
+    m_cb2Line = &m_cb2Conduit;
     reset();
 }
 

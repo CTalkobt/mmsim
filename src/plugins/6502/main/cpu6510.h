@@ -16,8 +16,8 @@
  *   bit 1 = HIRAM  (0 = RAM visible at $E000, 1 = KERNAL ROM)
  *   bit 2 = CHAREN (0 = Character ROM at $D000, 1 = I/O)
  *   bit 3 = Cassette write output   (not used for banking)
- *   bit 4 = Cassette motor control  (not used for banking)
- *   bit 5 = Cassette sense input    (not used for banking)
+ *   bit 4 = Cassette sense input  (not used for banking)
+ *   bit 5 = Cassette motor control    (not used for banking)
  *
  * The three banking lines are exposed as ISignalLine* so the PLA handler
  * (Phase 11.2) can observe them and reconfigure the memory map accordingly.
@@ -43,6 +43,9 @@ public:
     ISignalLine* signalLoram()  { return &m_loram; }
     ISignalLine* signalHiram()  { return &m_hiram; }
     ISignalLine* signalCharen() { return &m_charen; }
+    ISignalLine* signalCassetteWrite() { return &m_cassetteWrite; }
+    ISignalLine* signalCassetteMotor() { return &m_cassetteMotor; }
+    ISignalLine* signalCassetteSense() { return &m_cassetteSense; }
 
     /** ICore override: returns "loram", "hiram", or "charen" signal lines. */
     ISignalLine* getSignalLine(const char* name) override {
@@ -50,6 +53,9 @@ public:
         if (n == "loram")  return signalLoram();
         if (n == "hiram")  return signalHiram();
         if (n == "charen") return signalCharen();
+        if (n == "cassette_write") return signalCassetteWrite();
+        if (n == "cassette_motor") return signalCassetteMotor();
+        if (n == "cassette_sense") return signalCassetteSense();
         return nullptr;
     }
 
@@ -131,6 +137,9 @@ private:
     SignalLine  m_loram;
     SignalLine  m_hiram;
     SignalLine  m_charen;
+    SignalLine  m_cassetteWrite;
+    SignalLine  m_cassetteMotor;
+    SignalLine  m_cassetteSense;
 
     PortBus*    m_portBus = nullptr;
     IBus*       m_realBus = nullptr;

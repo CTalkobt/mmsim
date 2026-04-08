@@ -13,7 +13,8 @@ public:
     virtual ~CRTC6545() = default;
 
     // IOHandler implementation
-    const char* name() const override { return "CRTC6545"; }
+    const char* name() const override { return m_name.c_str(); }
+    void setName(const std::string& name) override { m_name = name; }
     uint32_t baseAddr() const override { return 0xE880; }
     uint32_t addrMask() const override { return 0x0001; } // Responds to $E880 and $E881
 
@@ -47,6 +48,7 @@ private:
     bool m_hSync = false;
     bool m_vSync = false;
     bool m_dispEnable = false;
+    std::string m_name = "CRTC6545";
 
     void updateCounters();
 };

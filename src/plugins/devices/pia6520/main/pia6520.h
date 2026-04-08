@@ -1,6 +1,7 @@
 #pragma once
 
 #include "libdevices/main/io_handler.h"
+#include "libdevices/main/isignal_line.h"
 #include "libdevices/main/iport_device.h"
 #include <cstdint>
 #include <string>
@@ -14,6 +15,12 @@ public:
     PIA6520();
     PIA6520(const std::string& name, uint32_t baseAddr);
     virtual ~PIA6520() = default;
+    ISignalLine* getSignalLine(const char* name) override {
+        std::string n(name);
+        if (n == "ca1") return &m_ca1Conduit;
+        if (n == "cb1") return &m_cb1Conduit;
+        return nullptr;
+    }
 
     // Configuration
     void setName(const std::string& name) override { m_name = name; }
@@ -65,6 +72,13 @@ public:
     }
 
 private:
+    struct SignalLine : public ISignalLine {
+        bool m_level = true;
+        bool get() const override { return m_level; }
+        void set(bool level) override { m_level = level; }
+        void pulse() override { m_level = !m_level; m_level = !m_level; }
+    };
+    SignalLine m_ca1Conduit, m_cb1Conduit;
     void updateIrq();
     void driveCA2(bool level);
     void driveCB2(bool level);

@@ -300,6 +300,105 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
             }
             m_output(out.str());
         }
+    } else if (cmd == "sym") {
+        if (!m_ctx.dbg) { m_output("No machine created.\n"); return; }
+        std::string sub;
+        if (ss >> sub) {
+            if (sub == "add") {
+                std::string label, addrStr;
+                if (ss >> label >> addrStr) {
+                    uint32_t addr;
+                    if (addrStr[0] == '$') addr = std::stoul(addrStr.substr(1), nullptr, 16);
+                    else addr = std::stoul(addrStr, nullptr, 0);
+                    m_ctx.dbg->symbols().addSymbol(addr, label);
+                    m_output("Symbol added: " + label + " = $" + addrStr + "\n");
+                } else {
+                    m_output("Usage: sym add <label> <address>\n");
+                }
+            } else if (sub == "del") {
+                std::string label;
+                if (ss >> label) {
+                    m_ctx.dbg->symbols().removeSymbol(label);
+                    m_output("Symbol removed: " + label + "\n");
+                } else {
+                    m_output("Usage: sym del <label>\n");
+                }
+            } else if (sub == "list") {
+                auto syms = m_ctx.dbg->symbols().symbols();
+                if (syms.empty()) {
+                    m_output("No symbols defined.\n");
+                } else {
+                    std::stringstream out;
+                    out << std::setfill('0') << std::uppercase << std::hex;
+                    for (const auto& pair : syms) {
+                        out << "$" << std::setw(4) << pair.first << "  " << pair.second << "\n";
+                    }
+                    m_output(out.str());
+                }
+            } else if (sub == "search") {
+                std::string query;
+                if (ss >> query) {
+                    auto syms = m_ctx.dbg->symbols().symbols();
+                    std::stringstream out;
+                    bool found = false;
+                    for (const auto& pair : syms) {
+                        if (pair.second.find(query) != std::string::npos) {
+                            out << "$" << std::hex << std::uppercase << std::setw(4) << std::setfill('0') << pair.first << "  " << pair.second << "\n";
+                            found = true;
+                        }
+                    }
+                    if (found) m_output(out.str());
+                    else m_output("No symbols matching '" + query + "' found.\n");
+                } else {
+                    m_output("Usage: sym search <query>\n");
+                }
+            } else if (sub == "load") {
+                std::string path;
+                if (ss >> path) {
+                    if (m_ctx.dbg->symbols().loadSym(path)) {
+                        m_output("Symbols loaded from: " + path + "\n");
+                    } else {
+                        m_output("Failed to load symbols from: " + path + "\n");
+                    }
+                } else {
+                    m_output("Usage: sym load <path>\n");
+                }
+            } else if (sub == "clear") {
+                m_ctx.dbg->symbols().clear();
+                m_output("Symbol table cleared.\n");
+            } else {
+                m_output("Unknown sym subcommand: " + sub + "\n");
+            }
+        } else {
+            m_output("Usage: sym <add|del|list|search|load|clear>\n");
+        }
+    } else if (cmd == "tape") {
+        if (!m_ctx.machine) { m_output("No machine created.\n"); return; }
+        std::string sub;
+        if (ss >> sub) {
+            IOHandler* tape = m_ctx.machine->ioRegistry ? m_ctx.machine->ioRegistry->findHandler("Tape") : nullptr;
+            if (!tape) {
+                m_output("No datasette found in this machine.\n");
+                return;
+            }
+            if (sub == "mount") {
+                std::string path;
+                if (ss >> path) {
+                    if (tape->mountTape(path)) {
+                        m_output("Mounted tape: " + path + "\n");
+                    } else {
+                        m_output("Failed to mount tape: " + path + "\n");
+                    }
+                } else {
+                    m_output("Usage: tape mount <path>\n");
+                }
+            } else {
+                tape->controlTape(sub);
+                m_output("Tape: " + sub + "\n");
+            }
+        } else {
+            m_output("Usage: tape <mount|play|stop|rewind>\n");
+        }
     } else if (cmd == "cart") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
         std::string path;
@@ -630,10 +729,11 @@ void CliInterpreter::printHelp() {
              "  load <path> [addr]- Load a program/binary file\n"
              "  screenshot <file>  - Save current screen to a PNG file\n"
              "  cart <path>      - Attach a cartridge image\n"
+             "  tape <mount|play|stop|rewind> - Tape controls\n"
              "  eject            - Eject currently attached cartridge\n"
              "  run [addr]       - Run from address (or last loaded address)\n"
-             "  .<instr>         - Assemble and execute a single instruction\n"
-             "  quit, q          - Exit the program\n"
+             "  sym <add|del|list|search|load|clear> - Symbol table management\n"
+             "  .<instr>         - Assemble and execute a single instruction\n"             "  quit, q          - Exit the program\n"
              "\nDebugging:\n"
              "  break <addr>     - Set execution breakpoint at address\n"
              "  watch read <addr> - Set read watchpoint at address\n"

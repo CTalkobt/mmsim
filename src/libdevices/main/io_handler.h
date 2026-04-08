@@ -64,6 +64,9 @@ public:
     // Generic device-to-device link by role name (e.g. "crtc" → CRTC6545*).
     // Allows the JSON loader to wire companion devices without machine-specific casts.
     virtual void setLinkedDevice(const char*, IOHandler*) {}
+    virtual ISignalLine* getSignalLine(const char*) { return nullptr; }
+    virtual bool mountTape(const std::string& path) { return false; }
+    virtual void controlTape(const std::string& op) {}
 
     // -----------------------------------------------------------------------
     // Identity (pure virtual — every device must provide these)

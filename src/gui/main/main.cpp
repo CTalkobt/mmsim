@@ -28,6 +28,8 @@
 #include "libtoolchain/main/toolchain_registry.h"
 #include "gui_ids.h"
 #include "screen_pane.h"
+#include "tape_pane.h"
+#include "symbol_pane.h"
 #include "include/util/logging.h"
 #include "gui_utils.h"
 #include <fstream>
@@ -63,6 +65,7 @@ private:
     void OnEjectCart(wxCommandEvent& event);
     void OnKbdFocus(wxCommandEvent& event);
     void OnShowBpPane(wxCommandEvent& event);
+    void OnShowSymPane(wxCommandEvent& event);
     void OnShowStackPane(wxCommandEvent& event);
     void OnShowMachinePane(wxCommandEvent& event);
     void OnNewMemView(wxCommandEvent& event);
@@ -70,6 +73,7 @@ private:
     void OnTimer(wxTimerEvent& event);
     void OnCtrlShiftK(wxKeyEvent& event);
     void ShowBreakpointPane();
+    void ShowSymbolPane();
     void ShowStackPane();
     void ShowMachineInspectorPane();
 
@@ -102,6 +106,7 @@ private:
     ConsolePane*    m_consolePane;
     CartridgePane*  m_cartPane;
     BreakpointPane* m_bpPane    = nullptr;
+    SymbolPane*     m_symPane   = nullptr;
     StackPane*      m_stackPane = nullptr;
     MachineInspectorPane* m_machineInspectorPane = nullptr;
     wxAuiNotebook*  m_notebook  = nullptr;
@@ -311,6 +316,23 @@ static void refreshScreenPane(void* paneHandle, uint64_t /*cycles*/, void* /*ctx
     static_cast<ScreenPane*>(paneHandle)->RefreshFrame();
 }
 
+static void* createTapePane(void* parentHandle, void* /*ctx*/) {
+    auto* parent = static_cast<wxWindow*>(parentHandle);
+    auto* pane = new TapePane(parent);
+    return static_cast<void*>(pane);
+}
+
+static void onTapeMachineLoad(void* paneHandle, MachineDescriptor* desc, void* /*ctx*/) {
+    auto* pane = static_cast<TapePane*>(paneHandle);
+    IOHandler* tape = desc && desc->ioRegistry ? desc->ioRegistry->findHandler("Tape") : nullptr;
+    pane->SetTapeDevice(tape);
+}
+
+static PluginPaneInfo s_builtInTapePane = {
+    "tape", "Tape Control", "Tools", nullptr,
+    createTapePane, nullptr, nullptr, onTapeMachineLoad, nullptr
+};
+
 static PluginPaneInfo s_builtInScreenPane = {
     "screen", "Screen", nullptr, nullptr,
     createScreenPane, nullptr, refreshScreenPane, onScreenMachineLoad, nullptr
@@ -326,6 +348,7 @@ public:
             PluginPaneManager::instance().registerPane(info);
         });
         PluginPaneManager::instance().registerPane(&s_builtInScreenPane);
+        PluginPaneManager::instance().registerPane(&s_builtInTapePane);
         PluginLoader::instance().loadFromDir("./lib");
         auto *frame = new MmemuFrame();
         frame->Show(true);
@@ -377,6 +400,7 @@ MmemuFrame::MmemuFrame()
     menuDebug->Append(ID_SWAP_MEM, "Swap Memory...");
     menuDebug->AppendSeparator();
     menuDebug->Append(ID_SHOW_BP_PANE,    "Breakpoints\tCtrl-B");
+    menuDebug->Append(ID_SHOW_SYM_PANE,   "Symbols\tCtrl-Y");
     menuDebug->Append(ID_SHOW_STACK_PANE, "Stack Trace\tCtrl-T");
     menuDebug->Append(ID_SHOW_MACHINE_PANE, "Machine Explorer\tCtrl-M");
     menuDebug->AppendSeparator();
@@ -433,6 +457,8 @@ MmemuFrame::MmemuFrame()
     m_notebook->AddPage(m_cartPane, "Cartridge");
     m_bpPane = new BreakpointPane(m_notebook);
     m_notebook->AddPage(m_bpPane, "Breakpoints");
+    m_symPane = new SymbolPane(m_notebook);
+    m_notebook->AddPage(m_symPane, "Symbols");
     m_stackPane = new StackPane(m_notebook);
     m_notebook->AddPage(m_stackPane, "Stack");
     
@@ -474,6 +500,7 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_MENU, &MmemuFrame::OnEjectCart, this, ID_EJECT_CART);
     Bind(wxEVT_MENU, &MmemuFrame::OnKbdFocus,   this, ID_KBD_FOCUS);
     Bind(wxEVT_MENU, &MmemuFrame::OnShowBpPane,    this, ID_SHOW_BP_PANE);
+    Bind(wxEVT_MENU, &MmemuFrame::OnShowSymPane,   this, ID_SHOW_SYM_PANE);
     Bind(wxEVT_MENU, &MmemuFrame::OnShowStackPane, this, ID_SHOW_STACK_PANE);
     Bind(wxEVT_MENU, &MmemuFrame::OnShowMachinePane, this, ID_SHOW_MACHINE_PANE);
     Bind(wxEVT_MENU, &MmemuFrame::OnNewMemView,    this, ID_NEW_MEM_VIEW);
@@ -499,13 +526,20 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             m_cpu = m_machine->cpus[0].cpu;
             // Use CPU data bus for memory pane if available, otherwise fallback to machine bus
             m_bus = m_machine->cpus[0].dataBus ? m_machine->cpus[0].dataBus : m_machine->buses[0].bus;
-            if (m_disasm) delete m_disasm;
+            if (m_disasm) {
+                delete m_disasm;
+                m_disasm = nullptr;
+            }
             m_disasm = ToolchainRegistry::instance().createDisassembler(m_cpu->isaName());
             
             delete m_dbg;
             m_dbg = new DebugContext(m_cpu, m_machine->buses[0].bus);
             m_cpu->setObserver(m_dbg);
             m_machine->buses[0].bus->setObserver(m_dbg);
+
+            if (m_disasm) {
+                m_disasm->setSymbolTable(&m_dbg->symbols());
+            }
 
             m_regPane->SetCPU(m_cpu);
             for (auto* p : m_memPanes) p->SetBus(m_bus);
@@ -514,6 +548,8 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             m_consolePane->SetContext(m_cpu, m_bus);
             m_consolePane->SetDebugContext(m_dbg);
             m_bpPane->SetDebugContext(m_dbg);
+            m_symPane->SetDebugContext(m_dbg);
+            m_symPane->SetGotoCallback([this](uint32_t addr){ m_disasmPane->GoTo(addr); });
             m_stackPane->SetDebugContext(m_dbg);
             m_stackPane->SetGotoCallback([this](uint32_t addr){ m_disasmPane->GoTo(addr); });
             m_cartPane->SetBus(m_bus);
@@ -910,6 +946,20 @@ void MmemuFrame::ShowBreakpointPane() {
 
 void MmemuFrame::OnShowBpPane(wxCommandEvent&) {
     ShowBreakpointPane();
+}
+
+void MmemuFrame::ShowSymbolPane() {
+    for (size_t i = 0; i < m_notebook->GetPageCount(); ++i) {
+        if (m_notebook->GetPage(i) == m_symPane) {
+            m_notebook->SetSelection(i);
+            return;
+        }
+    }
+    m_notebook->AddPage(m_symPane, "Symbols", true);
+}
+
+void MmemuFrame::OnShowSymPane(wxCommandEvent&) {
+    ShowSymbolPane();
 }
 
 void MmemuFrame::ShowStackPane() {

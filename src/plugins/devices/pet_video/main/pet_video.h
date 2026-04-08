@@ -22,7 +22,8 @@ public:
     virtual ~PetVideo() = default;
 
     // IOHandler implementation
-    const char* name() const override { return "PetVideo"; }
+    const char* name() const override { return m_name.c_str(); }
+    void setName(const std::string& name) override { m_name = name; }
     uint32_t baseAddr() const override { return 0x8000; }
     uint32_t addrMask() const override { return 0x07FF; } // 2KB Video RAM
 
@@ -48,6 +49,7 @@ private:
 
     uint32_t m_pixelOn = 0xFF00FF00;  // Green phosphor
     uint32_t m_pixelOff = 0xFF000000; // Black
+    std::string m_name = "PetVideo";
 
     void renderDiscrete(uint32_t* buffer, int width, int height);
     void renderCRTC(uint32_t* buffer, int width, int height);

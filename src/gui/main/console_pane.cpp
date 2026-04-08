@@ -42,6 +42,9 @@ void ConsolePane::SetContext(ICore* cpu, IBus* bus) {
     if (cpu) {
         m_ctx.disasm = ToolchainRegistry::instance().createDisassembler(cpu->isaName());
         m_ctx.assem = ToolchainRegistry::instance().createAssembler(cpu->isaName());
+        if (m_ctx.disasm && m_ctx.dbg) {
+            m_ctx.disasm->setSymbolTable(&m_ctx.dbg->symbols());
+        }
     }
 }
 

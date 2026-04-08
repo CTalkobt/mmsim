@@ -362,6 +362,41 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
     }
 
     // -----------------------------------------------------------------------
+    // -----------------------------------------------------------------------
+    // Phase 14 — tapeWiring: Datasette <-> CPU Port / CIA / VIA
+    // -----------------------------------------------------------------------
+    if (spec.contains("tapeWiring") && !spec["tapeWiring"].is_null()) {
+        const auto& tw = spec["tapeWiring"];
+        std::string tapeDevName = tw.value("device", "");
+        if (devPtrs.count(tapeDevName)) {
+            auto* tape = devPtrs[tapeDevName];
+            if (tw.contains("sense")) {
+                ISignalLine* sig = cpu ? cpu->getSignalLine(tw["sense"].get<std::string>().c_str()) : nullptr;
+                if (sig) tape->setSignalLine("sense", sig);
+            }
+            if (tw.contains("motor")) {
+                ISignalLine* sig = cpu ? cpu->getSignalLine(tw["motor"].get<std::string>().c_str()) : nullptr;
+                if (sig) tape->setSignalLine("motor", sig);
+            }
+            if (tw.contains("write")) {
+                ISignalLine* sig = cpu ? cpu->getSignalLine(tw["write"].get<std::string>().c_str()) : nullptr;
+                if (sig) tape->setSignalLine("write", sig);
+            }
+            if (tw.contains("readPulse")) {
+                std::string srcStr = tw["readPulse"].get<std::string>();
+                auto dot = srcStr.find(".");
+                if (dot != std::string::npos) {
+                    std::string devName = srcStr.substr(0, dot);
+                    std::string subPin  = srcStr.substr(dot + 1);
+                    if (devPtrs.count(devName)) {
+                        ISignalLine* sig = devPtrs[devName]->getSignalLine(subPin.c_str());
+                        if (sig) tape->setSignalLine("readPulse", sig);
+                    }
+                }
+            }
+        }
+    }
+
     // Phase 3 Step 12 — ramExpansions → OpenBusHandler for absent blocks
     // -----------------------------------------------------------------------
     if (spec.contains("ramExpansions")) {

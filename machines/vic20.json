@@ -12,7 +12,8 @@
         { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
         { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
         { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
-        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
+        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null },
+        { "type": "datasette",          "name": "Tape",     "baseAddr": null }
       ],
       "roms": [
         { "label": "char",   "path": "roms/vic20/char.bin",   "size": 4096,
@@ -32,6 +33,10 @@
       "signals": [
         { "name": "irq", "type": "shared", "sources": ["VIA1", "VIA2"] }
       ],
+      "tapeWiring": {
+        "device": "Tape",
+        "readPulse": "VIA1.ca1"
+      },
       "kbdWiring": {
         "device": "Keyboard",
         "colPort": { "device": "VIA2", "port": "B" },
@@ -52,7 +57,8 @@
         { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
         { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
         { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
-        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
+        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null },
+        { "type": "datasette",          "name": "Tape",     "baseAddr": null }
       ],
       "roms": [
         { "label": "char",   "path": "roms/vic20/char.bin",   "size": 4096,
@@ -72,6 +78,10 @@
       "signals": [
         { "name": "irq", "type": "shared", "sources": ["VIA1", "VIA2"] }
       ],
+      "tapeWiring": {
+        "device": "Tape",
+        "readPulse": "VIA1.ca1"
+      },
       "kbdWiring": {
         "device": "Keyboard",
         "colPort": { "device": "VIA2", "port": "B" },
@@ -92,7 +102,8 @@
         { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
         { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
         { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
-        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
+        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null },
+        { "type": "datasette",          "name": "Tape",     "baseAddr": null }
       ],
       "roms": [
         { "label": "char",   "path": "roms/vic20/char.bin",   "size": 4096,
@@ -112,6 +123,10 @@
       "signals": [
         { "name": "irq", "type": "shared", "sources": ["VIA1", "VIA2"] }
       ],
+      "tapeWiring": {
+        "device": "Tape",
+        "readPulse": "VIA1.ca1"
+      },
       "kbdWiring": {
         "device": "Keyboard",
         "colPort": { "device": "VIA2", "port": "B" },
@@ -132,7 +147,8 @@
         { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
         { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
         { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
-        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
+        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null },
+        { "type": "datasette",          "name": "Tape",     "baseAddr": null }
       ],
       "roms": [
         { "label": "char",   "path": "roms/vic20/char.bin",   "size": 4096,
@@ -152,6 +168,10 @@
       "signals": [
         { "name": "irq", "type": "shared", "sources": ["VIA1", "VIA2"] }
       ],
+      "tapeWiring": {
+        "device": "Tape",
+        "readPulse": "VIA1.ca1"
+      },
       "kbdWiring": {
         "device": "Keyboard",
         "colPort": { "device": "VIA2", "port": "B" },
@@ -172,7 +192,8 @@
         { "type": "6560",           "name": "VIC-I",    "baseAddr": "0x9000", "colorRam": true, "dmaBus": true },
         { "type": "6522",           "name": "VIA1",     "baseAddr": "0x9110" },
         { "type": "6522",           "name": "VIA2",     "baseAddr": "0x9120" },
-        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null }
+        { "type": "kbd_vic20",      "name": "Keyboard", "baseAddr": null },
+        { "type": "datasette",          "name": "Tape",     "baseAddr": null }
       ],
       "roms": [
         { "label": "char",   "path": "roms/vic20/char.bin",   "size": 4096,
@@ -192,6 +213,10 @@
       "signals": [
         { "name": "irq", "type": "shared", "sources": ["VIA1", "VIA2"] }
       ],
+      "tapeWiring": {
+        "device": "Tape",
+        "readPulse": "VIA1.ca1"
+      },
       "kbdWiring": {
         "device": "Keyboard",
         "colPort": { "device": "VIA2", "port": "B" },

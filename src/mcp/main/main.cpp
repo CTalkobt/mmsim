@@ -195,13 +195,36 @@ Json handleToolsList() {
     Json kReq(Json::ARR); kReq.push_back(Json("machine_id")); kReq.push_back(Json("key")); kReq.push_back(Json("down"));
     kSchema.oVal["required"] = kReq;
 
+    Json pathProp(Json::OBJ); pathProp.oVal["type"] = Json("string");
+
+    Json mtSchema(Json::OBJ);
+    mtSchema.oVal["type"] = Json("object");
+    Json mtProps(Json::OBJ);
+    mtProps.oVal["machine_id"] = midProp;
+    mtProps.oVal["path"] = pathProp;
+    mtSchema.oVal["properties"] = mtProps;
+    Json mtReq(Json::ARR); mtReq.push_back(Json("machine_id")); mtReq.push_back(Json("path"));
+    mtSchema.oVal["required"] = mtReq;
+    addTool("mount_tape", "Mount a .tap image into the datasette", mtSchema);
+
+    Json ctSchema(Json::OBJ);
+    ctSchema.oVal["type"] = Json("object");
+    Json ctProps(Json::OBJ);
+    ctProps.oVal["machine_id"] = midProp;
+    Json opProp(Json::OBJ);
+    opProp.oVal["type"] = Json("string");
+    ctProps.oVal["operation"] = opProp;
+    ctSchema.oVal["properties"] = ctProps;
+    Json ctReq(Json::ARR); ctReq.push_back(Json("machine_id")); ctReq.push_back(Json("operation"));
+    ctSchema.oVal["required"] = ctReq;
+    addTool("control_tape", "Control tape: \"play\", \"stop\", \"rewind\"", ctSchema);
+
     addTool("press_key", "Inject a keystroke", kSchema);
 
     Json liSchema(Json::OBJ);
     liSchema.oVal["type"] = Json("object");
     Json liProps(Json::OBJ);
     liProps.oVal["machine_id"] = midProp;
-    Json pathProp(Json::OBJ); pathProp.oVal["type"] = Json("string");
     liProps.oVal["path"] = pathProp;
     liProps.oVal["addr"] = addrProp;
     Json autoProp(Json::OBJ); autoProp.oVal["type"] = Json("boolean");
@@ -320,6 +343,45 @@ Json handleToolsList() {
     Json swmReq(Json::ARR); swmReq.push_back(Json("machine_id")); swmReq.push_back(Json("addr1")); swmReq.push_back(Json("addr2")); swmReq.push_back(Json("size"));
     swmSchema.oVal["required"] = swmReq;
     addTool("swap_memory", "Swap two memory ranges of equal size", swmSchema);
+
+    // list_symbols
+    Json lsSchema(Json::OBJ); lsSchema.oVal["type"] = Json("object");
+    Json lsProps(Json::OBJ); lsProps.oVal["machine_id"] = midProp;
+    lsSchema.oVal["properties"] = lsProps;
+    Json lsReq(Json::ARR); lsReq.push_back(Json("machine_id"));
+    lsSchema.oVal["required"] = lsReq;
+    addTool("list_symbols", "List all defined symbols", lsSchema);
+
+    // add_symbol
+    Json asSchema(Json::OBJ); asSchema.oVal["type"] = Json("object");
+    Json asProps(Json::OBJ); asProps.oVal["machine_id"] = midProp;
+    Json lblProp(Json::OBJ); lblProp.oVal["type"] = Json("string");
+    asProps.oVal["label"] = lblProp; asProps.oVal["addr"] = addrProp;
+    asSchema.oVal["properties"] = asProps;
+    Json asReq(Json::ARR); asReq.push_back(Json("machine_id")); asReq.push_back(Json("label")); asReq.push_back(Json("addr"));
+    asSchema.oVal["required"] = asReq;
+    addTool("add_symbol", "Add a symbol to the symbol table", asSchema);
+
+    // remove_symbol
+    Json rsSchema(Json::OBJ); rsSchema.oVal["type"] = Json("object");
+    Json rsProps(Json::OBJ); rsProps.oVal["machine_id"] = midProp;
+    rsProps.oVal["label"] = lblProp;
+    rsSchema.oVal["properties"] = rsProps;
+    Json rsReq(Json::ARR); rsReq.push_back(Json("machine_id")); rsReq.push_back(Json("label"));
+    rsSchema.oVal["required"] = rsReq;
+    addTool("remove_symbol", "Remove a symbol from the symbol table", rsSchema);
+
+    // clear_symbols
+    addTool("clear_symbols", "Clear all symbols from the symbol table", lsSchema);
+
+    // load_symbols
+    Json ldsSchema(Json::OBJ); ldsSchema.oVal["type"] = Json("object");
+    Json ldsProps(Json::OBJ); ldsProps.oVal["machine_id"] = midProp;
+    ldsProps.oVal["path"] = pathProp;
+    ldsSchema.oVal["properties"] = ldsProps;
+    Json ldsReq(Json::ARR); ldsReq.push_back(Json("machine_id")); ldsReq.push_back(Json("path"));
+    ldsSchema.oVal["required"] = ldsReq;
+    addTool("load_symbols", "Load symbols from a .sym file", ldsSchema);
 
     // set_breakpoint
     Json sbpSchema(Json::OBJ); sbpSchema.oVal["type"] = Json("object");
@@ -537,6 +599,54 @@ Json handleToolsCall(const Json& params) {
                 }
             }
         }
+    } else if (name == "mount_tape") {
+        std::string mid = args["machine_id"].sVal;
+        std::string path = args["path"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            IOHandler* tape = ms->machine->ioRegistry ? ms->machine->ioRegistry->findHandler("Tape") : nullptr;
+            auto* ds = tape;
+            if (ds) {
+                if (ds->mountTape(path)) {
+                    textItem.oVal["text"] = Json("Mounted tape: " + path);
+                } else {
+                    textItem.oVal["text"] = Json("Error: Failed to mount tape");
+                    textItem.oVal["isError"] = Json(true);
+                }
+            } else {
+                textItem.oVal["text"] = Json("Error: No datasette found in machine");
+                textItem.oVal["isError"] = Json(true);
+            }
+        }
+    } else if (name == "control_tape") {
+        std::string mid = args["machine_id"].sVal;
+        std::string op = args["operation"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            IOHandler* tape = ms->machine->ioRegistry ? ms->machine->ioRegistry->findHandler("Tape") : nullptr;
+            auto* ds = tape;
+            if (ds) {
+                if      (op == "play")   ds->controlTape("play");
+                else if (op == "stop")   ds->controlTape("stop");
+                else if (op == "rewind") ds->controlTape("rewind");
+                else {
+                    textItem.oVal["text"] = Json("Error: Unknown operation " + op);
+                    textItem.oVal["isError"] = Json(true);
+                }
+                if (!textItem.oVal.count("isError"))
+                    textItem.oVal["text"] = Json("Tape: " + op);
+            } else {
+                textItem.oVal["text"] = Json("Error: No datasette found in machine");
+                textItem.oVal["isError"] = Json(true);
+            }
+        }
+
     } else if (name == "press_key") {
         std::string mid = args["machine_id"].sVal;
         std::string key = args["key"].sVal;
@@ -679,6 +789,69 @@ Json handleToolsCall(const Json& params) {
             textItem.oVal["isError"] = Json(true);
         } else {
             textItem.oVal["text"] = Json("Created machine: " + std::string(ms->machine->displayName));
+        }
+    } else if (name == "list_symbols") {
+        std::string mid = args["machine_id"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            auto syms = ms->dbg->symbols().symbols();
+            std::stringstream ss;
+            ss << std::hex << std::uppercase << std::setfill('0');
+            for (const auto& pair : syms) {
+                ss << "$" << std::setw(4) << pair.first << "  " << pair.second << "\n";
+            }
+            textItem.oVal["text"] = Json(ss.str().empty() ? "(no symbols)\n" : ss.str());
+        }
+    } else if (name == "add_symbol") {
+        std::string mid = args["machine_id"].sVal;
+        std::string label = args["label"].sVal;
+        uint32_t addr = (uint32_t)args["addr"].nVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            ms->dbg->symbols().addSymbol(addr, label);
+            textItem.oVal["text"] = Json("Symbol added: " + label);
+        }
+    } else if (name == "remove_symbol") {
+        std::string mid = args["machine_id"].sVal;
+        std::string label = args["label"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            ms->dbg->symbols().removeSymbol(label);
+            textItem.oVal["text"] = Json("Symbol removed: " + label);
+        }
+    } else if (name == "clear_symbols") {
+        std::string mid = args["machine_id"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            ms->dbg->symbols().clear();
+            textItem.oVal["text"] = Json("Symbols cleared for " + mid);
+        }
+    } else if (name == "load_symbols") {
+        std::string mid = args["machine_id"].sVal;
+        std::string path = args["path"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            if (ms->dbg->symbols().loadSym(path)) {
+                textItem.oVal["text"] = Json("Symbols loaded from: " + path);
+            } else {
+                textItem.oVal["text"] = Json("Error: Failed to load symbols from: " + path);
+                textItem.oVal["isError"] = Json(true);
+            }
         }
     } else if (name == "run_cpu") {
         std::string mid = args["machine_id"].sVal;

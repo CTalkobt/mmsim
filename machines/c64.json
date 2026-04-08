@@ -19,7 +19,8 @@
         { "type": "6526",             "name": "CIA2",     "baseAddr": "0xDD00",
           "clockHz": 985248,
           "portAWriteCallback": "vic2_bank_select", "bankSelectTarget": "VIC-II" },
-        { "type": "kbd_c64",          "name": "Keyboard", "baseAddr": null }
+        { "type": "kbd_c64",          "name": "Keyboard", "baseAddr": null },
+        { "type": "datasette",          "name": "Tape",     "baseAddr": null }
       ],
       "roms": [
         { "label": "basic",  "path": "roms/c64/basic.bin",  "size": 8192,
@@ -43,6 +44,13 @@
           "hiram":  "hiram",
           "charen": "charen"
         }
+      },
+      "tapeWiring": {
+        "device": "Tape",
+        "sense": "cassette_sense",
+        "motor": "cassette_motor",
+        "write": "cassette_write",
+        "readPulse": "CIA1.flag"
       },
       "kbdWiring": {
         "device": "Keyboard",

@@ -12,6 +12,7 @@ public:
 
     int disasmOne(IBus* bus, uint32_t addr, char* buf, int bufsz) override;
     int disasmEntry(IBus* bus, uint32_t addr, DisasmEntry& entry) override;
+    void setSymbolTable(SymbolTable* symbols) override { m_symbols = symbols; }
 
 private:
     MOS6502 m_cpu;

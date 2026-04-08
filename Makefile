@@ -16,7 +16,7 @@ INCLUDES  = -Isrc -Isrc/include -Isrc/cli/main -Isrc/gui/main -Isrc/libcore/main
 	-Isrc/plugins/devices/vic2/main -Isrc/plugins/devices/sid6581/main \
 	-Isrc/plugins/machines/c64/main -Isrc/plugins/devices/pia6520/main \
 	-Isrc/plugins/devices/crtc6545/main -Isrc/plugins/devices/pet_video/main \
-	-Isrc/plugins/devices/pokey/main \
+	-Isrc/plugins/devices/pokey/main -Isrc/plugins/devices/datasette/main \
 	-Isrc/plugins/devices/keyboard/main \
 	-Isrc/plugins/machines/pet/main -Itests
 
@@ -113,6 +113,10 @@ PLUGIN_ANTIC_SRCS = src/plugins/devices/antic/main/antic.cpp \
 PLUGIN_GTIA_SRCS = src/plugins/devices/gtia/main/gtia.cpp \
 	src/plugins/devices/gtia/main/plugin_init.cpp
 
+PLUGIN_DATASETTE_SRCS = src/plugins/devices/datasette/main/datasette.cpp \
+        src/plugins/cbm-loader/main/tap_parser.cpp \
+        src/plugins/devices/datasette/main/plugin_init.cpp
+
 PLUGIN_POKEY_SRCS = src/plugins/devices/pokey/main/pokey.cpp \
 	src/plugins/devices/pokey/main/plugin_init.cpp
 
@@ -124,9 +128,11 @@ GUI_SRCS = src/gui/main/main.cpp \
 	src/gui/main/console_pane.cpp \
 	src/gui/main/cartridge_pane.cpp \
 	src/gui/main/breakpoint_pane.cpp \
+	src/gui/main/symbol_pane.cpp \
 	src/gui/main/stack_pane.cpp \
 	src/gui/main/machine_inspector_pane.cpp \
 	src/gui/main/screen_pane.cpp \
+        src/gui/main/tape_pane.cpp \
 	src/gui/main/dialogs/memory_dialogs.cpp \
 	src/gui/main/dialogs/assemble_dialog.cpp \
 	src/gui/main/dialogs/image_dialogs.cpp \
@@ -140,7 +146,7 @@ CLI_SRCS = src/cli/main/main.cpp \
 	src/cli/main/cli_interpreter.cpp \
 	src/cli/main/plugin_command_registry.cpp
 
-MCP_SRCS = src/mcp/main/main.cpp \
+MCP_SRCS = src/mcp/main/main.cpp src/plugins/devices/datasette/main/datasette.cpp src/plugins/cbm-loader/main/tap_parser.cpp \
 	src/mcp/main/plugin_tool_registry.cpp
 
 # Test Sources
@@ -263,16 +269,9 @@ PLUGIN_PET_OBJS      = $(PLUGIN_PET_SRCS:.cpp=.o) \
 	src/plugins/devices/crtc6545/main/crtc6545.o \
 	src/plugins/devices/pet_video/main/pet_video.o
 
-PLUGIN_ANTIC_SRCS = src/plugins/devices/antic/main/antic.cpp \
-	src/plugins/devices/antic/main/plugin_init.cpp
 PLUGIN_ANTIC_OBJS = $(PLUGIN_ANTIC_SRCS:.cpp=.o)
-
-PLUGIN_GTIA_SRCS = src/plugins/devices/gtia/main/gtia.cpp \
-	src/plugins/devices/gtia/main/plugin_init.cpp
 PLUGIN_GTIA_OBJS = $(PLUGIN_GTIA_SRCS:.cpp=.o)
-
-PLUGIN_POKEY_SRCS = src/plugins/devices/pokey/main/pokey.cpp \
-	src/plugins/devices/pokey/main/plugin_init.cpp
+PLUGIN_DATASETTE_OBJS = $(PLUGIN_DATASETTE_SRCS:.cpp=.o)
 PLUGIN_POKEY_OBJS = $(PLUGIN_POKEY_SRCS:.cpp=.o)
 
 GUI_OBJS = $(GUI_SRCS:.cpp=.o)
@@ -303,7 +302,8 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
 	$(LIBDIR)/mmemu-plugin-pet.so \
 	$(LIBDIR)/mmemu-plugin-antic.so \
 	$(LIBDIR)/mmemu-plugin-gtia.so \
-	$(LIBDIR)/mmemu-plugin-pokey.so
+	$(LIBDIR)/mmemu-plugin-pokey.so \
+        $(LIBDIR)/mmemu-plugin-datasette.so
 
 LIBS = $(ILIBDIR)/libmem.a $(ILIBDIR)/libcore.a $(ILIBDIR)/libdevices.a \
 	$(ILIBDIR)/libtoolchain.a $(ILIBDIR)/libdebug.a $(ILIBDIR)/libplugins.a
@@ -395,6 +395,9 @@ $(LIBDIR)/mmemu-plugin-antic.so: $(PLUGIN_ANTIC_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 $(LIBDIR)/mmemu-plugin-gtia.so: $(PLUGIN_GTIA_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
+
+$(LIBDIR)/mmemu-plugin-datasette.so: $(PLUGIN_DATASETTE_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 $(LIBDIR)/mmemu-plugin-pokey.so: $(PLUGIN_POKEY_OBJS) | $(LIBDIR)

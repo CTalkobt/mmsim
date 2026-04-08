@@ -46,6 +46,7 @@ TEST_CASE(toolchain_registry) {
         const char* isaName() const override { return "mock"; }
         int disasmOne(IBus*, uint32_t, char*, int) override { return 1; }
         int disasmEntry(IBus*, uint32_t, DisasmEntry&) override { return 1; }
+        void setSymbolTable(SymbolTable*) override {}
     };
     
     reg.registerToolchain("mock", []() { return new MockDisasm(); }, []() { return new MockAssem(); });

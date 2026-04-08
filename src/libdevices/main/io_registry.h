@@ -51,6 +51,11 @@ public:
     void enumerate(std::vector<IOHandler*>& list);
 
     /**
+     * Find a handler by name.
+     */
+    IOHandler* findHandler(const std::string& name);
+
+    /**
      * Remove all handlers from the registry.
      */
     void clear();
