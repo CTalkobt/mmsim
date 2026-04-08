@@ -54,6 +54,7 @@ private:
 
     void trackStack(ICore* cpu, const DisasmEntry& entry);
     void monitorKernal(ICore* cpu, const DisasmEntry& entry);
+    void monitorBasic(ICore* cpu, const DisasmEntry& entry);
     std::string formatState(ICore* cpu);
 
     ICore* m_cpu;
@@ -64,6 +65,7 @@ private:
     StackTrace     m_stackTrace;
     SymbolTable    m_symbols;
     std::vector<KernalCall> m_kernalStack;
+    std::vector<KernalCall> m_basicStack;
     std::vector<SystemSnapshot> m_snapshots;
     bool        m_paused          = false;
     uint32_t    m_lastPausedAddr  = ~0u;

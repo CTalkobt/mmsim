@@ -50,6 +50,7 @@ bool DebugContext::onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
 
     trackStack(cpu, entry);
     monitorKernal(cpu, entry);
+    monitorBasic(cpu, entry);
     return true;
 }
 
@@ -85,6 +86,33 @@ void DebugContext::monitorKernal(ICore* cpu, const DisasmEntry& entry) {
             logger->debug("ENTRY {}: {}", label, formatState(cpu));
             // Push to stack to monitor exit
             m_kernalStack.push_back({label, cpu->sp()});
+        }
+    }
+}
+
+void DebugContext::monitorBasic(ICore* cpu, const DisasmEntry& entry) {
+    if (!cpu) return;
+    auto logger = LogRegistry::instance().getLogger("basic");
+    if (!logger || logger->level() > spdlog::level::debug) return;
+
+    // 1. Check for Exit (RTS)
+    if (entry.isReturn && !m_basicStack.empty()) {
+        if (cpu->sp() == m_basicStack.back().entrySp) {
+            std::string name = m_basicStack.back().name;
+            m_basicStack.pop_back();
+            logger->debug("EXIT  {}: {}", name, formatState(cpu));
+        }
+    }
+
+    // 2. Check for Entry
+    // BASIC area is generally between $A000 and $DFFF across C64, VIC-20, and PET.
+    if (entry.addr >= 0xA000 && entry.addr <= 0xDFFF) {
+        std::string label = m_symbols.getLabel(entry.addr);
+        if (!label.empty()) {
+            // Log entry
+            logger->debug("ENTRY {}: {}", label, formatState(cpu));
+            // Push to stack to monitor exit
+            m_basicStack.push_back({label, cpu->sp()});
         }
     }
 }

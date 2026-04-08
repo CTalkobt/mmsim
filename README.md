@@ -88,10 +88,11 @@ Manage symbols via the CLI `sym` command or the GUI **Symbols** pane:
 - `sym load <path>`: Load symbols from a `.sym` file (supports `label = value` and `label value` formats).
 - `sym clear`: Clear the current symbol table.
 
-### 4.3 Kernal Routine Monitoring
-You can monitor the entry and exit points of Kernal routines by setting the "kernal" logger to DEBUG level:
+### 4.3 Kernal and BASIC Routine Monitoring
+You can monitor the entry and exit points of Kernal and BASIC routines by setting the "kernal" or "basic" logger to DEBUG level:
 ```bash
 log level kernal debug
+log level basic debug
 ```
 When enabled, the system will log the routine name and all register states upon entry, and log them again upon exit (detected via the matching `RTS`).
 
