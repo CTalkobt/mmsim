@@ -8,13 +8,34 @@ TEST_CASE(smoke_test) {
     ASSERT(1 == 1);
 }
 
-TEST_CASE(rom_loader_placeholder) {
-    // Just verify the symbol links
-    uint8_t buf[1];
-    (void)buf;
-    // We don't have a real file to load yet, but we verify it doesn't crash on null
-    bool result = romLoad("nonexistent_file_test", buf, 1);
+TEST_CASE(rom_loader_success) {
+    const char* path = "test_rom.bin";
+    uint8_t data[] = { 0x01, 0x02, 0x03, 0x04 };
+    FILE* f = fopen(path, "wb");
+    fwrite(data, 1, sizeof(data), f);
+    fclose(f);
+
+    uint8_t buf[4];
+    bool result = romLoad(path, buf, 4);
+    ASSERT(result == true);
+    ASSERT(buf[0] == 0x01);
+    ASSERT(buf[3] == 0x04);
+
+    remove(path);
+}
+
+TEST_CASE(rom_loader_size_mismatch) {
+    const char* path = "test_rom_mismatch.bin";
+    uint8_t data[] = { 0x01, 0x02, 0x03 };
+    FILE* f = fopen(path, "wb");
+    fwrite(data, 1, sizeof(data), f);
+    fclose(f);
+
+    uint8_t buf[4];
+    bool result = romLoad(path, buf, 4);
     ASSERT(result == false);
+
+    remove(path);
 }
 
 TEST_CASE(machine_descriptor_cleanup) {

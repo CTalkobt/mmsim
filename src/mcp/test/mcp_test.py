@@ -1,110 +1,167 @@
 import subprocess
 import json
 import sys
+import time
 
-def mcp_request(proc, req):
-    req_str = json.dumps(req)
-    proc.stdin.write(req_str + "\n")
-    proc.stdin.flush()
-    line = proc.stdout.readline()
-    if not line:
-        return None
-    return json.loads(line)
+class McpClient:
+    def __init__(self):
+        self.proc = subprocess.Popen(
+            ["./bin/mmemu-mcp"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+            bufsize=1
+        )
+        self.msg_id = 1
 
-def run_test():
-    proc = subprocess.Popen(["./bin/mmemu-mcp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-
-    # 1. Initialize
-    req = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": {"name": "test", "version": "1.0"}
+    def request(self, method, params=None):
+        req = {
+            "jsonrpc": "2.0",
+            "id": self.msg_id,
+            "method": method,
+            "params": params or {}
         }
-    }
-    res = mcp_request(proc, req)
-    if not res or "result" not in res:
-        print("Initialization failed")
-        sys.exit(1)
-    print("Initialize success")
+        self.msg_id += 1
+        self.proc.stdin.write(json.dumps(req) + "\n")
+        self.proc.stdin.flush()
+        
+        while True:
+            line = self.proc.stdout.readline()
+            if not line:
+                return None
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                res = json.loads(line)
+                if res.get("id") == req["id"]:
+                    return res
+            except json.JSONDecodeError:
+                continue
 
-    # 2. write_memory at 0x0000 with A9 42 (LDA #$42)
-    req = {
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "tools/call",
-        "params": {
-            "name": "write_memory",
-            "arguments": {
-                "machine_id": "raw6502",
-                "addr": 0x0000,
-                "bytes": [0xA9, 0x42]
-            }
-        }
-    }
-    res = mcp_request(proc, req)
-    print("Write memory:", res)
+    def call_tool(self, name, args):
+        return self.request("tools/call", {"name": name, "arguments": args})
 
-    # 3. step_cpu
-    req = {
-        "jsonrpc": "2.0",
-        "id": 3,
-        "method": "tools/call",
-        "params": {
-            "name": "step_cpu",
-            "arguments": {
-                "machine_id": "raw6502",
-                "count": 1
-            }
-        }
-    }
-    res = mcp_request(proc, req)
-    print("Step CPU:", res)
+    def close(self):
+        self.proc.terminate()
+        self.proc.wait()
 
-    # 4. read_registers
-    req = {
-        "jsonrpc": "2.0",
-        "id": 4,
-        "method": "tools/call",
-        "params": {
-            "name": "read_registers",
-            "arguments": {
-                "machine_id": "raw6502"
-            }
-        }
-    }
-    res = mcp_request(proc, req)
-    print("Read Registers:", res)
+def run_tests():
+    client = McpClient()
+    
+    print("--- 1. Initialization ---")
+    res = client.request("initialize", {
+        "protocolVersion": "2024-11-05",
+        "capabilities": {},
+        "clientInfo": {"name": "test-suite", "version": "1.0"}
+    })
+    assert "result" in res, "Initialize failed"
+    print("Initialize OK")
 
+    print("\n--- 2. Machine Management ---")
+    res = client.call_tool("create_machine", {"machine_id": "raw6502"})
+    assert "result" in res, "create_machine failed"
+    print("Create raw6502 OK")
+
+    print("\n--- 3. Memory Operations ---")
+    # Write
+    res = client.call_tool("write_memory", {
+        "machine_id": "raw6502",
+        "addr": 0x1000,
+        "bytes": [0x11, 0x22, 0x33, 0x44]
+    })
+    assert "result" in res and "content" in res["result"]
+    print("Write memory response:", res["result"]["content"][0]["text"])
+
+    # Read (Hex dump)
+    res = client.call_tool("read_memory", {
+        "machine_id": "raw6502",
+        "addr": 0x1000,
+        "size": 4
+    })
     content = res["result"]["content"][0]["text"]
-    if "A: $42" in content:
-        print("PASS: Register A is $42")
-    else:
-        print("FAIL: Register A is not $42")
-        sys.exit(1)
+    print("Read memory hex dump:\n", content)
+    assert "11 22 33 44" in content, "Memory read mismatch"
 
-    # 5. resources/read
-    req = {
-        "jsonrpc": "2.0",
-        "id": 5,
-        "method": "resources/read",
-        "params": {
-            "uri": "machine_state"
-        }
-    }
-    res = mcp_request(proc, req)
-    print("Read Resource:", res)
-    if "raw6502" in res["result"]["contents"][0]["text"]:
-        print("PASS: Resource read successful")
-    else:
-        print("FAIL: Resource read missing raw6502")
-        sys.exit(1)
+    # Fill
+    client.call_tool("fill_memory", {
+        "machine_id": "raw6502",
+        "addr": 0x2000,
+        "value": 0xEA,
+        "size": 10
+    })
+    res = client.call_tool("read_memory", {
+        "machine_id": "raw6502",
+        "addr": 0x2000,
+        "size": 10
+    })
+    assert "ea ea ea ea" in res["result"]["content"][0]["text"].lower()
+    print("Fill memory OK")
 
-    proc.terminate()
-    print("All tests passed.")
+    # Search
+    res = client.call_tool("search_memory", {
+        "machine_id": "raw6502",
+        "pattern": "11 22 33",
+        "is_hex": True
+    })
+    assert "Found at $1000" in res["result"]["content"][0]["text"], "Search failed"
+    print("Search memory OK")
+
+    print("\n--- 4. CPU Operations ---")
+    # Set PC
+    client.call_tool("set_pc", {"machine_id": "raw6502", "addr": 0x1000})
+    # Step
+    client.call_tool("write_memory", {"machine_id": "raw6502", "addr": 0x1000, "bytes": [0xEA]}) # NOP
+    res = client.call_tool("step_cpu", {"machine_id": "raw6502", "count": 1})
+    # Read Regs
+    res = client.call_tool("read_registers", {"machine_id": "raw6502"})
+    reg_text = res["result"]["content"][0]["text"]
+    print("Registers after step:", reg_text)
+    assert "PC: $1001" in reg_text, "PC did not advance correctly"
+
+    print("\n--- 5. Breakpoints ---")
+    res = client.call_tool("set_breakpoint", {"machine_id": "raw6502", "addr": 0x1005})
+    bp_text = res["result"]["content"][0]["text"]
+    print("Set breakpoint response:", bp_text)
+    # Extract ID from "Breakpoint 1 at $1005"
+    bp_id = int(bp_text.split()[1])
+
+    res = client.call_tool("list_breakpoints", {"machine_id": "raw6502"})
+    bp_list = res["result"]["content"][0]["text"]
+    print("Breakpoint list:\n", bp_list)
+    assert f"${0x1005:04x}" in bp_list.lower(), "Breakpoint missing from list"
+
+    # Delete
+    client.call_tool("delete_breakpoint", {"machine_id": "raw6502", "id": bp_id})
+    res = client.call_tool("list_breakpoints", {"machine_id": "raw6502"})
+    assert "No breakpoints set" in res["result"]["content"][0]["text"], "Breakpoint not deleted"
+    print("Breakpoint operations OK")
+
+
+    print("\n--- 6. Error Handling ---")
+    # Invalid machine ID
+    res = client.call_tool("read_registers", {"machine_id": "nonexistent"})
+    assert "Error" in res["result"]["content"][0]["text"]
+    print("Invalid machine ID error OK")
+
+    # Unknown tool
+    res = client.request("tools/call", {"name": "ghost_tool", "arguments": {}})
+    assert "Error" in res["result"]["content"][0]["text"]
+    print("Unknown tool error OK")
+
+    print("\n--- 7. Resource Read ---")
+    res = client.request("resources/read", {"uri": "machine_state"})
+    assert "raw6502" in res["result"]["contents"][0]["text"]
+    print("Resource read OK")
+
+
+
+    client.close()
+    print("\nALL MCP TESTS PASSED")
 
 if __name__ == "__main__":
-    run_test()
+    try:
+        run_tests()
+    except Exception as e:
+        print(f"TEST FAILED: {e}")
+        sys.exit(1)

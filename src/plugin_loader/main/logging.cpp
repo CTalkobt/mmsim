@@ -8,7 +8,7 @@ LogRegistry& LogRegistry::instance() {
 
 void LogRegistry::init() {
     if (m_sinks.empty()) {
-        m_sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
+        m_sinks.push_back(std::make_shared<spdlog::sinks::stderr_color_sink_mt>());
         spdlog::set_pattern("[%H:%M:%S.%e] [%n] [%^%l%$] %v");
         
         // Ensure system logger exists

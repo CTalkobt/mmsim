@@ -133,6 +133,7 @@ GUI_SRCS = src/gui/main/main.cpp \
 	src/cli/main/cli_interpreter.cpp \
 	src/gui/main/plugin_pane_manager.cpp \
 	src/cli/main/plugin_command_registry.cpp \
+	src/gui/main/gui_utils.cpp \
 	src/gui/main/audio_output.cpp
 
 CLI_SRCS = src/cli/main/main.cpp \
@@ -144,14 +145,18 @@ MCP_SRCS = src/mcp/main/main.cpp \
 
 # Test Sources
 TEST_SRCS = tests/test_main.cpp \
+	src/cli/test/test_cli.cpp \
+	src/gui/test/test_gui_logic.cpp \
 	src/libmem/test/test_flatmembus.cpp \
 	src/libcore/test/test_libcore.cpp \
 	src/libcore/test/test_registry.cpp \
 	src/libcore/test/test_json_machine_loader.cpp \
 	src/libcore/test/test_machine_boot.cpp \
 	src/libdevices/test/test_devices.cpp \
+	src/libdevices/test/test_ieee488.cpp \
 	src/libdevices/test/test_joystick.cpp \
 	src/libdebug/test/test_debug.cpp \
+	src/libdebug/test/test_trace_buffer.cpp \
 	src/libtoolchain/test/test_toolchain.cpp \
 	src/plugins/6502/test/test_cpu6502.cpp \
 	src/plugins/6502/test/test_disasm6502.cpp \
@@ -165,7 +170,8 @@ TEST_SRCS = tests/test_main.cpp \
 	src/plugins/devices/via6522/test/test_via6522.cpp \
 	src/plugins/devices/antic/test/test_antic.cpp \
 	src/plugins/devices/gtia/test/test_gtia.cpp \
-	src/plugins/devices/pokey/test/test_pokey.cpp
+	src/plugins/devices/pokey/test/test_pokey.cpp \
+	src/plugins/devices/cia6526/test/test_cia6526.cpp
 
 LIBDEBUG_TEST_SRCS = src/libdebug/test/test_breakpoints.cpp
 LIBCORE_TEST_SRCS = src/libcore/test/test_c_compatibility.c
@@ -207,6 +213,7 @@ PLUGIN_ANTIC_TEST_SRCS = src/plugins/devices/antic/test/test_atari_boot.cpp \
 REGISTRY_OBJS = src/cli/main/cli_interpreter.o \
 	src/cli/main/plugin_command_registry.o \
 	src/mcp/main/plugin_tool_registry.o \
+	src/gui/main/gui_utils.o \
 	src/gui/main/plugin_pane_manager.o
 
 TEST_OBJS = $(TEST_SRCS:.cpp=.o) \

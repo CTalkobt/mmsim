@@ -893,16 +893,14 @@ Json handleToolsCall(const Json& params) {
     } else {
         std::string resultJson;
         if (PluginToolRegistry::instance().dispatch(name, args.stringify(), resultJson)) {
-            content.aVal[0].oVal["text"] = Json(resultJson);
+            textItem.oVal["text"] = Json(resultJson);
         } else {
             textItem.oVal["text"] = Json("Error: Unknown tool");
             textItem.oVal["isError"] = Json(true);
         }
     }
 
-    if (content.aVal[0].oVal["text"].is_null()) {
-        content.push_back(textItem);
-    }
+    content.push_back(textItem);
     res.oVal["content"] = content;
     return res;
 }
