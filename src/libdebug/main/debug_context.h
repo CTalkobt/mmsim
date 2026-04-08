@@ -43,6 +43,9 @@ public:
     void resume() { m_resumeSkipAddr = m_lastPausedAddr; m_paused = false; }
     const std::string& lastHitMessage() const { return m_lastHitMessage; }
 
+    ICore* cpu() const { return m_cpu; }
+    IBus*  bus() const { return m_bus; }
+
 private:
     void trackStack(ICore* cpu, const DisasmEntry& entry);
 

@@ -5,10 +5,17 @@
 #include "libcore/main/image_loader.h"
 #include "libdevices/main/ivideo_output.h"
 #include "plugin_command_registry.h"
+#include "libdebug/main/expression_evaluator.h"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+
+static std::string toHex(uint32_t v, int width = 4) {
+    std::ostringstream ss;
+    ss << std::hex << std::uppercase << std::setfill('0') << std::setw(width) << v;
+    return ss.str();
+}
 
 void CliInterpreter::processLine(const std::string& line) {
     if (m_asmMode) {
@@ -20,6 +27,10 @@ void CliInterpreter::processLine(const std::string& line) {
 
 void CliInterpreter::handleNormalCommand(const std::string& line) {
     if (line.empty()) return;
+
+    auto parseAddr = [&](const std::string& expr, uint32_t& addr) -> bool {
+        return ExpressionEvaluator::evaluate(expr, m_ctx.dbg, addr);
+    };
 
     if (line[0] == '.') {
         if (!m_ctx.cpu || !m_ctx.assem) {
@@ -142,10 +153,15 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         showRegisters();
     } else if (cmd == "run") {
         if (!m_ctx.cpu) { m_output("No machine created.\n"); return; }
-        std::string addrStr;
-        if (ss >> addrStr) {
-            uint32_t addr = std::stoul(addrStr, nullptr, 16);
-            m_ctx.cpu->setPc(addr);
+        std::string expr;
+        if (ss >> expr) {
+            uint32_t addr;
+            if (parseAddr(expr, addr)) {
+                m_ctx.cpu->setPc(addr);
+            } else {
+                m_output("Error: Invalid address '" + expr + "'\n");
+                return;
+            }
         } else if (m_ctx.lastLoadAddr != 0) {
             m_ctx.cpu->setPc(m_ctx.lastLoadAddr);
         }
@@ -162,13 +178,17 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         showRegisters();
     } else if (cmd == "load") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
-        std::string path, addrStr;
+        std::string path, expr;
         if (ss >> path) {
             uint32_t addr = 0;
             bool hasAddr = false;
-            if (ss >> addrStr) {
-                addr = std::stoul(addrStr, nullptr, 16);
-                hasAddr = true;
+            if (ss >> expr) {
+                if (parseAddr(expr, addr)) {
+                    hasAddr = true;
+                } else {
+                    m_output("Error: Invalid address '" + expr + "'\n");
+                    return;
+                }
             }
             auto* loader = ImageLoaderRegistry::instance().findLoader(path);
             if (loader) {
@@ -220,11 +240,15 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         }
     } else if (cmd == "break") {
         if (!m_ctx.dbg) { m_output("No machine created.\n"); return; }
-        std::string addrStr;
-        if (ss >> addrStr) {
-            uint32_t addr = std::stoul(addrStr, nullptr, 16);
-            int id = m_ctx.dbg->breakpoints().add(addr, BreakpointType::EXEC);
-            m_output("Breakpoint " + std::to_string(id) + " at $" + addrStr + "\n");
+        std::string expr;
+        if (ss >> expr) {
+            uint32_t addr;
+            if (parseAddr(expr, addr)) {
+                int id = m_ctx.dbg->breakpoints().add(addr, BreakpointType::EXEC);
+                m_output("Breakpoint " + std::to_string(id) + " at $" + toHex(addr) + "\n");
+            } else {
+                m_output("Error: Invalid address '" + expr + "'\n");
+            }
         } else {
             m_output("Syntax: break <address>\n");
         }
@@ -257,20 +281,24 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         }
     } else if (cmd == "watch") {
         if (!m_ctx.dbg) { m_output("No machine created.\n"); return; }
-        std::string typeStr, addrStr;
-        if (ss >> typeStr >> addrStr) {
-            BreakpointType type;
-            if (typeStr == "read") {
-                type = BreakpointType::READ_WATCH;
-            } else if (typeStr == "write") {
-                type = BreakpointType::WRITE_WATCH;
+        std::string typeStr, expr;
+        if (ss >> typeStr >> expr) {
+            uint32_t addr;
+            if (parseAddr(expr, addr)) {
+                BreakpointType type;
+                if (typeStr == "read") {
+                    type = BreakpointType::READ_WATCH;
+                } else if (typeStr == "write") {
+                    type = BreakpointType::WRITE_WATCH;
+                } else {
+                    m_output("Syntax: watch <read|write> <address>\n");
+                    return;
+                }
+                int id = m_ctx.dbg->breakpoints().add(addr, type);
+                m_output("Watchpoint " + std::to_string(id) + " at $" + toHex(addr) + "\n");
             } else {
-                m_output("Syntax: watch <read|write> <address>\n");
-                return;
+                m_output("Error: Invalid address '" + expr + "'\n");
             }
-            uint32_t addr = std::stoul(addrStr, nullptr, 16);
-            int id = m_ctx.dbg->breakpoints().add(addr, type);
-            m_output("Watchpoint " + std::to_string(id) + " at $" + addrStr + "\n");
         } else {
             m_output("Syntax: watch <read|write> <address>\n");
         }
@@ -305,13 +333,15 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         std::string sub;
         if (ss >> sub) {
             if (sub == "add") {
-                std::string label, addrStr;
-                if (ss >> label >> addrStr) {
+                std::string label, expr;
+                if (ss >> label >> expr) {
                     uint32_t addr;
-                    if (addrStr[0] == '$') addr = std::stoul(addrStr.substr(1), nullptr, 16);
-                    else addr = std::stoul(addrStr, nullptr, 0);
-                    m_ctx.dbg->symbols().addSymbol(addr, label);
-                    m_output("Symbol added: " + label + " = $" + addrStr + "\n");
+                    if (parseAddr(expr, addr)) {
+                        m_ctx.dbg->symbols().addSymbol(addr, label);
+                        m_output("Symbol added: " + label + " = $" + toHex(addr) + "\n");
+                    } else {
+                        m_output("Error: Invalid address '" + expr + "'\n");
+                    }
                 } else {
                     m_output("Usage: sym add <label> <address>\n");
                 }
@@ -462,11 +492,15 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         }
     } else if (cmd == "setpc") {
         if (!m_ctx.cpu) { m_output("No machine created.\n"); return; }
-        std::string addrStr;
-        if (ss >> addrStr) {
-            uint32_t addr = std::stoul(addrStr, nullptr, 16);
-            m_ctx.cpu->setPc(addr);
-            showRegisters();
+        std::string expr;
+        if (ss >> expr) {
+            uint32_t addr;
+            if (parseAddr(expr, addr)) {
+                m_ctx.cpu->setPc(addr);
+                showRegisters();
+            } else {
+                m_output("Error: Invalid address '" + expr + "'\n");
+            }
         } else {
             m_output("Syntax: setpc <address>\n");
         }
@@ -475,50 +509,65 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         showRegisters();
     } else if (cmd == "m") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
-        std::string addrStr;
+        std::string expr;
         uint32_t addr = 0, len = 64;
-        if (ss >> addrStr) {
-            addr = std::stoul(addrStr, nullptr, 16);
-            if (ss >> addrStr) len = std::stoul(addrStr, nullptr, 16);
-            dumpMemory(addr, len);
+        if (ss >> expr) {
+            if (parseAddr(expr, addr)) {
+                if (ss >> expr) {
+                    uint32_t l;
+                    if (parseAddr(expr, l)) len = l;
+                }
+                dumpMemory(addr, len);
+            } else {
+                m_output("Error: Invalid address '" + expr + "'\n");
+            }
         }
     } else if (cmd == "f") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
-        std::string addrStr, valStr, lenStr;
-        if (ss >> addrStr >> valStr) {
-            uint32_t addr = std::stoul(addrStr, nullptr, 16);
-            uint8_t val = (uint8_t)std::stoul(valStr, nullptr, 16);
-            uint32_t len = 1;
-            if (ss >> lenStr) len = std::stoul(lenStr, nullptr, 16);
-            for (uint32_t i = 0; i < len; ++i) m_ctx.bus->write8(addr + i, val);
+        std::string addrExpr, valExpr, lenExpr;
+        if (ss >> addrExpr >> valExpr) {
+            uint32_t addr, val, len = 1;
+            if (parseAddr(addrExpr, addr) && parseAddr(valExpr, val)) {
+                if (ss >> lenExpr) {
+                    uint32_t l;
+                    if (parseAddr(lenExpr, l)) len = l;
+                }
+                for (uint32_t i = 0; i < len; ++i) m_ctx.bus->write8(addr + i, (uint8_t)val);
+            } else {
+                m_output("Error: Invalid address or value expression.\n");
+            }
         }
     } else if (cmd == "copy") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
-        std::string srcStr, dstStr, lenStr;
-        if (ss >> srcStr >> dstStr >> lenStr) {
-            uint32_t src = std::stoul(srcStr, nullptr, 16);
-            uint32_t dst = std::stoul(dstStr, nullptr, 16);
-            uint32_t len = std::stoul(lenStr, nullptr, 16);
-            std::vector<uint8_t> tmp(len);
-            for (uint32_t i = 0; i < len; ++i) tmp[i] = m_ctx.bus->read8(src + i);
-            for (uint32_t i = 0; i < len; ++i) m_ctx.bus->write8(dst + i, tmp[i]);
+        std::string srcExpr, dstExpr, lenExpr;
+        if (ss >> srcExpr >> dstExpr >> lenExpr) {
+            uint32_t src, dst, len;
+            if (parseAddr(srcExpr, src) && parseAddr(dstExpr, dst) && parseAddr(lenExpr, len)) {
+                std::vector<uint8_t> tmp(len);
+                for (uint32_t i = 0; i < len; ++i) tmp[i] = m_ctx.bus->peek8(src + i);
+                for (uint32_t i = 0; i < len; ++i) m_ctx.bus->write8(dst + i, tmp[i]);
+            } else {
+                m_output("Error: Invalid expression in copy command.\n");
+            }
         }
     } else if (cmd == "swap") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
-        std::string addr1Str, addr2Str, lenStr;
-        if (ss >> addr1Str >> addr2Str >> lenStr) {
-            uint32_t addr1 = std::stoul(addr1Str, nullptr, 16);
-            uint32_t addr2 = std::stoul(addr2Str, nullptr, 16);
-            uint32_t len   = std::stoul(lenStr, nullptr, 16);
-            std::vector<uint8_t> tmp(len);
-            for (uint32_t i = 0; i < len; ++i) {
-                uint8_t v1 = m_ctx.bus->read8(addr1 + i);
-                uint8_t v2 = m_ctx.bus->read8(addr2 + i);
-                tmp[i] = v1;
-                m_ctx.bus->write8(addr1 + i, v2);
+        std::string a1Expr, a2Expr, lenExpr;
+        if (ss >> a1Expr >> a2Expr >> lenExpr) {
+            uint32_t addr1, addr2, len;
+            if (parseAddr(a1Expr, addr1) && parseAddr(a2Expr, addr2) && parseAddr(lenExpr, len)) {
+                std::vector<uint8_t> tmp(len);
+                for (uint32_t i = 0; i < len; ++i) {
+                    uint8_t v1 = m_ctx.bus->read8(addr1 + i);
+                    uint8_t v2 = m_ctx.bus->read8(addr2 + i);
+                    tmp[i] = v1;
+                    m_ctx.bus->write8(addr1 + i, v2);
+                }
+                for (uint32_t i = 0; i < len; ++i) m_ctx.bus->write8(addr2 + i, tmp[i]);
+                m_output("Swapped.\n");
+            } else {
+                m_output("Error: Invalid expression in swap command.\n");
             }
-            for (uint32_t i = 0; i < len; ++i) m_ctx.bus->write8(addr2 + i, tmp[i]);
-            m_output("Swapped.\n");
         } else {
             m_output("Syntax: swap <addr1> <addr2> <len>\n");
         }
@@ -632,12 +681,16 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         if (!found) m_output("No prior occurrences found.\n");
     } else if (cmd == "disasm") {
         if (!m_ctx.cpu || !m_ctx.disasm) { m_output("No machine created.\n"); return; }
-        std::string addrStr;
+        std::string expr;
         uint32_t addr = m_ctx.cpu->pc();
         int n = 10;
-        if (ss >> addrStr) {
-            addr = std::stoul(addrStr, nullptr, 16);
-            if (ss >> n) {}
+        if (ss >> expr) {
+            if (parseAddr(expr, addr)) {
+                if (ss >> n) {}
+            } else {
+                m_output("Error: Invalid address '" + expr + "'\n");
+                return;
+            }
         }
         for (int i = 0; i < n; ++i) {
             char buf[64];
@@ -650,10 +703,16 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         }
     } else if (cmd == "asm") {
         if (!m_ctx.cpu || !m_ctx.assem) { m_output("No machine created.\n"); return; }
-        std::string addrStr;
-        if (ss >> addrStr) {
-            m_asmAddr = std::stoul(addrStr, nullptr, 16);
-            m_asmMode = true;
+        std::string expr;
+        if (ss >> expr) {
+            uint32_t addr;
+            if (parseAddr(expr, addr)) {
+                m_asmAddr = addr;
+                m_asmMode = true;
+            } else {
+                m_output("Error: Invalid address '" + expr + "'\n");
+                return;
+            }
         } else {
             m_output("Syntax: asm <address>\n");
         }

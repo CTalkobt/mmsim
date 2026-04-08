@@ -1,6 +1,6 @@
 #include "breakpoint_list.h"
-#include "libcore/main/icore.h"
-#include "libmem/main/ibus.h"
+#include "debug_context.h"
+#include "expression_evaluator.h"
 #include <algorithm>
 
 int BreakpointList::add(uint32_t addr, BreakpointType type) {
@@ -25,10 +25,10 @@ void BreakpointList::setEnabled(int id, bool enabled) {
     }
 }
 
-Breakpoint* BreakpointList::checkExec(uint32_t addr, ICore* cpu, IBus* bus) {
+Breakpoint* BreakpointList::checkExec(uint32_t addr, DebugContext* dbg) {
     for (auto& b : m_breakpoints) {
         if (b.enabled && b.type == BreakpointType::EXEC && b.addr == addr) {
-            if (m_evaluator.evaluate(b.condition, cpu, bus)) {
+            if (ExpressionEvaluator::evaluateCondition(b.condition, dbg)) {
                 b.hitCount++;
                 return &b;
             }
@@ -37,10 +37,10 @@ Breakpoint* BreakpointList::checkExec(uint32_t addr, ICore* cpu, IBus* bus) {
     return nullptr;
 }
 
-Breakpoint* BreakpointList::checkWrite(uint32_t addr, ICore* cpu, IBus* bus) {
+Breakpoint* BreakpointList::checkWrite(uint32_t addr, DebugContext* dbg) {
     for (auto& b : m_breakpoints) {
         if (b.enabled && b.type == BreakpointType::WRITE_WATCH && b.addr == addr) {
-            if (m_evaluator.evaluate(b.condition, cpu, bus)) {
+            if (ExpressionEvaluator::evaluateCondition(b.condition, dbg)) {
                 b.hitCount++;
                 return &b;
             }
@@ -49,10 +49,10 @@ Breakpoint* BreakpointList::checkWrite(uint32_t addr, ICore* cpu, IBus* bus) {
     return nullptr;
 }
 
-Breakpoint* BreakpointList::checkRead(uint32_t addr, ICore* cpu, IBus* bus) {
+Breakpoint* BreakpointList::checkRead(uint32_t addr, DebugContext* dbg) {
     for (auto& b : m_breakpoints) {
         if (b.enabled && b.type == BreakpointType::READ_WATCH && b.addr == addr) {
-            if (m_evaluator.evaluate(b.condition, cpu, bus)) {
+            if (ExpressionEvaluator::evaluateCondition(b.condition, dbg)) {
                 b.hitCount++;
                 return &b;
             }

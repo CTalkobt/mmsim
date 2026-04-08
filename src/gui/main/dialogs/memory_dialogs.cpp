@@ -1,7 +1,8 @@
 #include "memory_dialogs.h"
+#include "libdebug/main/expression_evaluator.h"
 
-FillMemoryDialog::FillMemoryDialog(wxWindow* parent)
-    : wxDialog(parent, wxID_ANY, "Fill Memory", wxDefaultPosition, wxDefaultSize)
+FillMemoryDialog::FillMemoryDialog(wxWindow* parent, DebugContext* dbg)
+    : wxDialog(parent, wxID_ANY, "Fill Memory", wxDefaultPosition, wxDefaultSize), m_dbg(dbg)
 {
     auto* sizer = new wxBoxSizer(wxVERTICAL);
     auto* flexSizer = new wxFlexGridSizer(3, 2, 10, 10);
@@ -29,18 +30,18 @@ FillMemoryDialog::FillMemoryDialog(wxWindow* parent)
 }
 
 void FillMemoryDialog::OnOK(wxCommandEvent& event) {
-    try {
-        m_address = std::stoul(m_addrCtrl->GetValue().ToStdString(), nullptr, 16);
-        m_length = std::stoul(m_lenCtrl->GetValue().ToStdString(), nullptr, 16);
-        m_value = (uint8_t)std::stoul(m_valCtrl->GetValue().ToStdString(), nullptr, 16);
+    if (ExpressionEvaluator::evaluate(m_addrCtrl->GetValue().ToStdString(), m_dbg, m_address) &&
+        ExpressionEvaluator::evaluate(m_lenCtrl->GetValue().ToStdString(), m_dbg, m_length) &&
+        ExpressionEvaluator::evaluate(m_valCtrl->GetValue().ToStdString(), m_dbg, (uint32_t&)m_value)) 
+    {
         EndModal(wxID_OK);
-    } catch (...) {
-        wxMessageBox("Invalid hex input!", "Error", wxOK | wxICON_ERROR);
+    } else {
+        wxMessageBox("Invalid expression input!", "Error", wxOK | wxICON_ERROR);
     }
 }
 
-CopyMemoryDialog::CopyMemoryDialog(wxWindow* parent)
-    : wxDialog(parent, wxID_ANY, "Copy Memory", wxDefaultPosition, wxDefaultSize)
+CopyMemoryDialog::CopyMemoryDialog(wxWindow* parent, DebugContext* dbg)
+    : wxDialog(parent, wxID_ANY, "Copy Memory", wxDefaultPosition, wxDefaultSize), m_dbg(dbg)
 {
     auto* sizer = new wxBoxSizer(wxVERTICAL);
     auto* flexSizer = new wxFlexGridSizer(3, 2, 10, 10);
@@ -68,20 +69,20 @@ CopyMemoryDialog::CopyMemoryDialog(wxWindow* parent)
 }
 void CopyMemoryDialog::OnOK(wxCommandEvent& event) {
     (void)event;
-    try {
-        m_srcAddr = std::stoul(m_srcAddrCtrl->GetValue().ToStdString(), nullptr, 16);
-        m_length = std::stoul(m_lenCtrl->GetValue().ToStdString(), nullptr, 16);
-        m_dstAddr = std::stoul(m_dstAddrCtrl->GetValue().ToStdString(), nullptr, 16);
+    if (ExpressionEvaluator::evaluate(m_srcAddrCtrl->GetValue().ToStdString(), m_dbg, m_srcAddr) &&
+        ExpressionEvaluator::evaluate(m_lenCtrl->GetValue().ToStdString(), m_dbg, m_length) &&
+        ExpressionEvaluator::evaluate(m_dstAddrCtrl->GetValue().ToStdString(), m_dbg, m_dstAddr))
+    {
         EndModal(wxID_OK);
-    } catch (...) {
-        wxMessageBox("Invalid hex input!", "Error", wxOK | wxICON_ERROR);
+    } else {
+        wxMessageBox("Invalid expression input!", "Error", wxOK | wxICON_ERROR);
     }
 }
 
 // --- SwapMemoryDialog ---
 
-SwapMemoryDialog::SwapMemoryDialog(wxWindow* parent)
-    : wxDialog(parent, wxID_ANY, "Swap Memory", wxDefaultPosition, wxDefaultSize)
+SwapMemoryDialog::SwapMemoryDialog(wxWindow* parent, DebugContext* dbg)
+    : wxDialog(parent, wxID_ANY, "Swap Memory", wxDefaultPosition, wxDefaultSize), m_dbg(dbg)
 {
     auto* sizer = new wxBoxSizer(wxVERTICAL);
     auto* flexSizer = new wxFlexGridSizer(3, 2, 10, 10);
@@ -110,20 +111,20 @@ SwapMemoryDialog::SwapMemoryDialog(wxWindow* parent)
 
 void SwapMemoryDialog::OnOK(wxCommandEvent& event) {
     (void)event;
-    try {
-        m_addr1 = std::stoul(m_addr1Ctrl->GetValue().ToStdString(), nullptr, 16);
-        m_length = std::stoul(m_lenCtrl->GetValue().ToStdString(), nullptr, 16);
-        m_addr2 = std::stoul(m_addr2Ctrl->GetValue().ToStdString(), nullptr, 16);
+    if (ExpressionEvaluator::evaluate(m_addr1Ctrl->GetValue().ToStdString(), m_dbg, m_addr1) &&
+        ExpressionEvaluator::evaluate(m_lenCtrl->GetValue().ToStdString(), m_dbg, m_length) &&
+        ExpressionEvaluator::evaluate(m_addr2Ctrl->GetValue().ToStdString(), m_dbg, m_addr2))
+    {
         EndModal(wxID_OK);
-    } catch (...) {
-        wxMessageBox("Invalid hex input!", "Error", wxOK | wxICON_ERROR);
+    } else {
+        wxMessageBox("Invalid expression input!", "Error", wxOK | wxICON_ERROR);
     }
 }
 
 // --- GotoAddressDialog ---
 
-GotoAddressDialog::GotoAddressDialog(wxWindow* parent, uint32_t currentAddr)
-    : wxDialog(parent, wxID_ANY, "Go to Address")
+GotoAddressDialog::GotoAddressDialog(wxWindow* parent, uint32_t currentAddr, DebugContext* dbg)
+    : wxDialog(parent, wxID_ANY, "Go to Address"), m_dbg(dbg)
 {
     auto* sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -147,19 +148,18 @@ GotoAddressDialog::GotoAddressDialog(wxWindow* parent, uint32_t currentAddr)
 
 void GotoAddressDialog::OnOK(wxCommandEvent& event) {
     (void)event;
-    try {
-        m_address = std::stoul(m_addrCtrl->GetValue().ToStdString(), nullptr, 16);
+    if (ExpressionEvaluator::evaluate(m_addrCtrl->GetValue().ToStdString(), m_dbg, m_address)) {
         m_setPC = m_setPCCheck->GetValue();
         EndModal(wxID_OK);
-    } catch (...) {
-        wxMessageBox("Invalid address format", "Error", wxOK | wxICON_ERROR);
+    } else {
+        wxMessageBox("Invalid address expression", "Error", wxOK | wxICON_ERROR);
     }
 }
 
 // --- SearchMemoryDialog ---
 
-SearchMemoryDialog::SearchMemoryDialog(wxWindow* parent, uint32_t maxAddr)
-    : wxDialog(parent, wxID_ANY, "Search Memory")
+SearchMemoryDialog::SearchMemoryDialog(wxWindow* parent, uint32_t maxAddr, DebugContext* dbg)
+    : wxDialog(parent, wxID_ANY, "Search Memory"), m_dbg(dbg)
 {
     auto* sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -197,11 +197,11 @@ void SearchMemoryDialog::OnOK(wxCommandEvent& event) {
     (void)event;
     m_pattern = m_patternCtrl->GetValue().ToStdString();
     m_isHex = m_hexRadio->GetValue();
-    try {
-        m_startAddr = std::stoul(m_startAddrCtrl->GetValue().ToStdString(), nullptr, 16);
-        m_length = std::stoul(m_lenCtrl->GetValue().ToStdString(), nullptr, 16);
+    if (ExpressionEvaluator::evaluate(m_startAddrCtrl->GetValue().ToStdString(), m_dbg, m_startAddr) &&
+        ExpressionEvaluator::evaluate(m_lenCtrl->GetValue().ToStdString(), m_dbg, m_length))
+    {
         EndModal(wxID_OK);
-    } catch (...) {
-        wxMessageBox("Invalid hex input!", "Error", wxOK | wxICON_ERROR);
+    } else {
+        wxMessageBox("Invalid expression input!", "Error", wxOK | wxICON_ERROR);
     }
 }

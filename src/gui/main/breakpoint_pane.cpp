@@ -1,5 +1,6 @@
 #include "breakpoint_pane.h"
 #include "libdebug/main/breakpoint_list.h"
+#include "libdebug/main/expression_evaluator.h"
 #include <sstream>
 #include <iomanip>
 
@@ -8,15 +9,15 @@
 // ---------------------------------------------------------------------------
 class AddBreakpointDialog : public wxDialog {
 public:
-    AddBreakpointDialog(wxWindow* parent)
+    AddBreakpointDialog(wxWindow* parent, DebugContext* dbg)
         : wxDialog(parent, wxID_ANY, "Add Breakpoint",
-                   wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
+                   wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE), m_dbg(dbg)
     {
         auto* sizer = new wxBoxSizer(wxVERTICAL);
         auto* form  = new wxFlexGridSizer(2, 2, 6, 10);
         form->AddGrowableCol(1);
 
-        form->Add(new wxStaticText(this, wxID_ANY, "Address (hex):"),
+        form->Add(new wxStaticText(this, wxID_ANY, "Address:"),
                   0, wxALIGN_CENTER_VERTICAL);
         m_addr = new wxTextCtrl(this, wxID_ANY, "");
         form->Add(m_addr, 1, wxEXPAND);
@@ -36,12 +37,10 @@ public:
         SetSizerAndFit(sizer);
         if (auto* btn = dynamic_cast<wxButton*>(FindWindowById(wxID_OK, this))) btn->SetDefault();
         m_addr->SetFocus();
+        Bind(wxEVT_BUTTON, &AddBreakpointDialog::OnOK, this, wxID_OK);
     }
 
-    uint32_t GetAddress() const {
-        try { return (uint32_t)std::stoul(m_addr->GetValue().ToStdString(), nullptr, 16); }
-        catch (...) { return 0; }
-    }
+    uint32_t GetAddress() const { return m_addressVal; }
 
     BreakpointType GetBreakpointType() const {
         switch (m_type->GetSelection()) {
@@ -52,8 +51,18 @@ public:
     }
 
 private:
+    void OnOK(wxCommandEvent& event) {
+        if (ExpressionEvaluator::evaluate(m_addr->GetValue().ToStdString(), m_dbg, m_addressVal)) {
+            EndModal(wxID_OK);
+        } else {
+            wxMessageBox("Invalid address expression!", "Error", wxOK | wxICON_ERROR);
+        }
+    }
+
     wxTextCtrl* m_addr;
     wxChoice*   m_type;
+    DebugContext* m_dbg;
+    uint32_t    m_addressVal = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -136,7 +145,7 @@ void BreakpointPane::OnAdd(wxCommandEvent&) {
         wxMessageBox("No machine loaded.", "Add Breakpoint", wxOK | wxICON_WARNING, this);
         return;
     }
-    AddBreakpointDialog dlg(this);
+    AddBreakpointDialog dlg(this, m_dbg);
     if (dlg.ShowModal() == wxID_OK)
         m_dbg->breakpoints().add(dlg.GetAddress(), dlg.GetBreakpointType());
     RefreshValues();

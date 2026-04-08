@@ -1,4 +1,5 @@
 #include "symbol_pane.h"
+#include "libdebug/main/expression_evaluator.h"
 #include <wx/filedlg.h>
 #include <sstream>
 #include <iomanip>
@@ -89,22 +90,16 @@ void SymbolPane::OnAdd(wxCommandEvent&) {
     wxString label = wxGetTextFromUser("Enter symbol label:", "Add Symbol");
     if (label.IsEmpty()) return;
     
-    wxString addrStr = wxGetTextFromUser("Enter address (hex with $ or dec):", "Add Symbol");
-    if (addrStr.IsEmpty()) return;
+    wxString expr = wxGetTextFromUser("Enter address expression:", "Add Symbol");
+    if (expr.IsEmpty()) return;
     
     uint32_t addr;
-    if (addrStr.StartsWith("$")) {
-        long val;
-        addrStr.Mid(1).ToLong(&val, 16);
-        addr = (uint32_t)val;
+    if (ExpressionEvaluator::evaluate(expr.ToStdString(), m_dbg, addr)) {
+        m_dbg->symbols().addSymbol(addr, label.ToStdString());
+        RefreshValues();
     } else {
-        long val;
-        addrStr.ToLong(&val, 0);
-        addr = (uint32_t)val;
+        wxMessageBox("Invalid address expression!", "Error", wxOK | wxICON_ERROR);
     }
-    
-    m_dbg->symbols().addSymbol(addr, label.ToStdString());
-    RefreshValues();
 }
 
 void SymbolPane::OnDelete(wxCommandEvent&) {

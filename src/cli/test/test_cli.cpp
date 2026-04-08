@@ -44,7 +44,7 @@ TEST_CASE(cli_state_management) {
 
     // Test asm mode state
     ASSERT(interpreter.isAssemblyMode() == false);
-    interpreter.processLine("asm 1000");
+    interpreter.processLine("asm $1000");
     ASSERT(interpreter.isAssemblyMode() == true);
     ASSERT(interpreter.getAsmAddr() == 0x1000);
 

@@ -55,15 +55,15 @@ TEST_CASE(TestBasicExecBreakpoint) {
     ASSERT_NE(ctx.dbg, nullptr);
 
     // Assemble a simple program
-    cli.processLine("asm 0400");
+    cli.processLine("asm $0400");
     cli.processLine("JMP $0400");
     cli.processLine(".");
 
     // Set a breakpoint
-    cli.processLine("break 0400");
+    cli.processLine("break $0400");
 
     // Run the machine
-    cli.processLine("run 0400");
+    cli.processLine("run $0400");
 
     EXPECT_TRUE(ctx.dbg->isPaused());
     EXPECT_EQ(ctx.cpu->pc(), 0x0400);

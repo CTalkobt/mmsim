@@ -637,7 +637,7 @@ void MmemuFrame::OnReset(wxCommandEvent& event) {
 void MmemuFrame::OnFillMem(wxCommandEvent& event) {
     (void)event;
     if (!m_bus) return;
-    FillMemoryDialog dialog(this);
+    FillMemoryDialog dialog(this, m_dbg);
     if (dialog.ShowModal() == wxID_OK) {
         uint32_t addr = dialog.GetAddress();
         uint32_t len = dialog.GetLength();
@@ -650,7 +650,7 @@ void MmemuFrame::OnFillMem(wxCommandEvent& event) {
 void MmemuFrame::OnCopyMem(wxCommandEvent& event) {
     (void)event;
     if (!m_bus) return;
-    CopyMemoryDialog dialog(this);
+    CopyMemoryDialog dialog(this, m_dbg);
     if (dialog.ShowModal() == wxID_OK) {
         uint32_t src = dialog.GetSrcAddress();
         uint32_t len = dialog.GetLength();
@@ -665,7 +665,7 @@ void MmemuFrame::OnCopyMem(wxCommandEvent& event) {
 void MmemuFrame::OnSwapMem(wxCommandEvent& event) {
     (void)event;
     if (!m_bus) return;
-    SwapMemoryDialog dialog(this);
+    SwapMemoryDialog dialog(this, m_dbg);
     if (dialog.ShowModal() == wxID_OK) {
         uint32_t addr1 = dialog.GetAddress1();
         uint32_t len = dialog.GetLength();
@@ -707,7 +707,7 @@ void MmemuFrame::OnAssemble(wxCommandEvent& event) {
 void MmemuFrame::OnGotoAddr(wxCommandEvent& event) {
     (void)event;
     if (!m_cpu) return;
-    GotoAddressDialog dialog(this, m_cpu->pc());
+    GotoAddressDialog dialog(this, m_cpu->pc(), m_dbg);
     if (dialog.ShowModal() == wxID_OK) {
         uint32_t addr = dialog.GetAddress();
         if (dialog.ShouldSetPC()) {
@@ -721,9 +721,9 @@ void MmemuFrame::OnGotoAddr(wxCommandEvent& event) {
 
 void MmemuFrame::OnSearchMem(wxCommandEvent& event) {
     (void)event;
-    if (!m_bus) return;
+    if (!m_cpu) return;
     uint32_t mask = m_bus->config().addrMask;
-    SearchMemoryDialog dialog(this, mask);
+    SearchMemoryDialog dialog(this, mask, m_dbg);
     if (dialog.ShowModal() == wxID_OK) {
         std::string pattern = dialog.GetPattern();
         bool isHex = dialog.IsHex();

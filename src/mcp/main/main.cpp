@@ -18,83 +18,75 @@
 #include "libdebug/main/debug_context.h"
 #include "libdebug/main/breakpoint_list.h"
 #include "libdebug/main/stack_trace.h"
+#include "libdebug/main/expression_evaluator.h"
+
+static bool resolveAddr(const Json& val, DebugContext* dbg, uint32_t& result) {
+    if (val.type == Json::NUM) {
+        result = (uint32_t)val.nVal;
+        return true;
+    }
+    if (val.type == Json::STR) {
+        return ExpressionEvaluator::evaluate(val.sVal, dbg, result);
+    }
+    return false;
+}
+
 #include "plugin_tool_registry.h"
 #include "include/util/logging.h"
 
 static std::string toHex(uint32_t v, int width = 4) {
     std::ostringstream ss;
-    ss << std::uppercase << std::hex << std::setfill('0') << std::setw(width) << v;
+    ss << std::hex << std::uppercase << std::setfill('0') << std::setw(width) << v;
     return ss.str();
 }
 
 struct MachineState {
     MachineDescriptor* machine = nullptr;
-    ICore*        cpu   = nullptr;
-    IBus*         bus   = nullptr;
-    DebugContext* dbg   = nullptr;
-    IDisassembler* disasm = nullptr;
+    ICore*             cpu     = nullptr;
+    IBus*              bus     = nullptr;
+    IDisassembler*     disasm  = nullptr;
+    DebugContext*      dbg     = nullptr;
+    std::string        id;
 };
 
-std::map<std::string, MachineState> g_machines;
+static std::map<std::string, MachineState> g_machines;
 
-MachineState* getMachine(const std::string& id) {
-    if (g_machines.find(id) == g_machines.end()) {
-        MachineDescriptor* md = MachineRegistry::instance().createMachine(id);
-        if (!md) return nullptr;
-        MachineState state;
-        state.machine = md;
-        state.cpu = md->cpus[0].cpu;
-        state.bus = md->buses[0].bus;
-        state.dbg = new DebugContext(state.cpu, state.bus);
-        state.cpu->setObserver(state.dbg);
-        state.bus->setObserver(state.dbg);
-        state.disasm = ToolchainRegistry::instance().createDisassembler(state.cpu->isaName());
-        if (md->onReset) md->onReset(*md);
-        g_machines[id] = state;
+static MachineState* getMachine(const std::string& id) {
+    if (g_machines.count(id)) return &g_machines[id];
+    
+    // Try to create it if it exists in registry
+    std::vector<std::string> available;
+    MachineRegistry::instance().enumerate(available);
+    bool found = false;
+    for (const auto& aid : available) { if (aid == id) found = true; break; }
+    
+    if (found) {
+        auto* desc = MachineRegistry::instance().createMachine(id);
+        if (desc) {
+            MachineState ms;
+            ms.machine = desc;
+            ms.cpu = desc->cpus[0].cpu;
+            ms.bus = desc->buses[0].bus;
+            ms.id = id;
+            ms.disasm = ToolchainRegistry::instance().createDisassembler(ms.cpu->isaName());
+            ms.dbg = new DebugContext(ms.cpu, ms.bus);
+            ms.cpu->setObserver(ms.dbg);
+            ms.bus->setObserver(ms.dbg);
+            if (ms.disasm) ms.disasm->setSymbolTable(&ms.dbg->symbols());
+            
+            g_machines[id] = ms;
+            return &g_machines[id];
+        }
     }
-    return &g_machines[id];
+    return nullptr;
 }
 
-void sendError(const Json& id, int code, const std::string& message) {
+Json handleDescribe() {
     Json res(Json::OBJ);
-    res.oVal["jsonrpc"] = Json("2.0");
-    res.oVal["id"] = id;
-    Json err(Json::OBJ);
-    err.oVal["code"] = Json(code);
-    err.oVal["message"] = Json(message);
-    res.oVal["error"] = err;
-    std::cout << res.stringify() << "\n";
-    std::cout.flush();
-}
-
-void sendResult(const Json& id, const Json& result) {
-    Json res(Json::OBJ);
-    res.oVal["jsonrpc"] = Json("2.0");
-    res.oVal["id"] = id;
-    res.oVal["result"] = result;
-    std::cout << res.stringify() << "\n";
-    std::cout.flush();
-}
-
-Json handleInitialize(const Json& params) {
-    (void)params;
-    Json res(Json::OBJ);
-    res.oVal["protocolVersion"] = Json("2024-11-05");
-    Json capabilities(Json::OBJ);
-    capabilities.oVal["tools"] = Json(Json::OBJ);
-    capabilities.oVal["resources"] = Json(Json::OBJ);
-    res.oVal["capabilities"] = capabilities;
-    Json serverInfo(Json::OBJ);
-    serverInfo.oVal["name"] = Json("mmemu-mcp");
-    serverInfo.oVal["version"] = Json("0.1.0");
-    res.oVal["serverInfo"] = serverInfo;
-    return res;
-}
-
-Json handleToolsList() {
-    Json res(Json::OBJ);
+    res.oVal["name"] = Json("mmemu-mcp");
+    res.oVal["version"] = Json("0.1.0");
+    
     Json tools(Json::ARR);
-
     auto addTool = [&](const std::string& name, const std::string& desc, const Json& schema) {
         Json t(Json::OBJ);
         t.oVal["name"] = Json(name);
@@ -105,9 +97,9 @@ Json handleToolsList() {
 
     // Common property schemas
     Json midProp(Json::OBJ); midProp.oVal["type"] = Json("string");
-    Json addrProp(Json::OBJ); addrProp.oVal["type"] = Json("integer");
+    Json addrProp(Json::OBJ); addrProp.oVal["type"] = Json("string"); addrProp.oVal["description"] = Json("Address expression (e.g. $1000, start+5, %1010, decimal)");
     Json cntProp(Json::OBJ); cntProp.oVal["type"] = Json("integer");
-    Json sizeProp(Json::OBJ); sizeProp.oVal["type"] = Json("integer");
+    Json sizeProp(Json::OBJ); sizeProp.oVal["type"] = Json("string"); sizeProp.oVal["description"] = Json("Size expression (hex or decimal)");
     Json pattProp(Json::OBJ); pattProp.oVal["type"] = Json("string");
     Json ishProp(Json::OBJ); ishProp.oVal["type"] = Json("boolean");
 
@@ -117,10 +109,9 @@ Json handleToolsList() {
     stepProps.oVal["machine_id"] = midProp;
     stepProps.oVal["count"] = cntProp;
     stepSchema.oVal["properties"] = stepProps;
-    Json stepReq(Json::ARR); stepReq.push_back(Json("machine_id")); stepReq.push_back(Json("count"));
+    Json stepReq(Json::ARR); stepReq.push_back(Json("machine_id"));
     stepSchema.oVal["required"] = stepReq;
-
-    addTool("step_cpu", "Execute N instructions", stepSchema);
+    addTool("step_cpu", "Step the CPU by a number of instructions", stepSchema);
 
     Json spcSchema(Json::OBJ);
     spcSchema.oVal["type"] = Json("object");
@@ -130,7 +121,6 @@ Json handleToolsList() {
     spcSchema.oVal["properties"] = spcProps;
     Json spcReq(Json::ARR); spcReq.push_back(Json("machine_id")); spcReq.push_back(Json("addr"));
     spcSchema.oVal["required"] = spcReq;
-
     addTool("set_pc", "Set CPU program counter", spcSchema);
 
     Json rmSchema(Json::OBJ);
@@ -142,8 +132,7 @@ Json handleToolsList() {
     rmSchema.oVal["properties"] = rmProps;
     Json rmReq(Json::ARR); rmReq.push_back(Json("machine_id")); rmReq.push_back(Json("addr")); rmReq.push_back(Json("size"));
     rmSchema.oVal["required"] = rmReq;
-
-    addTool("read_memory", "Read memory as hex dump", rmSchema);
+    addTool("read_memory", "Read a range of memory", rmSchema);
 
     Json wmSchema(Json::OBJ);
     wmSchema.oVal["type"] = Json("object");
@@ -157,18 +146,9 @@ Json handleToolsList() {
     wmSchema.oVal["properties"] = wmProps;
     Json wmReq(Json::ARR); wmReq.push_back(Json("machine_id")); wmReq.push_back(Json("addr")); wmReq.push_back(Json("bytes"));
     wmSchema.oVal["required"] = wmReq;
+    addTool("write_memory", "Write bytes to memory", wmSchema);
 
-    addTool("write_memory", "Inject bytes into memory", wmSchema);
-
-    Json rrSchema(Json::OBJ);
-    rrSchema.oVal["type"] = Json("object");
-    Json rrProps(Json::OBJ);
-    rrProps.oVal["machine_id"] = midProp;
-    rrSchema.oVal["properties"] = rrProps;
-    Json rrReq(Json::ARR); rrReq.push_back(Json("machine_id"));
-    rrSchema.oVal["required"] = rrReq;
-
-    addTool("read_registers", "Get full CPU state", rrSchema);
+    addTool("read_registers", "Read current CPU registers", spcSchema); // reuse machine_id + addr (addr ignored)
 
     Json smSchema(Json::OBJ);
     smSchema.oVal["type"] = Json("object");
@@ -180,27 +160,13 @@ Json handleToolsList() {
     smSchema.oVal["properties"] = smProps;
     Json smReq(Json::ARR); smReq.push_back(Json("machine_id")); smReq.push_back(Json("pattern"));
     smSchema.oVal["required"] = smReq;
-
     addTool("search_memory", "Search for pattern in memory", smSchema);
-
-    Json kSchema(Json::OBJ);
-    kSchema.oVal["type"] = Json("object");
-    Json kProps(Json::OBJ);
-    kProps.oVal["machine_id"] = midProp;
-    Json knProp(Json::OBJ); knProp.oVal["type"] = Json("string");
-    Json ksProp(Json::OBJ); ksProp.oVal["type"] = Json("boolean");
-    kProps.oVal["key"] = knProp;
-    kProps.oVal["down"] = ksProp;
-    kSchema.oVal["properties"] = kProps;
-    Json kReq(Json::ARR); kReq.push_back(Json("machine_id")); kReq.push_back(Json("key")); kReq.push_back(Json("down"));
-    kSchema.oVal["required"] = kReq;
-
-    Json pathProp(Json::OBJ); pathProp.oVal["type"] = Json("string");
 
     Json mtSchema(Json::OBJ);
     mtSchema.oVal["type"] = Json("object");
     Json mtProps(Json::OBJ);
     mtProps.oVal["machine_id"] = midProp;
+    Json pathProp(Json::OBJ); pathProp.oVal["type"] = Json("string");
     mtProps.oVal["path"] = pathProp;
     mtSchema.oVal["properties"] = mtProps;
     Json mtReq(Json::ARR); mtReq.push_back(Json("machine_id")); mtReq.push_back(Json("path"));
@@ -219,6 +185,17 @@ Json handleToolsList() {
     ctSchema.oVal["required"] = ctReq;
     addTool("control_tape", "Control tape: \"play\", \"stop\", \"rewind\"", ctSchema);
 
+    Json kSchema(Json::OBJ);
+    kSchema.oVal["type"] = Json("object");
+    Json kProps(Json::OBJ);
+    kProps.oVal["machine_id"] = midProp;
+    Json keyProp(Json::OBJ); keyProp.oVal["type"] = Json("string");
+    kProps.oVal["key"] = keyProp;
+    Json ksProp(Json::OBJ); ksProp.oVal["type"] = Json("boolean");
+    kProps.oVal["down"] = ksProp;
+    kSchema.oVal["properties"] = kProps;
+    Json kReq(Json::ARR); kReq.push_back(Json("machine_id")); kReq.push_back(Json("key")); kReq.push_back(Json("down"));
+    kSchema.oVal["required"] = kReq;
     addTool("press_key", "Inject a keystroke", kSchema);
 
     Json liSchema(Json::OBJ);
@@ -232,8 +209,7 @@ Json handleToolsList() {
     liSchema.oVal["properties"] = liProps;
     Json liReq(Json::ARR); liReq.push_back(Json("machine_id")); liReq.push_back(Json("path"));
     liSchema.oVal["required"] = liReq;
-
-    addTool("load_image", "Load program/binary into memory", liSchema);
+    addTool("load_image", "Load a PRG or BIN image", liSchema);
 
     Json acSchema(Json::OBJ);
     acSchema.oVal["type"] = Json("object");
@@ -244,7 +220,6 @@ Json handleToolsList() {
     acSchema.oVal["properties"] = acProps;
     Json acReq(Json::ARR); acReq.push_back(Json("machine_id")); acReq.push_back(Json("path"));
     acSchema.oVal["required"] = acReq;
-
     addTool("attach_cartridge", "Attach a cartridge image", acSchema);
 
     Json ecSchema(Json::OBJ);
@@ -254,7 +229,6 @@ Json handleToolsList() {
     ecSchema.oVal["properties"] = ecProps;
     Json ecReq(Json::ARR); ecReq.push_back(Json("machine_id"));
     ecSchema.oVal["required"] = ecReq;
-
     addTool("eject_cartridge", "Eject currently attached cartridge", ecSchema);
 
     Json rstSchema(Json::OBJ);
@@ -264,7 +238,6 @@ Json handleToolsList() {
     rstSchema.oVal["properties"] = rstProps;
     Json rstReq(Json::ARR); rstReq.push_back(Json("machine_id"));
     rstSchema.oVal["required"] = rstReq;
-
     addTool("reset_machine", "Reset a machine to its power-on state", rstSchema);
 
     Json emptySchema(Json::OBJ);
@@ -293,6 +266,45 @@ Json handleToolsList() {
     Json cmReq(Json::ARR); cmReq.push_back(Json("machine_id"));
     cmSchema.oVal["required"] = cmReq;
     addTool("create_machine", "Create (or re-create) a machine by ID", cmSchema);
+
+    // list_symbols
+    Json lsSchema(Json::OBJ); lsSchema.oVal["type"] = Json("object");
+    Json lsProps(Json::OBJ); lsProps.oVal["machine_id"] = midProp;
+    lsSchema.oVal["properties"] = lsProps;
+    Json lsReq(Json::ARR); lsReq.push_back(Json("machine_id"));
+    lsSchema.oVal["required"] = lsReq;
+    addTool("list_symbols", "List all defined symbols", lsSchema);
+
+    // add_symbol
+    Json asSchema(Json::OBJ); asSchema.oVal["type"] = Json("object");
+    Json asProps(Json::OBJ); asProps.oVal["machine_id"] = midProp;
+    Json lblProp(Json::OBJ); lblProp.oVal["type"] = Json("string");
+    asProps.oVal["label"] = lblProp; asProps.oVal["addr"] = addrProp;
+    asSchema.oVal["properties"] = asProps;
+    Json asReq(Json::ARR); asReq.push_back(Json("machine_id")); asReq.push_back(Json("label")); asReq.push_back(Json("addr"));
+    asSchema.oVal["required"] = asReq;
+    addTool("add_symbol", "Add a symbol to the symbol table", asSchema);
+
+    // remove_symbol
+    Json rsSchema(Json::OBJ); rsSchema.oVal["type"] = Json("object");
+    Json rsProps(Json::OBJ); rsProps.oVal["machine_id"] = midProp;
+    rsProps.oVal["label"] = lblProp;
+    rsSchema.oVal["properties"] = rsProps;
+    Json rsReq(Json::ARR); rsReq.push_back(Json("machine_id")); rsReq.push_back(Json("label"));
+    rsSchema.oVal["required"] = rsReq;
+    addTool("remove_symbol", "Remove a symbol from the symbol table", rsSchema);
+
+    // clear_symbols
+    addTool("clear_symbols", "Clear all symbols from the symbol table", lsSchema);
+
+    // load_symbols
+    Json ldsSchema(Json::OBJ); ldsSchema.oVal["type"] = Json("object");
+    Json ldsProps(Json::OBJ); ldsProps.oVal["machine_id"] = midProp;
+    ldsProps.oVal["path"] = pathProp;
+    ldsSchema.oVal["properties"] = ldsProps;
+    Json ldsReq(Json::ARR); ldsReq.push_back(Json("machine_id")); ldsReq.push_back(Json("path"));
+    ldsSchema.oVal["required"] = ldsReq;
+    addTool("load_symbols", "Load symbols from a .sym file", ldsSchema);
 
     // run_cpu
     Json runSchema(Json::OBJ); runSchema.oVal["type"] = Json("object");
@@ -343,45 +355,6 @@ Json handleToolsList() {
     Json swmReq(Json::ARR); swmReq.push_back(Json("machine_id")); swmReq.push_back(Json("addr1")); swmReq.push_back(Json("addr2")); swmReq.push_back(Json("size"));
     swmSchema.oVal["required"] = swmReq;
     addTool("swap_memory", "Swap two memory ranges of equal size", swmSchema);
-
-    // list_symbols
-    Json lsSchema(Json::OBJ); lsSchema.oVal["type"] = Json("object");
-    Json lsProps(Json::OBJ); lsProps.oVal["machine_id"] = midProp;
-    lsSchema.oVal["properties"] = lsProps;
-    Json lsReq(Json::ARR); lsReq.push_back(Json("machine_id"));
-    lsSchema.oVal["required"] = lsReq;
-    addTool("list_symbols", "List all defined symbols", lsSchema);
-
-    // add_symbol
-    Json asSchema(Json::OBJ); asSchema.oVal["type"] = Json("object");
-    Json asProps(Json::OBJ); asProps.oVal["machine_id"] = midProp;
-    Json lblProp(Json::OBJ); lblProp.oVal["type"] = Json("string");
-    asProps.oVal["label"] = lblProp; asProps.oVal["addr"] = addrProp;
-    asSchema.oVal["properties"] = asProps;
-    Json asReq(Json::ARR); asReq.push_back(Json("machine_id")); asReq.push_back(Json("label")); asReq.push_back(Json("addr"));
-    asSchema.oVal["required"] = asReq;
-    addTool("add_symbol", "Add a symbol to the symbol table", asSchema);
-
-    // remove_symbol
-    Json rsSchema(Json::OBJ); rsSchema.oVal["type"] = Json("object");
-    Json rsProps(Json::OBJ); rsProps.oVal["machine_id"] = midProp;
-    rsProps.oVal["label"] = lblProp;
-    rsSchema.oVal["properties"] = rsProps;
-    Json rsReq(Json::ARR); rsReq.push_back(Json("machine_id")); rsReq.push_back(Json("label"));
-    rsSchema.oVal["required"] = rsReq;
-    addTool("remove_symbol", "Remove a symbol from the symbol table", rsSchema);
-
-    // clear_symbols
-    addTool("clear_symbols", "Clear all symbols from the symbol table", lsSchema);
-
-    // load_symbols
-    Json ldsSchema(Json::OBJ); ldsSchema.oVal["type"] = Json("object");
-    Json ldsProps(Json::OBJ); ldsProps.oVal["machine_id"] = midProp;
-    ldsProps.oVal["path"] = pathProp;
-    ldsSchema.oVal["properties"] = ldsProps;
-    Json ldsReq(Json::ARR); ldsReq.push_back(Json("machine_id")); ldsReq.push_back(Json("path"));
-    ldsSchema.oVal["required"] = ldsReq;
-    addTool("load_symbols", "Load symbols from a .sym file", ldsSchema);
 
     // set_breakpoint
     Json sbpSchema(Json::OBJ); sbpSchema.oVal["type"] = Json("object");
@@ -481,7 +454,7 @@ Json handleToolsCall(const Json& params) {
 
     if (name == "step_cpu") {
         std::string mid = args["machine_id"].sVal;
-        int count = (int)args["count"].nVal;
+        int count = args.contains("count") ? (int)args["count"].nVal : 1;
         MachineState* ms = getMachine(mid);
         if (!ms) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID");
@@ -492,37 +465,47 @@ Json handleToolsCall(const Json& params) {
         }
     } else if (name == "set_pc") {
         std::string mid = args["machine_id"].sVal;
-        uint32_t addr = (uint32_t)args["addr"].nVal;
         MachineState* ms = getMachine(mid);
         if (!ms) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID");
             textItem.oVal["isError"] = Json(true);
         } else {
-            ms->cpu->setPc(addr);
-            textItem.oVal["text"] = Json("Set PC to " + std::to_string(addr));
+            uint32_t addr;
+            if (resolveAddr(args["addr"], ms->dbg, addr)) {
+                ms->cpu->setPc(addr);
+                textItem.oVal["text"] = Json("PC set to $" + toHex(addr));
+            } else {
+                textItem.oVal["text"] = Json("Error: Invalid address expression");
+                textItem.oVal["isError"] = Json(true);
+            }
         }
     } else if (name == "read_memory") {
         std::string mid = args["machine_id"].sVal;
-        uint32_t addr = (uint32_t)args["addr"].nVal;
-        uint32_t size = (uint32_t)args["size"].nVal;
         MachineState* ms = getMachine(mid);
         if (!ms) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID");
             textItem.oVal["isError"] = Json(true);
         } else {
-            std::stringstream ss;
-            for (uint32_t i = 0; i < size; i += 16) {
-                ss << std::hex << std::setw(4) << std::setfill('0') << (addr + i) << ": ";
-                for (uint32_t j = 0; j < 16 && (i + j) < size; ++j) {
-                    ss << std::setw(2) << (int)ms->bus->peek8(addr + i + j) << " ";
+            uint32_t addr, size;
+            if (resolveAddr(args["addr"], ms->dbg, addr) &&
+                resolveAddr(args["size"], ms->dbg, size)) 
+            {
+                std::stringstream ss;
+                for (uint32_t i = 0; i < size; i += 16) {
+                    ss << std::hex << std::setw(4) << std::setfill('0') << (addr + i) << ": ";
+                    for (uint32_t j = 0; j < 16 && (i + j) < size; ++j) {
+                        ss << std::setw(2) << (int)ms->bus->peek8(addr + i + j) << " ";
+                    }
+                    ss << "\n";
                 }
-                ss << "\n";
+                textItem.oVal["text"] = Json(ss.str());
+            } else {
+                textItem.oVal["text"] = Json("Error: Invalid address/size expression");
+                textItem.oVal["isError"] = Json(true);
             }
-            textItem.oVal["text"] = Json(ss.str());
         }
     } else if (name == "write_memory") {
         std::string mid = args["machine_id"].sVal;
-        uint32_t addr = (uint32_t)args["addr"].nVal;
         Json bytes = args["bytes"];
         MachineState* ms = getMachine(mid);
         if (!ms) {
@@ -532,10 +515,16 @@ Json handleToolsCall(const Json& params) {
             textItem.oVal["text"] = Json("Error: bytes must be an array");
             textItem.oVal["isError"] = Json(true);
         } else {
-            for (size_t i = 0; i < bytes.aVal.size(); ++i) {
-                ms->bus->write8(addr + i, (uint8_t)bytes.aVal[i].nVal);
+            uint32_t addr;
+            if (resolveAddr(args["addr"], ms->dbg, addr)) {
+                for (size_t i = 0; i < bytes.aVal.size(); ++i) {
+                    ms->bus->write8(addr + i, (uint8_t)bytes.aVal[i].nVal);
+                }
+                textItem.oVal["text"] = Json("Wrote " + std::to_string(bytes.aVal.size()) + " bytes at $" + toHex(addr));
+            } else {
+                textItem.oVal["text"] = Json("Error: Invalid address expression");
+                textItem.oVal["isError"] = Json(true);
             }
-            textItem.oVal["text"] = Json("Wrote " + std::to_string(bytes.aVal.size()) + " bytes.");
         }
     } else if (name == "read_registers") {
         std::string mid = args["machine_id"].sVal;
@@ -559,43 +548,49 @@ Json handleToolsCall(const Json& params) {
         std::string mid = args["machine_id"].sVal;
         std::string pattern = args["pattern"].sVal;
         bool isHex = args.contains("is_hex") ? args["is_hex"].bVal : true;
-        uint32_t startAddr = args.contains("start_addr") ? (uint32_t)args["start_addr"].nVal : 0;
         MachineState* ms = getMachine(mid);
         if (!ms) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID");
             textItem.oVal["isError"] = Json(true);
         } else {
-            std::vector<uint8_t> bytes;
-            if (isHex) {
-                std::stringstream pss(pattern);
-                std::string byteStr;
-                while (pss >> byteStr) {
-                    try { bytes.push_back((uint8_t)std::stoul(byteStr, nullptr, 16)); } catch (...) {}
-                }
-            } else {
-                for (char c : pattern) bytes.push_back((uint8_t)c);
-            }
-            
-            if (bytes.empty()) {
-                textItem.oVal["text"] = Json("Error: Empty or invalid pattern");
+            uint32_t startAddr = 0;
+            if (args.contains("start_addr") && !resolveAddr(args["start_addr"], ms->dbg, startAddr)) {
+                textItem.oVal["text"] = Json("Error: Invalid start_addr expression");
                 textItem.oVal["isError"] = Json(true);
             } else {
-                uint32_t found = 0xFFFFFFFF;
-                for (uint32_t i = startAddr; i < 0x10000 - bytes.size(); ++i) {
-                    bool match = true;
-                    for (size_t j = 0; j < bytes.size(); ++j) {
-                        if (ms->bus->peek8(i + j) != bytes[j]) {
-                            match = false; break;
-                        }
+                std::vector<uint8_t> bytes;
+                if (isHex) {
+                    std::stringstream pss(pattern);
+                    std::string byteStr;
+                    while (pss >> byteStr) {
+                        try { bytes.push_back((uint8_t)std::stoul(byteStr, nullptr, 16)); } catch (...) {}
                     }
-                    if (match) { found = i; break; }
-                }
-                if (found != 0xFFFFFFFF) {
-                    std::stringstream ss;
-                    ss << "Found at $" << std::hex << std::setw(4) << std::setfill('0') << found;
-                    textItem.oVal["text"] = Json(ss.str());
                 } else {
-                    textItem.oVal["text"] = Json("Pattern not found");
+                    for (char c : pattern) bytes.push_back((uint8_t)c);
+                }
+                
+                if (bytes.empty()) {
+                    textItem.oVal["text"] = Json("Error: Empty or invalid pattern");
+                    textItem.oVal["isError"] = Json(true);
+                } else {
+                    uint32_t found = 0xFFFFFFFF;
+                    uint32_t mask = ms->bus->config().addrMask;
+                    for (uint32_t i = startAddr; i <= mask && (i + bytes.size() <= mask + 1); ++i) {
+                        bool match = true;
+                        for (size_t j = 0; j < bytes.size(); ++j) {
+                            if (ms->bus->peek8((i + j) & mask) != bytes[j]) {
+                                match = false; break;
+                            }
+                        }
+                        if (match) { found = i; break; }
+                    }
+                    if (found != 0xFFFFFFFF) {
+                        std::stringstream ss;
+                        ss << "Found at $" << std::hex << std::setw(4) << std::setfill('0') << found;
+                        textItem.oVal["text"] = Json(ss.str());
+                    } else {
+                        textItem.oVal["text"] = Json("Pattern not found");
+                    }
                 }
             }
         }
@@ -608,9 +603,8 @@ Json handleToolsCall(const Json& params) {
             textItem.oVal["isError"] = Json(true);
         } else {
             IOHandler* tape = ms->machine->ioRegistry ? ms->machine->ioRegistry->findHandler("Tape") : nullptr;
-            auto* ds = tape;
-            if (ds) {
-                if (ds->mountTape(path)) {
+            if (tape) {
+                if (tape->mountTape(path)) {
                     textItem.oVal["text"] = Json("Mounted tape: " + path);
                 } else {
                     textItem.oVal["text"] = Json("Error: Failed to mount tape");
@@ -630,11 +624,10 @@ Json handleToolsCall(const Json& params) {
             textItem.oVal["isError"] = Json(true);
         } else {
             IOHandler* tape = ms->machine->ioRegistry ? ms->machine->ioRegistry->findHandler("Tape") : nullptr;
-            auto* ds = tape;
-            if (ds) {
-                if      (op == "play")   ds->controlTape("play");
-                else if (op == "stop")   ds->controlTape("stop");
-                else if (op == "rewind") ds->controlTape("rewind");
+            if (tape) {
+                if      (op == "play")   tape->controlTape("play");
+                else if (op == "stop")   tape->controlTape("stop");
+                else if (op == "rewind") tape->controlTape("rewind");
                 else {
                     textItem.oVal["text"] = Json("Error: Unknown operation " + op);
                     textItem.oVal["isError"] = Json(true);
@@ -646,7 +639,6 @@ Json handleToolsCall(const Json& params) {
                 textItem.oVal["isError"] = Json(true);
             }
         }
-
     } else if (name == "press_key") {
         std::string mid = args["machine_id"].sVal;
         std::string key = args["key"].sVal;
@@ -669,36 +661,41 @@ Json handleToolsCall(const Json& params) {
     } else if (name == "load_image") {
         std::string mid = args["machine_id"].sVal;
         std::string path = args["path"].sVal;
-        uint32_t addr = args.contains("addr") ? (uint32_t)args["addr"].nVal : 0;
-        bool autoStart = args.contains("auto_start") ? args["auto_start"].bVal : false;
         MachineState* ms = getMachine(mid);
         if (!ms) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID");
             textItem.oVal["isError"] = Json(true);
         } else {
-            auto* loader = ImageLoaderRegistry::instance().findLoader(path);
-            if (loader) {
-                if (loader->load(path, ms->bus, ms->machine, addr)) {
-                    uint32_t startAddr = addr;
-                    if (startAddr == 0 && std::string(loader->name()).find("PRG") != std::string::npos) {
-                        std::ifstream f(path, std::ios::binary);
-                        uint8_t h[2];
-                        f.read((char*)h, 2);
-                        startAddr = h[0] | (h[1] << 8);
+            uint32_t addr = 0;
+            if (args.contains("addr") && !resolveAddr(args["addr"], ms->dbg, addr)) {
+                textItem.oVal["text"] = Json("Error: Invalid address expression");
+                textItem.oVal["isError"] = Json(true);
+            } else {
+                bool autoStart = args.contains("auto_start") ? args["auto_start"].bVal : false;
+                auto* loader = ImageLoaderRegistry::instance().findLoader(path);
+                if (loader) {
+                    if (loader->load(path, ms->bus, ms->machine, addr)) {
+                        uint32_t startAddr = addr;
+                        if (startAddr == 0 && std::string(loader->name()).find("PRG") != std::string::npos) {
+                            std::ifstream f(path, std::ios::binary);
+                            uint8_t h[2];
+                            f.read((char*)h, 2);
+                            startAddr = h[0] | (h[1] << 8);
+                        }
+                        if (autoStart) {
+                            ms->cpu->setPc(startAddr);
+                        }
+                        std::stringstream sss;
+                        sss << "Loaded '" << path << "' at $" << std::hex << startAddr;
+                        textItem.oVal["text"] = Json(sss.str());
+                    } else {
+                        textItem.oVal["text"] = Json("Error: Failed to load image");
+                        textItem.oVal["isError"] = Json(true);
                     }
-                    if (autoStart) {
-                        ms->cpu->setPc(startAddr);
-                    }
-                    std::stringstream ss;
-                    ss << "Loaded '" << path << "' at $" << std::hex << startAddr;
-                    textItem.oVal["text"] = Json(ss.str());
                 } else {
-                    textItem.oVal["text"] = Json("Error: Failed to load image");
+                    textItem.oVal["text"] = Json("Error: No loader found for file type");
                     textItem.oVal["isError"] = Json(true);
                 }
-            } else {
-                textItem.oVal["text"] = Json("Error: No loader found for file type");
-                textItem.oVal["isError"] = Json(true);
             }
         }
     } else if (name == "attach_cartridge") {
@@ -808,14 +805,19 @@ Json handleToolsCall(const Json& params) {
     } else if (name == "add_symbol") {
         std::string mid = args["machine_id"].sVal;
         std::string label = args["label"].sVal;
-        uint32_t addr = (uint32_t)args["addr"].nVal;
         MachineState* ms = getMachine(mid);
         if (!ms) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID");
             textItem.oVal["isError"] = Json(true);
         } else {
-            ms->dbg->symbols().addSymbol(addr, label);
-            textItem.oVal["text"] = Json("Symbol added: " + label);
+            uint32_t addr;
+            if (resolveAddr(args["addr"], ms->dbg, addr)) {
+                ms->dbg->symbols().addSymbol(addr, label);
+                textItem.oVal["text"] = Json("Symbol added: " + label + " at $" + toHex(addr));
+            } else {
+                textItem.oVal["text"] = Json("Error: Invalid address expression");
+                textItem.oVal["isError"] = Json(true);
+            }
         }
     } else if (name == "remove_symbol") {
         std::string mid = args["machine_id"].sVal;
@@ -893,7 +895,18 @@ Json handleToolsCall(const Json& params) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID or no disassembler");
             textItem.oVal["isError"] = Json(true);
         } else {
-            uint32_t addr = args.contains("addr") ? (uint32_t)args["addr"].nVal : ms->cpu->pc();
+            uint32_t addr;
+            if (args.contains("addr")) {
+                if (!resolveAddr(args["addr"], ms->dbg, addr)) {
+                    textItem.oVal["text"] = Json("Error: Invalid address expression");
+                    textItem.oVal["isError"] = Json(true);
+                    content.push_back(textItem);
+                    res.oVal["content"] = content;
+                    return res;
+                }
+            } else {
+                addr = ms->cpu->pc();
+            }
             int count = args.contains("count") ? (int)args["count"].nVal : 10;
             std::stringstream ss;
             for (int i = 0; i < count; ++i) {
@@ -907,66 +920,88 @@ Json handleToolsCall(const Json& params) {
         }
     } else if (name == "fill_memory") {
         std::string mid = args["machine_id"].sVal;
-        uint32_t addr  = (uint32_t)args["addr"].nVal;
-        uint8_t  value = (uint8_t)args["value"].nVal;
-        uint32_t size  = (uint32_t)args["size"].nVal;
         MachineState* ms = getMachine(mid);
         if (!ms) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID");
             textItem.oVal["isError"] = Json(true);
         } else {
-            for (uint32_t i = 0; i < size; ++i) ms->bus->write8(addr + i, value);
-            textItem.oVal["text"] = Json("Filled " + std::to_string(size) + " bytes at $" + toHex(addr));
+            uint32_t addr, value, size;
+            if (resolveAddr(args["addr"], ms->dbg, addr) &&
+                resolveAddr(args["value"], ms->dbg, value) &&
+                resolveAddr(args["size"], ms->dbg, size)) 
+            {
+                for (uint32_t i = 0; i < size; ++i) ms->bus->write8(addr + i, (uint8_t)value);
+                textItem.oVal["text"] = Json("Filled " + std::to_string(size) + " bytes at $" + toHex(addr));
+            } else {
+                textItem.oVal["text"] = Json("Error: Invalid expression in fill_memory");
+                textItem.oVal["isError"] = Json(true);
+            }
         }
     } else if (name == "copy_memory") {
         std::string mid = args["machine_id"].sVal;
-        uint32_t src  = (uint32_t)args["src_addr"].nVal;
-        uint32_t dst  = (uint32_t)args["dst_addr"].nVal;
-        uint32_t size = (uint32_t)args["size"].nVal;
         MachineState* ms = getMachine(mid);
         if (!ms) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID");
             textItem.oVal["isError"] = Json(true);
         } else {
-            std::vector<uint8_t> buf(size);
-            for (uint32_t i = 0; i < size; ++i) buf[i] = ms->bus->peek8(src + i);
-            for (uint32_t i = 0; i < size; ++i) ms->bus->write8(dst + i, buf[i]);
-            textItem.oVal["text"] = Json("Copied " + std::to_string(size) + " bytes from $" + toHex(src) + " to $" + toHex(dst));
+            uint32_t src, dst, size;
+            if (resolveAddr(args["src_addr"], ms->dbg, src) &&
+                resolveAddr(args["dst_addr"], ms->dbg, dst) &&
+                resolveAddr(args["size"], ms->dbg, size))
+            {
+                std::vector<uint8_t> buf(size);
+                for (uint32_t i = 0; i < size; ++i) buf[i] = ms->bus->peek8(src + i);
+                for (uint32_t i = 0; i < size; ++i) ms->bus->write8(dst + i, buf[i]);
+                textItem.oVal["text"] = Json("Copied " + std::to_string(size) + " bytes from $" + toHex(src) + " to $" + toHex(dst));
+            } else {
+                textItem.oVal["text"] = Json("Error: Invalid expression in copy_memory");
+                textItem.oVal["isError"] = Json(true);
+            }
         }
     } else if (name == "swap_memory") {
         std::string mid = args["machine_id"].sVal;
-        uint32_t addr1 = (uint32_t)args["addr1"].nVal;
-        uint32_t addr2 = (uint32_t)args["addr2"].nVal;
-        uint32_t size  = (uint32_t)args["size"].nVal;
         MachineState* ms = getMachine(mid);
         if (!ms) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID");
             textItem.oVal["isError"] = Json(true);
         } else {
-            std::vector<uint8_t> tmp(size);
-            for (uint32_t i = 0; i < size; ++i) {
-                uint8_t v1 = ms->bus->read8(addr1 + i);
-                uint8_t v2 = ms->bus->read8(addr2 + i);
-                tmp[i] = v1;
-                ms->bus->write8(addr1 + i, v2);
+            uint32_t addr1, addr2, size;
+            if (resolveAddr(args["addr1"], ms->dbg, addr1) &&
+                resolveAddr(args["addr2"], ms->dbg, addr2) &&
+                resolveAddr(args["size"], ms->dbg, size))
+            {
+                std::vector<uint8_t> tmp(size);
+                for (uint32_t i = 0; i < size; ++i) {
+                    uint8_t v1 = ms->bus->read8(addr1 + i);
+                    uint8_t v2 = ms->bus->read8(addr2 + i);
+                    tmp[i] = v1;
+                    ms->bus->write8(addr1 + i, v2);
+                }
+                for (uint32_t i = 0; i < size; ++i) ms->bus->write8(addr2 + i, tmp[i]);
+                textItem.oVal["text"] = Json("Swapped " + std::to_string(size) + " bytes between $" + toHex(addr1) + " and $" + toHex(addr2));
+            } else {
+                textItem.oVal["text"] = Json("Error: Invalid expression in swap_memory");
+                textItem.oVal["isError"] = Json(true);
             }
-            for (uint32_t i = 0; i < size; ++i) ms->bus->write8(addr2 + i, tmp[i]);
-            textItem.oVal["text"] = Json("Swapped " + std::to_string(size) + " bytes between $" + toHex(addr1) + " and $" + toHex(addr2));
         }
     } else if (name == "set_breakpoint") {
         std::string mid = args["machine_id"].sVal;
-        uint32_t addr = (uint32_t)args["addr"].nVal;
         MachineState* ms = getMachine(mid);
         if (!ms) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID");
             textItem.oVal["isError"] = Json(true);
         } else {
-            int id = ms->dbg->breakpoints().add(addr, BreakpointType::EXEC);
-            textItem.oVal["text"] = Json("Breakpoint " + std::to_string(id) + " at $" + toHex(addr));
+            uint32_t addr;
+            if (resolveAddr(args["addr"], ms->dbg, addr)) {
+                int id = ms->dbg->breakpoints().add(addr, BreakpointType::EXEC);
+                textItem.oVal["text"] = Json("Breakpoint " + std::to_string(id) + " set at $" + toHex(addr));
+            } else {
+                textItem.oVal["text"] = Json("Error: Invalid address expression");
+                textItem.oVal["isError"] = Json(true);
+            }
         }
     } else if (name == "set_watchpoint") {
         std::string mid = args["machine_id"].sVal;
-        uint32_t addr = (uint32_t)args["addr"].nVal;
         std::string type = args["type"].sVal;
         MachineState* ms = getMachine(mid);
         if (!ms) {
@@ -976,9 +1011,15 @@ Json handleToolsCall(const Json& params) {
             textItem.oVal["text"] = Json("Error: type must be \"read\" or \"write\"");
             textItem.oVal["isError"] = Json(true);
         } else {
-            BreakpointType btype = (type == "read") ? BreakpointType::READ_WATCH : BreakpointType::WRITE_WATCH;
-            int id = ms->dbg->breakpoints().add(addr, btype);
-            textItem.oVal["text"] = Json("Watchpoint " + std::to_string(id) + " (" + type + ") at $" + toHex(addr));
+            uint32_t addr;
+            if (resolveAddr(args["addr"], ms->dbg, addr)) {
+                BreakpointType btype = (type == "read") ? BreakpointType::READ_WATCH : BreakpointType::WRITE_WATCH;
+                int id = ms->dbg->breakpoints().add(addr, btype);
+                textItem.oVal["text"] = Json("Watchpoint " + std::to_string(id) + " (" + type + ") at $" + toHex(addr));
+            } else {
+                textItem.oVal["text"] = Json("Error: Invalid address expression");
+                textItem.oVal["isError"] = Json(true);
+            }
         }
     } else if (name == "delete_breakpoint") {
         std::string mid = args["machine_id"].sVal;
@@ -1021,23 +1062,13 @@ Json handleToolsCall(const Json& params) {
             textItem.oVal["isError"] = Json(true);
         } else {
             const auto& bps = ms->dbg->breakpoints().breakpoints();
-            if (bps.empty()) {
-                textItem.oVal["text"] = Json("No breakpoints set.");
-            } else {
-                std::stringstream ss;
-                for (const auto& bp : bps) {
-                    std::string type;
-                    switch (bp.type) {
-                        case BreakpointType::EXEC:        type = "exec";  break;
-                        case BreakpointType::READ_WATCH:  type = "read";  break;
-                        case BreakpointType::WRITE_WATCH: type = "write"; break;
-                    }
-                    ss << bp.id << "  " << std::left << std::setw(6) << type
-                       << (bp.enabled ? "y" : "n") << "  $" << toHex(bp.addr)
-                       << "  hits=" << bp.hitCount << "\n";
-                }
-                textItem.oVal["text"] = Json(ss.str());
+            std::stringstream ss;
+            ss << "ID  Type   Addr  En  Hits\n";
+            for (const auto& bp : bps) {
+                const char* t = (bp.type == BreakpointType::EXEC) ? "exec" : (bp.type == BreakpointType::READ_WATCH ? "read" : "write");
+                ss << std::left << std::setw(4) << bp.id << std::setw(7) << t << "$" << toHex(bp.addr) << "  " << (bp.enabled ? "Y" : "N") << "   " << bp.hitCount << "\n";
             }
+            textItem.oVal["text"] = Json(ss.str().empty() ? "(no breakpoints)\n" : ss.str());
         }
     } else if (name == "get_stack") {
         std::string mid = args["machine_id"].sVal;
@@ -1047,30 +1078,17 @@ Json handleToolsCall(const Json& params) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID");
             textItem.oVal["isError"] = Json(true);
         } else {
-            auto& st = ms->dbg->stackTrace();
-            auto entries = st.recent(count);
+            auto trace = ms->dbg->stackTrace().recent(count);
             std::stringstream ss;
-            ss << "Stack (depth " << st.depth() << ", showing " << entries.size() << "):\n";
-            for (int i = 0; i < (int)entries.size(); ++i) {
-                const auto& e = entries[i];
-                ss << "  " << std::setw(3) << i << "  "
-                   << std::left << std::setw(5) << stackPushTypeName(e.type) << "  ";
-                if (e.type == StackPushType::CALL || e.type == StackPushType::BRK)
-                    ss << "$" << std::uppercase << std::hex << std::setfill('0') << std::setw(4) << e.value;
-                else
-                    ss << "$" << std::uppercase << std::hex << std::setfill('0') << std::setw(2) << e.value;
-                ss << "  pushed by $" << std::setw(4) << e.pushedByPc << "\n";
+            for (const auto& e : trace) {
+                const char* t = (e.type == StackPushType::CALL) ? "CALL" : (e.type == StackPushType::BRK ? "BRK" : "PUSH");
+                ss << t << " from $" << toHex(e.pushedByPc) << " val: $" << toHex(e.value, 2) << "\n";
             }
-            textItem.oVal["text"] = Json(ss.str());
+            textItem.oVal["text"] = Json(ss.str().empty() ? "(stack empty)\n" : ss.str());
         }
     } else {
-        std::string resultJson;
-        if (PluginToolRegistry::instance().dispatch(name, args.stringify(), resultJson)) {
-            textItem.oVal["text"] = Json(resultJson);
-        } else {
-            textItem.oVal["text"] = Json("Error: Unknown tool");
-            textItem.oVal["isError"] = Json(true);
-        }
+        textItem.oVal["text"] = Json("Error: Unknown tool " + name);
+        textItem.oVal["isError"] = Json(true);
     }
 
     content.push_back(textItem);
@@ -1078,50 +1096,37 @@ Json handleToolsCall(const Json& params) {
     return res;
 }
 
-int main(int argc, char *argv[]) {
+static Json handleCall(const std::string& method, const Json& params) {
+    if (method == "list_resources") return handleResourcesList();
+    if (method == "read_resource") return handleResourcesRead(params);
+    if (method == "call_tool") return handleToolsCall(params);
+    if (method == "describe") return handleDescribe();
+    
+    Json res(Json::OBJ);
+    res.oVal["error"] = Json("Method not found");
+    return res;
+}
+
+int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
-
-    LogRegistry::instance().init();
-
-    PluginLoader::instance().setMcpToolRegisterFn([](const PluginMcpToolInfo* info) {
-        PluginToolRegistry::instance().registerTool(info);
-    });
-
-    PluginLoader::instance().loadFromDir("./lib");
-
+    
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty()) continue;
-        
-        Json req = Json::parse(line);
-        if (!req.is_object() || !req.contains("jsonrpc") || !req.contains("method")) {
-            sendError(Json(Json::NULL_VAL), -32600, "Invalid Request");
-            continue;
-        }
-
-        Json id = req.contains("id") ? req["id"] : Json(Json::NULL_VAL);
-        std::string method = req["method"].sVal;
-        Json params = req.contains("params") ? req["params"] : Json(Json::OBJ);
-
-        if (method == "initialize") {
-            sendResult(id, handleInitialize(params));
-        } else if (method == "tools/list") {
-            sendResult(id, handleToolsList());
-        } else if (method == "tools/call") {
-            sendResult(id, handleToolsCall(params));
-        } else if (method == "resources/list") {
-            sendResult(id, handleResourcesList());
-        } else if (method == "resources/read") {
-            sendResult(id, handleResourcesRead(params));
-        } else if (method == "notifications/initialized") {
-            // Ignore
-        } else if (method == "ping") {
-            sendResult(id, Json(Json::OBJ));
-        } else if (!id.is_null()) {
-            sendError(id, -32601, "Method not found");
+        try {
+            Json req = Json::parse(line);
+            std::string method = req["method"].sVal;
+            Json params = req["params"];
+            
+            Json res = handleCall(method, params);
+            res.oVal["id"] = req["id"];
+            std::cout << res.stringify() << std::endl;
+        } catch (const std::exception& e) {
+            Json res(Json::OBJ);
+            res.oVal["error"] = Json(e.what());
+            std::cout << res.stringify() << std::endl;
         }
     }
-
-    PluginLoader::instance().unloadAll();
+    
     return 0;
 }
