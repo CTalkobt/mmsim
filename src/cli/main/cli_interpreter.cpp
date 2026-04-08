@@ -120,6 +120,15 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
                 m_ctx.dbg = new DebugContext(m_ctx.cpu, m_ctx.bus);
                 m_ctx.cpu->setObserver(m_ctx.dbg);
                 m_ctx.bus->setObserver(m_ctx.dbg);
+
+                for (const auto& path : md->symbolFiles) {
+                    m_ctx.dbg->symbols().loadSym(path);
+                }
+
+                if (m_ctx.disasm) {
+                    m_ctx.disasm->setSymbolTable(&m_ctx.dbg->symbols());
+                }
+
                 m_output("Created machine: " + md->displayName + "\n");
                 
                 if (m_ctx.machine->onReset) {

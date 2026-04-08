@@ -93,4 +93,5 @@ struct MachineDescriptor {
 
     std::vector<MemOverlay> overlays;
     std::vector<uint8_t*>   roms; // Buffers owned by the machine
+    std::vector<std::string> symbolFiles;
 };

@@ -846,34 +846,34 @@ pulse-encoded format for VIC-20, C64, and PET.*
 
 ### Phase 14.1: .tap Archive Parser (`src/plugins/cbm-loader/`)
 
-- [ ] Implement `TapArchive` class to parse "C64-TAPE-RAW" headers.
-- [ ] Decoder for pulse timings (converting .tap byte values to CPU cycles).
-- [ ] Support for both Version 0 and Version 1 .tap files.
-- [ ] Co-located with other CBM format parsers in the `cbm-loader` plugin.
+- [x] Implement `TapArchive` class to parse "C64-TAPE-RAW" headers.
+- [x] Decoder for pulse timings (converting .tap byte values to CPU cycles).
+- [x] Support for both Version 0 and Version 1 .tap files.
+- [x] Co-located with other CBM format parsers in the `cbm-loader` plugin.
 
 ### Phase 14.2: Datasette Device (`src/plugins/devices/datasette/`)
 
-- [ ] Implement `Datasette : public ISignalLine` (for the tape pulse output).
-- [ ] Sense line (connected to CPU port bash1 bit 4 on C64): indicates if a button 
+- [x] Implement `Datasette : public ISignalLine` (for the tape pulse output).
+- [x] Sense line (connected to CPU port bash1 bit 4 on C64): indicates if a button 
       is pressed.
-- [ ] Motor control: responds to motor signal from CPU port.
+- [x] Motor control: responds to motor signal from CPU port.
 - [ ] Write pulse capture (for saving to tape).
-- [ ] Internal timer/state machine to "play" the pulses into the CPU's IRQ/FLAG 
+- [x] Internal timer/state machine to "play" the pulses into the CPU's IRQ/FLAG 
       lines at the correct cycle-exact intervals.
 
 ### Phase 14.3: Per-Machine Wiring
 
-- [ ] **C64**: Wire Datasette to CPU Port bash1 (Sense/Motor) and CIA #1 FLAG 
+- [x] **C64**: Wire Datasette to CPU Port bash1 (Sense/Motor) and CIA #1 FLAG 
       line (Pulses).
 - [ ] **VIC-20**: Wire to VIA #1.
 - [ ] **PET**: Wire to PIA #1.
 
 ### Phase 14.4: Tape UI and Controls
 
-- [ ] **CLI**: `tape mount <file>`, `tape play`, `tape stop`, `tape rewind`.
-- [ ] **GUI**: "Tape Control" pane with tape counter, play/stop/rewind buttons, 
+- [x] **CLI**: `tape mount <file>`, `tape play`, `tape stop`, `tape rewind`.
+- [x] **GUI**: "Tape Control" pane with tape counter, play/stop/rewind buttons, 
       signal and status LED.
-- [ ] **MCP**: `mount_tape`, `control_tape` tools.
+- [x] **MCP**: `mount_tape`, `control_tape` tools.
 
 ---
 

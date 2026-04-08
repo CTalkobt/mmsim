@@ -47,6 +47,38 @@ struct MachineState {
     IDisassembler*     disasm  = nullptr;
     DebugContext*      dbg     = nullptr;
     std::string        id;
+
+    ~MachineState() {
+        // MachineDescriptor owns cpu and bus
+        delete dbg;
+        delete disasm;
+        delete machine;
+    }
+    
+    // Disable copy since we own pointers
+    MachineState() = default;
+    MachineState(const MachineState&) = delete;
+    MachineState& operator=(const MachineState&) = delete;
+    MachineState(MachineState&& o) noexcept {
+        machine = o.machine; o.machine = nullptr;
+        cpu = o.cpu; o.cpu = nullptr;
+        bus = o.bus; o.bus = nullptr;
+        disasm = o.disasm; o.disasm = nullptr;
+        dbg = o.dbg; o.dbg = nullptr;
+        id = std::move(o.id);
+    }
+    MachineState& operator=(MachineState&& o) noexcept {
+        if (this != &o) {
+            delete dbg; delete disasm; delete machine;
+            machine = o.machine; o.machine = nullptr;
+            cpu = o.cpu; o.cpu = nullptr;
+            bus = o.bus; o.bus = nullptr;
+            disasm = o.disasm; o.disasm = nullptr;
+            dbg = o.dbg; o.dbg = nullptr;
+            id = std::move(o.id);
+        }
+        return *this;
+    }
 };
 
 static std::map<std::string, MachineState> g_machines;
@@ -54,29 +86,22 @@ static std::map<std::string, MachineState> g_machines;
 static MachineState* getMachine(const std::string& id) {
     if (g_machines.count(id)) return &g_machines[id];
     
-    // Try to create it if it exists in registry
-    std::vector<std::string> available;
-    MachineRegistry::instance().enumerate(available);
-    bool found = false;
-    for (const auto& aid : available) { if (aid == id) found = true; break; }
-    
-    if (found) {
-        auto* desc = MachineRegistry::instance().createMachine(id);
-        if (desc) {
-            MachineState ms;
-            ms.machine = desc;
-            ms.cpu = desc->cpus[0].cpu;
-            ms.bus = desc->buses[0].bus;
-            ms.id = id;
-            ms.disasm = ToolchainRegistry::instance().createDisassembler(ms.cpu->isaName());
-            ms.dbg = new DebugContext(ms.cpu, ms.bus);
-            ms.cpu->setObserver(ms.dbg);
-            ms.bus->setObserver(ms.dbg);
-            if (ms.disasm) ms.disasm->setSymbolTable(&ms.dbg->symbols());
-            
-            g_machines[id] = ms;
-            return &g_machines[id];
-        }
+    auto* desc = MachineRegistry::instance().createMachine(id);
+    if (desc && !desc->cpus.empty() && desc->cpus[0].cpu && !desc->buses.empty() && desc->buses[0].bus) {
+        MachineState ms;
+        ms.machine = desc;
+        ms.cpu = desc->cpus[0].cpu;
+        ms.bus = desc->buses[0].bus;
+        ms.id = id;
+        ms.disasm = ToolchainRegistry::instance().createDisassembler(ms.cpu->isaName());
+        ms.dbg = new DebugContext(ms.cpu, ms.bus);
+        ms.cpu->setObserver(ms.dbg);
+        ms.bus->setObserver(ms.dbg);
+        if (ms.disasm && ms.dbg) ms.disasm->setSymbolTable(&ms.dbg->symbols());
+
+        g_machines[id] = std::move(ms);
+        return &g_machines[id];
+        } else if (desc) {        delete desc;
     }
     return nullptr;
 }
@@ -891,8 +916,8 @@ Json handleToolsCall(const Json& params) {
     } else if (name == "disassemble") {
         std::string mid = args["machine_id"].sVal;
         MachineState* ms = getMachine(mid);
-        if (!ms || !ms->disasm) {
-            textItem.oVal["text"] = Json("Error: Invalid machine ID or no disassembler");
+        if (!ms || !ms->disasm || !ms->bus || !ms->cpu) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID or missing component (disasm/bus/cpu)");
             textItem.oVal["isError"] = Json(true);
         } else {
             uint32_t addr;
@@ -1107,6 +1132,7 @@ static Json handleCall(const std::string& method, const Json& params) {
     return res;
 }
 
+#ifndef TEST_BUILD
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
     
@@ -1130,3 +1156,4 @@ int main(int argc, char* argv[]) {
     
     return 0;
 }
+#endif

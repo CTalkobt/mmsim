@@ -228,6 +228,15 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
     }
 
     // -----------------------------------------------------------------------
+    // symbolFiles parsing
+    // -----------------------------------------------------------------------
+    if (spec.contains("symbolFiles") && spec["symbolFiles"].is_array()) {
+        for (const auto& symPath : spec["symbolFiles"]) {
+            desc->symbolFiles.push_back(symPath.get<std::string>());
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Step 5 — Device creation
     // -----------------------------------------------------------------------
     std::map<std::string, IOHandler*> devPtrs;
@@ -361,7 +370,6 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
         }
     }
 
-    // -----------------------------------------------------------------------
     // -----------------------------------------------------------------------
     // Phase 14 — tapeWiring: Datasette <-> CPU Port / CIA / VIA
     // -----------------------------------------------------------------------

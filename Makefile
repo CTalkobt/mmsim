@@ -160,13 +160,17 @@ TEST_SRCS = tests/test_main.cpp \
 	src/libcore/test/test_machine_boot.cpp \
 	src/libdevices/test/test_devices.cpp \
 	src/libdevices/test/test_ieee488.cpp \
-	src/libdevices/test/test_joystick.cpp \
 	src/libdebug/test/test_debug.cpp \
 	src/libdebug/test/test_trace_buffer.cpp \
+	src/libdebug/test/test_expression_evaluator.cpp \
 	src/libtoolchain/test/test_toolchain.cpp \
+	src/libtoolchain/test/test_symbol_table_enhanced.cpp \
+	src/libcore/test/test_machine_symbols.cpp \
+	src/mcp/test/test_mcp_symbols.cpp \
 	src/plugins/6502/test/test_cpu6502.cpp \
 	src/plugins/6502/test/test_disasm6502.cpp \
 	src/plugins/6502/test/test_assembler6502.cpp \
+	src/plugins/6502/test/test_cpu6510_io.cpp \
 	src/plugins/machines/vic20/test/test_vic20_integration.cpp \
 	src/plugins/machines/c64/test/test_c64_integration.cpp \
 	src/plugins/machines/pet/test/test_pet_integration.cpp \
@@ -219,6 +223,7 @@ PLUGIN_ANTIC_TEST_SRCS = src/plugins/devices/antic/test/test_atari_boot.cpp \
 REGISTRY_OBJS = src/cli/main/cli_interpreter.o \
 	src/cli/main/plugin_command_registry.o \
 	src/mcp/main/plugin_tool_registry.o \
+	src/mcp/main/main.o \
 	src/gui/main/gui_utils.o \
 	src/gui/main/plugin_pane_manager.o
 
@@ -414,11 +419,18 @@ $(MCP_BIN): $(MCP_OBJS) $(LIBS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -rdynamic -o $@ $(MCP_OBJS) $(BASE_LIBS)
 
 $(TEST_BIN): $(TEST_OBJS) $(LIBS) | $(BINDIR)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -Itests -rdynamic -o $@ $(TEST_OBJS) $(BASE_LIBS) $(WXLIBS) -lasound
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -DTEST_BUILD -Itests -rdynamic -o $@ $(TEST_OBJS) $(BASE_LIBS) $(WXLIBS) -lasound
 
 # Generic rules
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -c -o $@ $<
+
+# Special rule for test objects to include TEST_BUILD
+src/%/test/%.o: src/%/test/%.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -DTEST_BUILD -c -o $@ $<
+
+src/mcp/main/main.o: src/mcp/main/main.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(WXCXXFLAGS) -DTEST_BUILD -c -o $@ $<
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<

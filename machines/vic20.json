@@ -23,6 +23,7 @@
         { "label": "kernal", "path": "roms/vic20/kernal.bin", "size": 8192,
           "overlayAddr": "0xE000", "writable": false }
       ],
+      "symbolFiles": [ "roms/vic20/kernal.sym" ],
       "ramExpansions": [
         { "name": "BLK0", "base": "0x0400", "size": 3072,  "installed": false },
         { "name": "BLK1", "base": "0x2000", "size": 8192,  "installed": false },
@@ -68,6 +69,7 @@
         { "label": "kernal", "path": "roms/vic20/kernal.bin", "size": 8192,
           "overlayAddr": "0xE000", "writable": false }
       ],
+      "symbolFiles": [ "roms/vic20/kernal.sym" ],
       "ramExpansions": [
         { "name": "BLK0", "base": "0x0400", "size": 3072, "installed": true },
         { "name": "BLK1", "base": "0x2000", "size": 8192, "installed": false },
@@ -113,6 +115,7 @@
         { "label": "kernal", "path": "roms/vic20/kernal.bin", "size": 8192,
           "overlayAddr": "0xE000", "writable": false }
       ],
+      "symbolFiles": [ "roms/vic20/kernal.sym" ],
       "ramExpansions": [
         { "name": "BLK0", "base": "0x0400", "size": 3072, "installed": false },
         { "name": "BLK1", "base": "0x2000", "size": 8192, "installed": true },
@@ -158,6 +161,7 @@
         { "label": "kernal", "path": "roms/vic20/kernal.bin", "size": 8192,
           "overlayAddr": "0xE000", "writable": false }
       ],
+      "symbolFiles": [ "roms/vic20/kernal.sym" ],
       "ramExpansions": [
         { "name": "BLK0", "base": "0x0400", "size": 3072, "installed": false },
         { "name": "BLK1", "base": "0x2000", "size": 8192, "installed": true },
@@ -203,6 +207,7 @@
         { "label": "kernal", "path": "roms/vic20/kernal.bin", "size": 8192,
           "overlayAddr": "0xE000", "writable": false }
       ],
+      "symbolFiles": [ "roms/vic20/kernal.sym" ],
       "ramExpansions": [
         { "name": "BLK0", "base": "0x0400", "size": 3072, "installed": false },
         { "name": "BLK1", "base": "0x2000", "size": 8192, "installed": true },

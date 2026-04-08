@@ -127,6 +127,10 @@ bool SymbolTable::loadSym(const std::string& path) {
             std::stringstream ss;
             ss << std::hex << valStr.substr(1);
             ss >> addr;
+        } else if (valStr[0] == '%') {
+            try {
+                addr = std::stoul(valStr.substr(1), nullptr, 2);
+            } catch (...) { continue; }
         } else {
             try {
                 addr = std::stoul(valStr, nullptr, 0);

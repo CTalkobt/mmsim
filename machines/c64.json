@@ -33,6 +33,7 @@
           "overlayAddr": null, "writable": false,
           "passToDevice": ["PLA", "VIC-II"] }
       ],
+      "symbolFiles": [ "roms/c64/kernal.sym" ],
       "signals": [
         { "name": "irq", "type": "shared", "sources": ["VIC-II", "CIA1"] },
         { "name": "nmi", "type": "nmi",    "sources": ["CIA2"] }

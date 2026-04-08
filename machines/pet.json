@@ -28,6 +28,7 @@
           "overlayAddr": null, "writable": false,
           "passToDevice": ["PetVideo"] }
       ],
+      "symbolFiles": [ "roms/pet4032/kernal.sym" ],
       "signals": [
         { "name": "vsync", "type": "latch" },
         { "name": "irq",   "type": "shared",
@@ -85,6 +86,7 @@
           "overlayAddr": null, "writable": false,
           "passToDevice": ["PetVideo"] }
       ],
+      "symbolFiles": [ "roms/pet4032/kernal.sym" ],
       "signals": [
         { "name": "vsync", "type": "latch" },
         { "name": "irq",   "type": "shared",
@@ -142,6 +144,7 @@
           "overlayAddr": null, "writable": false,
           "passToDevice": ["PetVideo"] }
       ],
+      "symbolFiles": [ "roms/pet4032/kernal.sym" ],
       "signals": [
         { "name": "vsync", "type": "latch" },
         { "name": "irq",   "type": "shared",

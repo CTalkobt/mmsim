@@ -537,6 +537,10 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             m_cpu->setObserver(m_dbg);
             m_machine->buses[0].bus->setObserver(m_dbg);
 
+            for (const auto& path : m_machine->symbolFiles) {
+                m_dbg->symbols().loadSym(path);
+            }
+
             if (m_disasm) {
                 m_disasm->setSymbolTable(&m_dbg->symbols());
             }

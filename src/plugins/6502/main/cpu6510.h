@@ -144,12 +144,14 @@ private:
     PortBus*    m_portBus = nullptr;
     IBus*       m_realBus = nullptr;
 
+public:
     // Internal helpers (called from PortBus)
     uint8_t portRead() const;
 
     void ddrWrite(uint8_t val);
     void dataWrite(uint8_t val);
 
+private:
     void updateSignals();
     void installBus(IBus* bus);
 };
