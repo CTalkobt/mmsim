@@ -2,6 +2,7 @@
 #include <wx/dcbuffer.h>
 #include <wx/clipbrd.h>
 #include <wx/numdlg.h>
+#include "libdebug/main/expression_evaluator.h"
 #include <iomanip>
 #include <sstream>
 #include <climits>
@@ -442,12 +443,16 @@ void DisasmPane::GoTo(uint32_t addr) {
 
 void DisasmPane::OnGoto() {
     wxString s = wxGetTextFromUser(
-        "Enter address (hex):", "Go to Address",
+        "Enter address (hex, expression, or symbol):", "Go to Address",
         wxString::Format("%04X", m_highlightAddr), this);
     if (s.IsEmpty()) return;
-    unsigned long addr = 0;
-    if (s.ToULong(&addr, 16) && addr <= 0xFFFFFFFFul)
-        GoTo((uint32_t)addr);
+    
+    uint32_t addr = 0;
+    if (ExpressionEvaluator::evaluate(s.ToStdString(), m_dbg, addr)) {
+        GoTo(addr);
+    } else {
+        wxMessageBox("Invalid address or symbol: " + s, "Error", wxOK | wxICON_ERROR);
+    }
 }
 
 // ---------------------------------------------------------------------------
