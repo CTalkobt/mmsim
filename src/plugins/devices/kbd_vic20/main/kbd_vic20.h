@@ -67,5 +67,5 @@ private:
     ColumnPort m_colPort;
     RowPort    m_rowPort;
 
-    static std::map<std::string, std::pair<int, int>> s_keyMap;
+    std::map<std::string, std::pair<int, int>> m_keyMap;
 };

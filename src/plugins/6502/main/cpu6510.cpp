@@ -54,15 +54,16 @@ void MOS6510::dataWrite(uint8_t val) {
 void MOS6510::installBus(IBus* bus) {
     if (m_realBus == bus && m_portBus) return;
     
-    delete m_portBus;
     m_realBus = bus;
+    delete m_portBus;
+    m_portBus = nullptr;
+
     if (bus) {
         m_portBus = new PortBus(this, bus);
         // Pass the proxy to the 6502 core so all CPU reads/writes go through it.
         MOS6502::setDataBus(m_portBus);
         MOS6502::setCodeBus(m_portBus);
     } else {
-        m_portBus = nullptr;
         MOS6502::setDataBus(nullptr);
         MOS6502::setCodeBus(nullptr);
     }

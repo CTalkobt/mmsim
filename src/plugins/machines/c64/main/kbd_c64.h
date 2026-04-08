@@ -18,7 +18,7 @@
  */
 class KbdC64 : public IOHandler, public IKeyboardMatrix {
 public:
-    KbdC64() : m_colPort(this), m_rowPort(this) { clearKeys(); }
+    KbdC64();
     ~KbdC64() override = default;
 
     // IOHandler
@@ -86,5 +86,5 @@ private:
     ColumnPort m_colPort;
     RowPort    m_rowPort;
 
-    static std::map<std::string, std::pair<int,int>> s_keyMap; // {col, row}
+    std::map<std::string, std::pair<int,int>> m_keyMap; // {col, row}
 };

@@ -1132,6 +1132,11 @@ static Json handleCall(const std::string& method, const Json& params) {
     return res;
 }
 
+void mcpCleanup() {
+    g_machines.clear();
+    PluginLoader::instance().unloadAll();
+}
+
 #ifndef TEST_BUILD
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
@@ -1153,6 +1158,9 @@ int main(int argc, char* argv[]) {
             std::cout << res.stringify() << std::endl;
         }
     }
+    
+    g_machines.clear();
+    PluginLoader::instance().unloadAll();
     
     return 0;
 }

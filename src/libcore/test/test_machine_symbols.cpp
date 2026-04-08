@@ -3,6 +3,7 @@
 #include "libcore/main/machine_desc.h"
 #include "libdebug/main/debug_context.h"
 #include "cli/main/cli_interpreter.h"
+#include "plugin_loader/main/plugin_loader.h"
 
 TEST_CASE(machine_symbol_autoload) {
     CliContext ctx;
@@ -26,4 +27,6 @@ TEST_CASE(machine_symbol_autoload) {
     ASSERT_NE(ctx.dbg, nullptr);
     EXPECT_EQ(ctx.dbg->symbols().getAddress("CHROUT"), 0xFFD2);
     EXPECT_EQ(ctx.dbg->symbols().getAddress("RESET"), 0xFD17);
+
+    // Cleanup via PluginLoader
 }

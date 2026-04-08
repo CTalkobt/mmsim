@@ -6,6 +6,7 @@
 #include <map>
 #include <functional>
 
+
 class CoreRegistry {
 public:
     using FactoryFn = std::function<ICore*()>;

@@ -89,7 +89,7 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
                         m_output("Set logger '" + target + "' to " + levelStr + "\n");
                     }
                 } else {
-                    m_output("Usage: log level <name|all> <trace|debug|info|warn|error|off>\n");
+                    m_output("Usage: log level <name|all|kernal> <trace|debug|info|warn|error|off>\n");
                 }
             }
         } else {
@@ -105,18 +105,23 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
                     delete md;
                     return;
                 }
-                if (m_ctx.machine) delete m_ctx.machine;
+                if (m_ctx.machine) {
+                    if (m_ctx.cpu) m_ctx.cpu->setObserver(nullptr);
+                    if (m_ctx.bus) m_ctx.bus->setObserver(nullptr);
+                    delete m_ctx.machine;
+                    m_ctx.machine = nullptr;
+                }
                 m_ctx.machine = md;
                 m_ctx.cpu = md->cpus[0].cpu;
                 // Use CPU data bus if available, otherwise fallback to machine bus
                 m_ctx.bus = m_ctx.cpu->getDataBus() ? m_ctx.cpu->getDataBus() : md->buses[0].bus;
                 
-                if (m_ctx.disasm) delete m_ctx.disasm;
-                if (m_ctx.assem) delete m_ctx.assem;
+                if (m_ctx.disasm) { delete m_ctx.disasm; m_ctx.disasm = nullptr; }
+                if (m_ctx.assem)  { delete m_ctx.assem;  m_ctx.assem = nullptr; }
                 m_ctx.disasm = ToolchainRegistry::instance().createDisassembler(m_ctx.cpu->isaName());
                 m_ctx.assem = ToolchainRegistry::instance().createAssembler(m_ctx.cpu->isaName());
                 
-                if (m_ctx.dbg) delete m_ctx.dbg;
+                if (m_ctx.dbg) { delete m_ctx.dbg; m_ctx.dbg = nullptr; }
                 m_ctx.dbg = new DebugContext(m_ctx.cpu, m_ctx.bus);
                 m_ctx.cpu->setObserver(m_ctx.dbg);
                 m_ctx.bus->setObserver(m_ctx.dbg);

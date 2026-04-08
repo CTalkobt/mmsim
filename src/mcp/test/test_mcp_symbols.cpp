@@ -5,24 +5,20 @@
 #include <string>
 #include <algorithm>
 
-// Forward decl of the handler we want to test
+// Forward decl of the handlers we want to test
 Json handleToolsCall(const Json& params);
 
 TEST_CASE(mcp_symbol_tools) {
-    // 1. Load plugins and create raw6502 machine
+    // 1. Load plugins and create machine
     PluginLoader::instance().loadFromDir("./lib");
+    
     std::string mid = "raw6502";
 
     Json createReq = Json::parse(R"({"name":"create_machine","arguments":{"machine_id":")" + mid + R"("}})");
     Json createRes = handleToolsCall(createReq);
     
     if (createRes["content"].aVal[0].contains("isError")) {
-        std::cerr << "Create Error: " << createRes["content"].aVal[0]["text"].sVal << std::endl;
-        std::vector<std::string> ids;
-        MachineRegistry::instance().enumerate(ids);
-        std::cerr << "Available: ";
-        for (auto& i : ids) std::cerr << i << " ";
-        std::cerr << std::endl;
+        std::cerr << "MCP CREATE ERROR: " << createRes["content"].aVal[0]["text"].sVal << std::endl;
     }
     ASSERT(!createRes["content"].aVal[0].contains("isError"));
     
@@ -37,4 +33,11 @@ TEST_CASE(mcp_symbol_tools) {
     std::string text = listRes["content"].aVal[0]["text"].sVal;
     EXPECT_TRUE(text.find("mcp_test") != std::string::npos);
     EXPECT_TRUE(text.find("1234") != std::string::npos);
+
+    // 4. Test disassemble using that symbol
+    Json disReq = Json::parse(R"({"name":"disassemble","arguments":{"machine_id":")" + mid + R"(","addr":"mcp_test","count":1}})");
+    Json disRes = handleToolsCall(disReq);
+    ASSERT(!disRes["content"].aVal[0].contains("isError"));
+
+    // Cleanup
 }

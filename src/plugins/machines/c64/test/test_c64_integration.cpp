@@ -11,6 +11,8 @@
 #include "vic2.h"
 #include "sid6581.h"
 #include "kbd_c64.h"
+#include "plugin_loader/main/plugin_loader.h"
+#include "cli/main/cli_interpreter.h"
 #include <vector>
 #include <string>
 #include <cstring>
@@ -19,23 +21,8 @@
 // Registry setup — called once; singletons persist across all test cases.
 // ---------------------------------------------------------------------------
 
-static bool s_registriesReady = false;
 static void ensureRegistriesReady() {
-    if (s_registriesReady) return;
-    s_registriesReady = true;
-    CoreRegistry::instance().registerCore("6510", "MOS6510", "open",
-        []() -> ICore* { return new MOS6510(); });
-    DeviceRegistry::instance().registerDevice("c64_pla",
-        []() -> IOHandler* { return new C64PLA(); });
-    DeviceRegistry::instance().registerDevice("6567",
-        []() -> IOHandler* { return new VIC2("VIC-II", 0xD000); });
-    DeviceRegistry::instance().registerDevice("6581",
-        []() -> IOHandler* { return new SID6581("SID", 0xD400); });
-    DeviceRegistry::instance().registerDevice("6526",
-        []() -> IOHandler* { return new CIA6526("CIA", 0); });
-    DeviceRegistry::instance().registerDevice("kbd_c64",
-        []() -> IOHandler* { return new KbdC64(); });
-    JsonMachineLoader().loadFile("machines/c64.json");
+    PluginLoader::instance().loadFromDir("./lib");
 }
 
 // ---------------------------------------------------------------------------
@@ -43,11 +30,8 @@ static void ensureRegistriesReady() {
 // ---------------------------------------------------------------------------
 
 static FlatMemoryBus* getBus(MachineDescriptor* desc) {
+    if (!desc || desc->buses.empty()) return nullptr;
     return static_cast<FlatMemoryBus*>(desc->buses[0].bus);
-}
-
-static void destroyDesc(MachineDescriptor* desc) {
-    delete desc;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,17 +40,20 @@ static void destroyDesc(MachineDescriptor* desc) {
 
 TEST_CASE(c64_setup) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("c64");
-    ASSERT(desc != nullptr);
-    ASSERT(desc->machineId == std::string("c64"));
-    ASSERT(!desc->cpus.empty());
-    ASSERT(desc->cpus[0].cpu != nullptr);
-    ASSERT(!desc->buses.empty());
-    ASSERT(desc->buses[0].bus != nullptr);
-    ASSERT(desc->ioRegistry != nullptr);
-    ASSERT(desc->schedulerStep != nullptr);
-    ASSERT(desc->onReset != nullptr);
-    destroyDesc(desc);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create c64");
+
+    ASSERT(ctx.machine != nullptr);
+    ASSERT(ctx.machine->machineId == std::string("c64"));
+    ASSERT(!ctx.machine->cpus.empty());
+    ASSERT(ctx.machine->cpus[0].cpu != nullptr);
+    ASSERT(!ctx.machine->buses.empty());
+    ASSERT(ctx.machine->buses[0].bus != nullptr);
+    ASSERT(ctx.machine->ioRegistry != nullptr);
+    ASSERT(ctx.machine->schedulerStep != nullptr);
+    ASSERT(ctx.machine->onReset != nullptr);
+    
 }
 
 // ---------------------------------------------------------------------------
@@ -75,12 +62,15 @@ TEST_CASE(c64_setup) {
 
 TEST_CASE(c64_cpu_is_6510) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("c64");
-    ASSERT(desc != nullptr);
-    ICore* cpu = desc->cpus[0].cpu;
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create c64");
+
+    ASSERT(ctx.machine != nullptr);
+    ICore* cpu = ctx.machine->cpus[0].cpu;
     ASSERT(cpu != nullptr);
     ASSERT(std::string(cpu->variantName()) == "MOS 6510");
-    destroyDesc(desc);
+    
 }
 
 // ---------------------------------------------------------------------------
@@ -89,8 +79,12 @@ TEST_CASE(c64_cpu_is_6510) {
 
 TEST_CASE(c64_execute_ram_write) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("c64");
-    ASSERT(desc != nullptr);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create c64");
+
+    ASSERT(ctx.machine != nullptr);
+    auto* desc = ctx.machine;
     auto* bus = getBus(desc);
     ICore* cpu = desc->cpus[0].cpu;
 
@@ -103,7 +97,7 @@ TEST_CASE(c64_execute_ram_write) {
     bus->write8(0x2002, 0x8D); bus->write8(0x2003, 0x00); bus->write8(0x2004, 0x04);
     bus->write8(0x2005, 0x4C); bus->write8(0x2006, 0x05); bus->write8(0x2007, 0x20);
 
-    desc->onReset(*desc);
+    cli.processLine("reset");
     cpu->setPc(0x2000);
 
     for (int i = 0; i < 100 && !cpu->isProgramEnd(bus); ++i)
@@ -111,7 +105,7 @@ TEST_CASE(c64_execute_ram_write) {
 
     ASSERT(cpu->isProgramEnd(bus));
     ASSERT(bus->read8(0x0400) == 0x55);
-    destroyDesc(desc);
+    
 }
 
 // ---------------------------------------------------------------------------
@@ -120,8 +114,12 @@ TEST_CASE(c64_execute_ram_write) {
 
 TEST_CASE(c64_6510_io_port) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("c64");
-    ASSERT(desc != nullptr);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create c64");
+
+    ASSERT(ctx.machine != nullptr);
+    auto* desc = ctx.machine;
     auto* bus = getBus(desc);
     ICore* cpu = desc->cpus[0].cpu;
 
@@ -137,7 +135,7 @@ TEST_CASE(c64_6510_io_port) {
     bus->write8(0x3006, 0x85); bus->write8(0x3007, 0x01);
     bus->write8(0x3008, 0x4C); bus->write8(0x3009, 0x08); bus->write8(0x300A, 0x30);
 
-    desc->onReset(*desc);
+    cli.processLine("reset");
     cpu->setPc(0x3000);
 
     for (int i = 0; i < 200 && !cpu->isProgramEnd(bus); ++i)
@@ -150,7 +148,7 @@ TEST_CASE(c64_6510_io_port) {
     ASSERT(cpu6510 != nullptr);
     ASSERT(cpu6510->portDDR()  == 0x07);
     ASSERT(cpu6510->portData() == 0x37);
-    destroyDesc(desc);
+    
 }
 
 // ---------------------------------------------------------------------------
@@ -159,10 +157,14 @@ TEST_CASE(c64_6510_io_port) {
 
 TEST_CASE(c64_cia1_timer) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("c64");
-    ASSERT(desc != nullptr);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create c64");
+
+    ASSERT(ctx.machine != nullptr);
+    auto* desc = ctx.machine;
     auto* bus = getBus(desc);
-    desc->onReset(*desc);
+    cli.processLine("reset");
 
     // Load latch, then start timer in one-shot mode.
     desc->ioRegistry->dispatchWrite(bus, 0xDC04, 0x05); // TALO latch = 5
@@ -175,7 +177,7 @@ TEST_CASE(c64_cia1_timer) {
     bool ok = desc->ioRegistry->dispatchRead(bus, 0xDC0D, &icr); // CIA1 ICR
     ASSERT(ok);
     ASSERT(icr & 0x01); // ICR_TA (bit 0) must be set
-    destroyDesc(desc);
+    
 }
 
 // ---------------------------------------------------------------------------
@@ -186,10 +188,14 @@ TEST_CASE(c64_cia1_timer) {
 
 TEST_CASE(c64_pla_kernal_routing) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("c64");
-    ASSERT(desc != nullptr);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create c64");
+
+    ASSERT(ctx.machine != nullptr);
+    auto* desc = ctx.machine;
     auto* bus = getBus(desc);
-    desc->onReset(*desc);
+    cli.processLine("reset");
 
     // After reset, 6510 DATA=$3F DDR=$00 → all bits float high (pull-ups).
     // Effective port: (~$00 & $3F) = $3F → HIRAM=1, LORAM=1, CHAREN=1.
@@ -207,7 +213,7 @@ TEST_CASE(c64_pla_kernal_routing) {
     bool claimed = desc->ioRegistry->dispatchRead(bus, 0xE000, &val);
     ASSERT(claimed);        // PLA must have handled the read
     ASSERT(val != 0xAB);    // val must have been written by the PLA handler
-    destroyDesc(desc);
+    
 }
 
 // ---------------------------------------------------------------------------
@@ -216,15 +222,19 @@ TEST_CASE(c64_pla_kernal_routing) {
 
 TEST_CASE(c64_vic2_raster_advance) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("c64");
-    ASSERT(desc != nullptr);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create c64");
+
+    ASSERT(ctx.machine != nullptr);
+    auto* desc = ctx.machine;
     auto* bus = getBus(desc);
 
     // JMP $4000 (self) keeps CPU spinning without halting.
     bus->write8(0x4000, 0x4C);
     bus->write8(0x4001, 0x00);
     bus->write8(0x4002, 0x40);
-    desc->onReset(*desc);
+    cli.processLine("reset");
     desc->cpus[0].cpu->setPc(0x4000);
 
     // 65 cycles per raster line (NTSC 6567); run at least 2 lines.
@@ -234,7 +244,7 @@ TEST_CASE(c64_vic2_raster_advance) {
     bool ok = desc->ioRegistry->dispatchRead(bus, 0xD012, &raster);
     ASSERT(ok);
     ASSERT(raster >= 1); // at least one raster line completed
-    destroyDesc(desc);
+    
 }
 
 // ---------------------------------------------------------------------------
@@ -244,10 +254,14 @@ TEST_CASE(c64_vic2_raster_advance) {
 
 TEST_CASE(c64_color_ram) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("c64");
-    ASSERT(desc != nullptr);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create c64");
+
+    ASSERT(ctx.machine != nullptr);
+    auto* desc = ctx.machine;
     auto* bus = getBus(desc);
-    desc->onReset(*desc);
+    cli.processLine("reset");
 
     // Color RAM is at $D800–$DBFF (1 KB, 4-bit cells).
     // Write a sentinel value; the handler stores only the lower nibble.
@@ -270,7 +284,6 @@ TEST_CASE(c64_color_ram) {
     ASSERT((val2 & 0x0F) == 0x0C);
     ASSERT((val2 & 0xF0) == 0xF0);
 
-    destroyDesc(desc);
 }
 
 // ---------------------------------------------------------------------------
@@ -280,10 +293,14 @@ TEST_CASE(c64_color_ram) {
 
 TEST_CASE(c64_keyboard_scan) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("c64");
-    ASSERT(desc != nullptr);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create c64");
+
+    ASSERT(ctx.machine != nullptr);
+    auto* desc = ctx.machine;
     auto* bus = getBus(desc);
-    desc->onReset(*desc);
+    cli.processLine("reset");
     ASSERT(desc->onKey != nullptr);
 
     // Press "a" — PA1 column (PB2 row): keymap {col=1, row=2}.
@@ -306,7 +323,6 @@ TEST_CASE(c64_keyboard_scan) {
     desc->ioRegistry->dispatchRead(bus, 0xDC01, &pb0);
     ASSERT(pb0 == 0xFF); // no key in PA0 column pressed
 
-    destroyDesc(desc);
 }
 
 // ---------------------------------------------------------------------------
@@ -316,8 +332,12 @@ TEST_CASE(c64_keyboard_scan) {
 
 TEST_CASE(c64_vic2_character_map_visibility) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("c64");
-    ASSERT(desc != nullptr);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create c64");
+
+    ASSERT(ctx.machine != nullptr);
+    auto* desc = ctx.machine;
     auto* bus = getBus(desc);
 
     // Find the VIC2 instance in the IO registry
@@ -368,5 +388,4 @@ TEST_CASE(c64_vic2_character_map_visibility) {
     bus->write8(0x5123, 0x99);
     ASSERT(vic2->dmaPeek(0x1123) == 0x99); // Should NOT see Char ROM
 
-    destroyDesc(desc);
 }

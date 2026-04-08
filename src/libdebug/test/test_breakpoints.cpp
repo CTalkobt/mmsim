@@ -10,35 +10,12 @@
 #include "via6522.h"
 #include "vic6560.h"
 #include "kbd_vic20.h"
+#include "plugin_loader/main/plugin_loader.h"
 #include <vector>
 #include <string>
 
-static bool s_bpRegistriesReady = false;
 static void setupBreakpointTestRegistries() {
-    if (s_bpRegistriesReady) return;
-    s_bpRegistriesReady = true;
-    CoreRegistry::instance().registerCore("6502", "NMOS", "open",
-        []() -> ICore* { return new MOS6502(); });
-    DeviceRegistry::instance().registerDevice("6560",
-        []() -> IOHandler* { return new VIC6560("VIC-I", 0x9000); });
-    DeviceRegistry::instance().registerDevice("6522",
-        []() -> IOHandler* { return new VIA6522("6522", 0); });
-    // KbdVic20 is IKeyboardMatrix only; wrap in a minimal IOHandler for the registry
-    struct KbdWrapper : public IOHandler {
-        KbdWrapper() : m_kbd(new KbdVic20()) {}
-        ~KbdWrapper() { delete m_kbd; }
-        const char* name() const override { return "kbd_vic20"; }
-        uint32_t baseAddr() const override { return 0; }
-        uint32_t addrMask() const override { return 0; }
-        bool ioRead(IBus*, uint32_t, uint8_t*) override { return false; }
-        bool ioWrite(IBus*, uint32_t, uint8_t) override { return false; }
-        void reset() override {}
-        void tick(uint64_t) override {}
-        KbdVic20* m_kbd;
-    };
-    DeviceRegistry::instance().registerDevice("kbd_vic20",
-        []() -> IOHandler* { return new KbdWrapper(); });
-    JsonMachineLoader().loadFile("machines/vic20.json");
+    PluginLoader::instance().loadFromDir("./lib");
 }
 
 TEST_CASE(TestBasicExecBreakpoint) {
@@ -67,4 +44,5 @@ TEST_CASE(TestBasicExecBreakpoint) {
 
     EXPECT_TRUE(ctx.dbg->isPaused());
     EXPECT_EQ(ctx.cpu->pc(), 0x0400);
+    
 }

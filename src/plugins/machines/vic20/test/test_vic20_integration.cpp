@@ -9,9 +9,11 @@
 #include "via6522.h"
 #include "vic6560.h"
 #include "plugin_loader/main/plugin_loader.h"
+#include "cli/main/cli_interpreter.h"
 #include "cli/main/plugin_command_registry.h"
 #include <vector>
 #include <string>
+#include <iostream>
 
 // ---------------------------------------------------------------------------
 #include "kbd_vic20.h"
@@ -40,19 +42,8 @@ private:
 // Registry setup — called once; singletons persist across all test cases.
 // ---------------------------------------------------------------------------
 
-static bool s_registriesReady = false;
 static void ensureRegistriesReady() {
-    if (s_registriesReady) return;
-    s_registriesReady = true;
-    CoreRegistry::instance().registerCore("6502", "NMOS", "open",
-        []() -> ICore* { return new MOS6502(); });
-    DeviceRegistry::instance().registerDevice("6560",
-        []() -> IOHandler* { return new VIC6560("VIC-I", 0x9000); });
-    DeviceRegistry::instance().registerDevice("6522",
-        []() -> IOHandler* { return new VIA6522("6522", 0); });
-    DeviceRegistry::instance().registerDevice("kbd_vic20",
-        []() -> IOHandler* { return new TestKeyboardWrapper(); });
-    JsonMachineLoader().loadFile("machines/vic20.json");
+    PluginLoader::instance().loadFromDir("./lib");
 }
 
 // ---------------------------------------------------------------------------
@@ -60,11 +51,10 @@ static void ensureRegistriesReady() {
 // ---------------------------------------------------------------------------
 
 static FlatMemoryBus* getBus(MachineDescriptor* desc) {
-    return static_cast<FlatMemoryBus*>(desc->buses[0].bus);
-}
-
-static void destroyDesc(MachineDescriptor* desc) {
-    delete desc;
+    if (!desc) return nullptr;
+    if (desc->buses.empty()) return nullptr;
+    auto* bus = desc->buses[0].bus;
+    return static_cast<FlatMemoryBus*>(bus);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,17 +63,20 @@ static void destroyDesc(MachineDescriptor* desc) {
 
 TEST_CASE(vic20_setup) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("vic20");
-    ASSERT(desc != nullptr);
-    ASSERT(desc->machineId == "vic20");
-    ASSERT(!desc->cpus.empty());
-    ASSERT(desc->cpus[0].cpu != nullptr);
-    ASSERT(!desc->buses.empty());
-    ASSERT(desc->buses[0].bus != nullptr);
-    ASSERT(desc->ioRegistry != nullptr);
-    ASSERT(desc->schedulerStep != nullptr);
-    ASSERT(desc->onReset != nullptr);
-    destroyDesc(desc);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create vic20");
+
+    ASSERT(ctx.machine != nullptr);
+    ASSERT(ctx.machine->machineId == "vic20");
+    ASSERT(!ctx.machine->cpus.empty());
+    ASSERT(ctx.machine->cpus[0].cpu != nullptr);
+    ASSERT(!ctx.machine->buses.empty());
+    ASSERT(ctx.machine->buses[0].bus != nullptr);
+    ASSERT(ctx.machine->ioRegistry != nullptr);
+    ASSERT(ctx.machine->schedulerStep != nullptr);
+    ASSERT(ctx.machine->onReset != nullptr);
+    
 }
 
 // ---------------------------------------------------------------------------
@@ -92,10 +85,16 @@ TEST_CASE(vic20_setup) {
 
 TEST_CASE(vic20_execute_screen_write) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("vic20");
-    ASSERT(desc != nullptr);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create vic20");
+
+    ASSERT(ctx.machine != nullptr);
+    auto* desc = ctx.machine;
     auto* bus = getBus(desc);
+    ASSERT(bus != nullptr);
     ICore* cpu = desc->cpus[0].cpu;
+    ASSERT(cpu != nullptr);
 
     // Minimal test program:
     //   $1000  A9 41        LDA #$41
@@ -105,20 +104,17 @@ TEST_CASE(vic20_execute_screen_write) {
     bus->write8(0x1002, 0x8D); bus->write8(0x1003, 0x00); bus->write8(0x1004, 0x1E);
     bus->write8(0x1005, 0x4C); bus->write8(0x1006, 0x05); bus->write8(0x1007, 0x10);
 
-    // onReset resets all IO and CPU; the KERNAL ROM at $FFFC sets PC to $FD22.
-    // Force PC to the test stub directly.
-    desc->onReset(*desc);
+    cli.processLine("reset");
     cpu->setPc(0x1000);
 
     // Run until JMP-to-self is detected; guard with iteration cap.
     for (int i = 0; i < 100 && !cpu->isProgramEnd(bus); ++i) {
-        desc->schedulerStep(*desc);
+        if (desc->schedulerStep) desc->schedulerStep(*desc);
     }
 
     ASSERT(cpu->isProgramEnd(bus));
     ASSERT(bus->read8(0x1E00) == 0x41);
 
-    destroyDesc(desc);
 }
 
 // ---------------------------------------------------------------------------
@@ -127,24 +123,30 @@ TEST_CASE(vic20_execute_screen_write) {
 
 TEST_CASE(vic20_raster_frame) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("vic20");
-    ASSERT(desc != nullptr);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create vic20");
+
+    ASSERT(ctx.machine != nullptr);
+    auto* desc = ctx.machine;
     auto* bus = getBus(desc);
+    ASSERT(bus != nullptr);
 
     // JMP $1000 (JMP to self) keeps the CPU spinning without halting.
     bus->write8(0x1000, 0x4C); bus->write8(0x1001, 0x00); bus->write8(0x1002, 0x10);
-    desc->onReset(*desc);
+    cli.processLine("reset");
     desc->cpus[0].cpu->setPc(0x1000);
 
     // 50 steps × 3 cycles/JMP = 150 cycles.  VIC raster line = 150 / 65 = 2.
-    for (int i = 0; i < 50; ++i) desc->schedulerStep(*desc);
+    for (int i = 0; i < 50; ++i) {
+        if (desc->schedulerStep) desc->schedulerStep(*desc);
+    }
 
     uint8_t rasterLine = 0;
     bool ok = desc->ioRegistry->dispatchRead(bus, 0x9004, &rasterLine);
     ASSERT(ok);
     ASSERT(rasterLine >= 2);
 
-    destroyDesc(desc);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,10 +155,15 @@ TEST_CASE(vic20_raster_frame) {
 
 TEST_CASE(vic20_via_timer) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("vic20");
-    ASSERT(desc != nullptr);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create vic20");
+
+    ASSERT(ctx.machine != nullptr);
+    auto* desc = ctx.machine;
     auto* bus = getBus(desc);
-    desc->onReset(*desc);
+    ASSERT(bus != nullptr);
+    cli.processLine("reset");
 
     // Write T1CL latch first, then T1CH to load and start the timer.
     desc->ioRegistry->dispatchWrite(bus, 0x9114, 0x05); // T1CL latch = 5
@@ -169,7 +176,6 @@ TEST_CASE(vic20_via_timer) {
     ASSERT(ok);
     ASSERT(ifr & 0x40); // T1 interrupt flag (bit 6) must be set
 
-    destroyDesc(desc);
 }
 
 // ---------------------------------------------------------------------------
@@ -178,10 +184,13 @@ TEST_CASE(vic20_via_timer) {
 
 TEST_CASE(vic20_machine_id_pane_match) {
     ensureRegistriesReady();
-    auto* desc = MachineRegistry::instance().createMachine("vic20");
-    ASSERT(desc != nullptr);
-    ASSERT(desc->machineId == "vic20");
-    destroyDesc(desc);
+    CliContext ctx;
+    CliInterpreter cli(ctx, [](const std::string&){});
+    cli.processLine("create vic20");
+
+    ASSERT(ctx.machine != nullptr);
+    ASSERT(ctx.machine->machineId == "vic20");
+
 }
 
 // ---------------------------------------------------------------------------

@@ -1,9 +1,11 @@
 #include "debug_context.h"
 #include "include/mmemu_plugin_api.h"
 #include "libcore/main/image_loader.h"
+#include "include/util/logging.h"
 #include <iostream>
 #include <cstring>
 #include <sstream>
+#include <iomanip>
 #include <string>
 
 static std::string toHex(uint32_t v) {
@@ -47,6 +49,7 @@ bool DebugContext::onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
     }
 
     trackStack(cpu, entry);
+    monitorKernal(cpu, entry);
     return true;
 }
 
@@ -56,6 +59,46 @@ static uint32_t regByName(ICore* cpu, const char* name) {
             return cpu->regRead(i);
     }
     return 0;
+}
+
+void DebugContext::monitorKernal(ICore* cpu, const DisasmEntry& entry) {
+    if (!cpu) return;
+    auto logger = LogRegistry::instance().getLogger("kernal");
+    if (!logger || logger->level() > spdlog::level::debug) return;
+
+    // 1. Check for Exit (RTS)
+    // 6502 RTS is opcode $60. It pulls from stack when SP is at the value it was at entry.
+    if (entry.isReturn && !m_kernalStack.empty()) {
+        if (cpu->sp() == m_kernalStack.back().entrySp) {
+            std::string name = m_kernalStack.back().name;
+            m_kernalStack.pop_back();
+            logger->debug("EXIT  {}: {}", name, formatState(cpu));
+        }
+    }
+
+    // 2. Check for Entry
+    // We consider it a Kernal entry if the address has a symbol AND is in the Kernal ROM area (>$E000)
+    if (entry.addr >= 0xE000) {
+        std::string label = m_symbols.getLabel(entry.addr);
+        if (!label.empty()) {
+            // Log entry
+            logger->debug("ENTRY {}: {}", label, formatState(cpu));
+            // Push to stack to monitor exit
+            m_kernalStack.push_back({label, cpu->sp()});
+        }
+    }
+}
+
+std::string DebugContext::formatState(ICore* cpu) {
+    std::stringstream ss;
+    for (int i = 0; i < cpu->regCount(); ++i) {
+        const auto* desc = cpu->regDescriptor(i);
+        if (desc->flags & REGFLAG_INTERNAL) continue;
+        uint32_t val = cpu->regRead(i);
+        ss << desc->name << "=$" << std::hex << std::uppercase << std::setfill('0')
+           << std::setw(desc->width == RegWidth::R16 ? 4 : 2) << val << " ";
+    }
+    return ss.str();
 }
 
 void DebugContext::trackStack(ICore* cpu, const DisasmEntry& entry) {

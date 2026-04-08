@@ -47,7 +47,14 @@ public:
     IBus*  bus() const { return m_bus; }
 
 private:
+    struct KernalCall {
+        std::string name;
+        uint32_t    entrySp;
+    };
+
     void trackStack(ICore* cpu, const DisasmEntry& entry);
+    void monitorKernal(ICore* cpu, const DisasmEntry& entry);
+    std::string formatState(ICore* cpu);
 
     ICore* m_cpu;
     IBus*  m_bus;
@@ -56,6 +63,7 @@ private:
     TraceBuffer    m_trace;
     StackTrace     m_stackTrace;
     SymbolTable    m_symbols;
+    std::vector<KernalCall> m_kernalStack;
     std::vector<SystemSnapshot> m_snapshots;
     bool        m_paused          = false;
     uint32_t    m_lastPausedAddr  = ~0u;

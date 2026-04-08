@@ -51,18 +51,53 @@ A single plugin module can provide multiple resources, which are automatically r
 ### Commodore VIC-20
 - **Profiles**: `vic20`, `vic20+3k`, `vic20+8k`, `vic20+16k`, `vic20+32k`.
 - **Hardware**: MOS 6502 CPU, 6560/6561 VIC-I Video/Sound, dual 6522 VIAs, keyboard matrix, joystick.
+- **Symbols**: Standard KERNAL jump table symbols are auto-loaded from `roms/vic20/kernal.sym`.
 
 ### Commodore 64
 - **Profile**: `c64`.
 - **Hardware**: MOS 6510 CPU, 6567/6569 VIC-II Video, 6581 SID Sound, dual 6526 CIAs, PLA banking, keyboard matrix.
+- **Symbols**: Standard KERNAL jump table symbols are auto-loaded from `roms/c64/kernal.sym`.
 
 ### Commodore PET Series
 - **Profiles**: `pet2001`, `pet4032`, `pet8032`.
 - **Hardware**: MOS 6502 CPU, 6520 PIA, 6522 VIA, 6545 CRTC (for 4032/8032), discrete video logic (for 2001), IEEE-488 bus.
+- **Symbols**: Standard KERNAL jump table symbols are auto-loaded from `roms/pet4032/kernal.sym`.
 
 ---
 
-## 4. CLI Target (Implemented)
+## 4. Symbol Management & Expressions
+
+**mmsim** features a robust expression evaluator and symbol management system integrated into all targets.
+
+### 4.1 Expression Evaluator
+Anywhere an address or value is required (CLI, GUI dialogs, MCP), you can use complex expressions:
+- **Formats**:
+    - **Hex**: `$1000` or `0x1000`.
+    - **Binary**: `%10101010`.
+    - **Decimal**: `4096`.
+- **Symbols**: Use any defined label (e.g., `CHROUT`, `start_vector`).
+- **Registers**: Use current CPU register names (e.g., `PC + 2`, `SP`).
+- **Arithmetic**: Basic addition (`+`) and subtraction (`-`) are supported.
+
+### 4.2 Symbol Management
+Manage symbols via the CLI `sym` command or the GUI **Symbols** pane:
+- `sym add <label> <addr>`: Manually add a label.
+- `sym del <label>`: Remove a label.
+- `sym list`: List all symbols.
+- `sym search <query>`: Search for symbols by name.
+- `sym load <path>`: Load symbols from a `.sym` file (supports `label = value` and `label value` formats).
+- `sym clear`: Clear the current symbol table.
+
+### 4.3 Kernal Routine Monitoring
+You can monitor the entry and exit points of Kernal routines by setting the "kernal" logger to DEBUG level:
+```bash
+log level kernal debug
+```
+When enabled, the system will log the routine name and all register states upon entry, and log them again upon exit (detected via the matching `RTS`).
+
+---
+
+## 5. CLI Target (Implemented)
 
 The `mmemu-cli` binary provides an interactive REPL for low-level machine control and debugging.
 
@@ -79,231 +114,72 @@ The `mmemu-cli` binary provides an interactive REPL for low-level machine contro
     - `f <addr> <val> [len]`: Direct memory modification (supports ranges).
     - `copy <src> <dst> <len>`: Copy memory blocks.
     - `swap <addr1> <addr2> <len>`: Swap two equal-length memory blocks.
-    - `search <hex...>`: Search for a hex byte pattern (all matches; use `findnext`/`findprior` to navigate).
-    - `searcha <str>`: Search for an ASCII string (all matches; use `findnext`/`findprior` to navigate).
-    - `findnext` / `findprior`: Jump to the next or previous occurrence of the last search pattern.
-    - `load <path> <addr>`: Binary file injection into the simulation space.
+    - `search <hex...>`: Search for a hex byte pattern.
+    - `findnext` / `findprior`: Navigate search results.
+    - `load <path> <addr>`: Binary file injection.
+- **Symbol Table**: Full management via the `sym` command.
 - **Disassembly**: Multi-ISA disassembly with integrated symbol resolution.
 
 ---
 
-## 5. MCP Target (Implemented)
+## 6. MCP Target (Implemented)
 
-The `mmemu-mcp` binary implements the **Model Context Protocol**, allowing AI agents (like Claude) to interact directly with the simulator.
+The `mmemu-mcp` binary implements the **Model Context Protocol**, allowing AI agents to interact with the simulator.
 
 ### Available Tools:
 - `step_cpu(machine_id, count)`: Execute instructions.
-- `run_cpu(machine_id, max_steps)`: Run until breakpoint, program end, or step limit.
-- `read_memory(machine_id, addr, size)`: Inspect memory states.
-- `write_memory(machine_id, addr, bytes)`: Inject code or data.
-- `fill_memory(machine_id, addr, value, size)`: Fill a memory range with a byte value.
-- `copy_memory(machine_id, src_addr, dst_addr, size)`: Copy a memory block.
-- `swap_memory(machine_id, addr1, addr2, size)`: Swap two equal-length memory blocks.
-- `search_memory(machine_id, pattern, is_hex, start_addr)`: Find a byte or ASCII pattern in memory.
+- `run_cpu(machine_id, max_steps)`: Run until breakpoint or limit.
+- `read_memory(machine_id, addr, size)`: Inspect memory.
+- `write_memory(machine_id, addr, bytes)`: Inject data.
 - `read_registers(machine_id)`: Inspect CPU state.
-- `set_pc(machine_id, addr)`: Set the program counter.
 - `disassemble(machine_id, addr, count)`: Disassemble instructions.
-- `set_breakpoint` / `set_watchpoint` / `delete_breakpoint` / `enable_breakpoint` / `disable_breakpoint` / `list_breakpoints`: Full breakpoint management.
+- `list_symbols`, `add_symbol`, `remove_symbol`, `load_symbols`, `clear_symbols`: Manage symbols.
+- `set_breakpoint` / `set_watchpoint` / `delete_breakpoint`: Breakpoint management.
 - `get_stack(machine_id, count)`: Show the call stack trace.
-- `load_image(machine_id, path, addr, auto_start)`: Load a program or binary file.
-- `attach_cartridge` / `eject_cartridge`: Cartridge management.
-- `reset_machine(machine_id)`: Reset to power-on state.
-- `press_key(machine_id, key, down)`: Inject a keystroke.
-- `list_machines` / `create_machine`: Machine enumeration and creation.
-- `list_loggers` / `set_log_level`: Logging control.
+- `load_image`, `attach_cartridge`, `reset_machine`: Lifecycle and media.
+- `list_machines`, `create_machine`: Machine management.
+- `list_loggers`, `set_log_level`: Logging control.
 
 ---
 
-## 6. GUI Target (mmemu-gui)
+## 7. GUI Target (mmemu-gui)
 
-The `mmemu-gui` binary provides a professional, multi-pane graphical debugging environment built on wxWidgets. The layout consists of a left column (Disassembly + Memory, and a bottom Console), a center notebook, and a right-side Register pane.
+Multi-pane graphical debugging environment built on wxWidgets.
 
----
+### 7.1 Toolbar & Menus
+- **Ctrl+Y**: Show the Symbol Table pane.
+- **Ctrl+B / Ctrl+T / Ctrl+M**: Quick access to Breakpoints, Stack, and Machine tabs.
+- **Debug Menu**: Enhanced with memory fill/copy/swap and symbol management.
 
-### 6.1 Toolbar
-
-| Button | Shortcut | Action |
-|---|---|---|
-| Machine | Ctrl+L | Open the machine selector dialog |
-| Step | F11 | Execute one CPU instruction |
-| Run | F5 | Start continuous execution |
-| Pause | F6 | Halt continuous execution |
-| Go to | Ctrl+G | Jump the memory/disasm view to an address |
-| Keyboard Focus | Ctrl+Shift+K | Toggle keyboard capture for the emulated machine |
-
----
-
-### 6.2 Menus
-
-#### File
-| Item | Shortcut | Description |
-|---|---|---|
-| Load Machine… | Ctrl+L | Select and instantiate a machine preset |
-| Exit | | Quit the application |
-
-#### Control
-| Item | Shortcut | Description |
-|---|---|---|
-| Step | F11 | Execute one CPU instruction |
-| Run | F5 | Start continuous execution at ~1 MHz |
-| Pause | F6 | Stop continuous execution |
-| Reset | Ctrl+R | Invoke the machine's reset handler |
-| Load Image… | Ctrl+I | Load a `.prg` or `.bin` file into memory |
-| Attach Cartridge… | | Attach a `.crt` or `.car` cartridge image |
-| Eject Cartridge | | Detach the currently-inserted cartridge and reset |
-
-#### Debug
-| Item | Shortcut | Description |
-|---|---|---|
-| Assemble… | Ctrl+A | Assemble a single instruction at a given address |
-| Go to Address… | Ctrl+G | Navigate memory/disasm views to an address; optionally set PC |
-| Search Memory… | Ctrl+F | Search memory for a hex or ASCII pattern |
-| Find Next | F3 | Jump to the next occurrence of the last search pattern |
-| Find Prior | Shift+F3 | Jump to the previous occurrence |
-| Fill Memory… | | Fill a memory range with a single byte value |
-| Copy Memory… | | Copy a block of memory from one address to another |
-| Swap Memory… | | Swap two equal-length memory blocks |
-| Breakpoints | Ctrl+B | Show the Breakpoints notebook tab |
-| Stack Trace | Ctrl+T | Show the Stack Trace notebook tab |
-| Machine Explorer | Ctrl+M | Show the Machine Explorer notebook tab |
-| New Memory View | Ctrl+Shift+M | Open a new memory view tab |
-| Rename Memory View… | | Rename the currently-selected memory view tab |
+### 7.2 Panes
+- **Disassembly Pane**: Real-time ISA decoding with symbol resolution.
+- **Symbols Pane**: Integrated management of labels with search and "Go To" navigation.
+- **Console Pane**: Full parity with `mmemu-cli`.
+- **Register & Memory Panes**: Real-time inspection and editing.
+- **Stack Pane**: JSR/RTS tracking with navigation support.
 
 ---
 
-### 6.3 Panes
+## 8. Plugin Ecosystem
 
-#### Disassembly Pane
-Displays real-time disassembly of the memory visible around the current program counter. The current PC is highlighted. Automatically follows the PC during single-step or on every refresh tick while running. Uses the machine's registered disassembler for accurate ISA decoding.
-
-#### Memory Pane
-A tabbed set of scrollable hex and ASCII dump views of the machine's address bus. Multiple independent memory views can be open simultaneously, each positioned at a different address. Views are displayed as tabs below the Disassembly pane.
-
-- **Navigation**: Use the vertical scroll bar or **Go to Address** (Ctrl+G / Debug menu) to jump to any address in the active view.
-- **Multiple views**: Use **Debug → New Memory View** (Ctrl+Shift+M) to open an additional memory view tab. Each tab tracks its own scroll position and address independently. Close any tab with its × button; the last tab cannot be closed.
-- **Renaming**: Use **Debug → Rename Memory View…** to give the active tab a descriptive name (e.g. "Stack", "ROM", "Zero Page").
-- **In-place editing**: Click any hex byte to open an editor cell (red highlight). Type up to two hex digits and press **Enter** to commit and advance to the next byte, or **Escape** to cancel without writing. Clicking another cell while an editor is open commits nothing and opens a new editor at the clicked position.
-- **Context menu** (right-click):
-  - **Go to Address…** — navigate the pane to a specific address.
-  - **Fill Memory…** — fill a range with a constant byte.
-  - **Copy Memory…** — copy a block to another address.
-  - **Swap Memory…** — swap two equal-length blocks.
-  - **Search Memory…** — search for a hex or ASCII pattern.
-
-#### Console Pane
-An embedded interactive REPL with full parity with the `mmemu-cli` standalone binary. Accepts all CLI commands (`step`, `regs`, `m`, `f`, `copy`, `load`, `asm`, etc.) directly in the GUI. Output is displayed in a scrollable text area above the input field.
-
-#### Register Pane
-Displays all CPU registers for the currently-loaded machine. Registers that changed since the last refresh are highlighted. Updates automatically at ~30 Hz while running and after each manual step.
-
-#### Screen Pane (plugin-provided)
-Visible when a machine with a video output device is loaded (e.g., VIC-20, C64). Renders the video frame produced by the VIC-I or VIC-II chip at ~30 Hz. Contains a **Capture Keyboard** button to toggle keyboard routing to the emulated machine (equivalent to Ctrl+Shift+K).
+For a complete list of supported hardware, see **[doc/README-PLUGINS.md](doc/README-PLUGINS.md)**.
 
 ---
 
-### 6.4 Notebook Tabs
-
-#### Machine
-Shows the full machine descriptor: CPU slots, bus slots, and IO device registry. Useful for verifying the hardware composition of the loaded machine preset.
-
-#### Cartridge
-Displays metadata for the currently-attached cartridge image (type, bank layout, ROM regions). Empty when no cartridge is attached.
-
-#### Breakpoints
-Lists all active breakpoints and watchpoints. Breakpoints can be added, removed, enabled, or disabled. Supports address breakpoints and memory watchpoints. When a breakpoint is hit during Run, execution pauses and the pane is automatically brought into focus.
-
-#### Stack
-Displays the call stack trace based on JSR/RTS tracking. Each frame shows the return address. Double-clicking a frame navigates the disassembly pane to that address.
-
----
-
-### 6.5 Drag and Drop
-Program images (`.prg`, `.bin`) and cartridge files (`.crt`, `.car`) can be dragged and dropped onto the main window. Program images open the Load Image dialog pre-filled with the dropped path. Cartridge files open the Attach Cartridge flow directly.
-
----
-
-## 7. Plugin Ecosystem
-
-**mmsim** utilizes a modular plugin architecture. For a complete list of available processors, devices, and machine presets, see the **[Plugin Index (doc/README-PLUGINS.md)](doc/README-PLUGINS.md)**.
-
-### 7.1 Machine Types
-- [Machine Descriptor JSON Format (machines/README-machines.md)](machines/README-machines.md)
-- [VIC-20 Machine Implementation](doc/README-VIC20.md)
-- [C64 Machine Implementation](doc/README-C64.md)
-- [PET Machine Implementation](doc/README-PET.md)
-
-### 7.2 Video
-- [6560 VIC-I (Video/Sound)](doc/README-6560.md)
-- [6567/6569 VIC-II](doc/README-VIC2.md)
-- [6545 CRTC](doc/README-6545.md)
-- [PET Video Subsystem](doc/README-PET-VIDEO.md)
-- [ANTIC Video Subsystem](doc/README-ANTIC.md)
-- [GTIA Color/PMG Subsystem](doc/README-GTIA.md)
-
-### 7.3 Sound
-- [6581 SID Implementation](doc/README-SID.md)
-- [POKEY Audio/IO Implementation](doc/README-POKEY.md)
-
-### 7.4 Processors
-- [6502/6510 Implementation](doc/README-6502.md)
-- [6510 I/O Port & Banking](doc/README-6510.md)
-
-### 7.5 I/O & Peripherals
-- [6520 PIA Implementation](doc/README-6520.md)
-- [6522 VIA Implementation](doc/README-6522.md)
-- [6526 CIA Implementation](doc/README-6526.md)
-- [C64 PLA Banking Controller](doc/README-C64PLA.md)
-- [PET Keyboard Matrix](doc/README-KBD-PET.md)
-- [VIC-20 Keyboard Matrix](doc/README-KBD-VIC20.md)
-
----
-
-## 8. Getting Started
+## 9. Getting Started
 
 ### Prerequisites
-
-To build **mmsim**, you will need:
-
-- **Compiler**: A C++17 compatible compiler (e.g., GCC 9+, Clang 10+).
-- **Build System**: `make`.
-- **Libraries**:
-    - `spdlog`: Fast C++ logging library.
-    - `fmt`: Modern formatting library.
-    - `wxWidgets` (3.0+): Required for the GUI target and most machine/device plugins.
-    - `ALSA` (`libasound`): Required for audio output in the GUI and test binaries.
-    - `nlohmann/json` (3.x): JSON parsing library used by the machine loader.
-- **Tools**: `pkg-config` (often used by `wx-config`).
-
-On Debian/Ubuntu-based systems, you can install the dependencies with:
-```bash
-sudo apt-get install build-essential libwxgtk3.0-gtk3-dev libspdlog-dev libfmt-dev libasound2-dev nlohmann-json3-dev
-```
+- **C++17 Compiler** (GCC 9+, Clang 10+).
+- **Libraries**: `spdlog`, `fmt`, `wxWidgets` (3.0+), `ALSA` (`libasound`), `nlohmann/json`.
 
 ### Building
-
-The project uses a standard `Makefile`.
-
 ```bash
-make all      # Build CLI, GUI, and MCP binaries and all plugins
-make cli      # Build only the CLI binary (mmemu-cli)
-make gui      # Build only the GUI binary (mmemu-gui)
-make mcp      # Build only the MCP binary (mmemu-mcp)
-make plugins  # Build all dynamic plugins in ./lib
-make test     # Build and run the unified test suite
-make clean    # Remove all build artifacts
-```
-
-### Running
-
-After building, the binaries are located in the `bin/` directory, and plugins in the `lib/` directory.
-
-```bash
-./bin/mmemu-cli
-./bin/mmemu-gui
+make all      # Build everything
+make test     # Build and run the test suite (153+ tests)
 ```
 
 ---
 
-## 9. Development Standards
-- Adhere to the conventions in [STYLEGUIDE.md](STYLEGUIDE.md).
-- Track all significant updates in [CHANGELOG.md](CHANGELOG.md).
+## 10. Development Standards
+- Adhere to [STYLEGUIDE.md](STYLEGUIDE.md).
+- Track updates in [CHANGELOG.md](CHANGELOG.md).

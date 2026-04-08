@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0-dev] - 2026-04-07
+
+### Added
+- **Enhanced Symbol Table Management**:
+    - CLI: Added `sym` command with `add`, `del`, `list`, `search`, `load`, and `clear` subcommands.
+    - GUI: Integrated a new **Symbols** pane with real-time search, manual management, and double-click navigation.
+    - MCP: Added `list_symbols`, `add_symbol`, `remove_symbol`, `load_symbols`, and `clear_symbols` tools.
+    - Support for multiple `.sym` file formats (`label = value` or `label value`).
+- **Core Expression Evaluator**:
+    - Implemented a robust recursive-descent parser for addresses and values.
+    - Supported formats: Hex (`$prefix` or `0x`), Binary (`%prefix`), and Decimal.
+    - Integrated support for using symbols and CPU registers (e.g., `PC + 5`, `start_addr`) in expressions.
+    - Integrated the evaluator into all address-taking CLI commands, GUI dialogs, and MCP tools.
+- **Kernal Symbols & Monitoring**:
+    - Added standard KERNAL symbol tables for C64, VIC-20, and PET machines.
+    - Implemented auto-loading of these symbols upon machine creation via the new `symbolFiles` machine configuration field.
+    - Added **Kernal Routine Monitoring**: Setting `log level kernal debug` now logs register states upon entry to Kernal routines and displays result states upon matching `RTS` exit.
+- **Testing Expansion**:
+    - Added 5 new test suites (totaling 153 passing tests) covering Expression Evaluation, Symbol Management, Kernal Autoloading, and C64 I/O logic.
+
+### Fixed
+- **Build System**: Fixed several Makefile syntax errors and redundant variable definitions.
+- **Datasette/Tape Pane**: Fixed "No Datasette found" error by ensuring `Datasette` and other plugins correctly implement `setName()` and `name()` to match machine configurations.
+- **C64 Logic**: Repaired severely broken bit-manipulation logic in the 6510 I/O port (`cpu6510.cpp`).
+- **Stability**: Added null checks and move semantics to MCP machine management to prevent crashes and double-free errors.
+
 ## [0.2.0-dev] - 2026-04-07 (2)
 
 ### Added
