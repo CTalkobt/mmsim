@@ -18,7 +18,7 @@ INCLUDES  = -Isrc -Isrc/include -Isrc/cli/main -Isrc/gui/main -Isrc/libcore/main
 	-Isrc/plugins/devices/crtc6545/main -Isrc/plugins/devices/pet_video/main \
 	-Isrc/plugins/devices/pokey/main -Isrc/plugins/devices/datasette/main \
 	-Isrc/plugins/devices/keyboard/main \
-	-Isrc/plugins/machines/pet/main -Itests
+	-Isrc/plugins/machines/pet/main -Itests/src
 
 BINDIR   = bin
 LIBDIR   = lib
@@ -150,7 +150,8 @@ MCP_SRCS = src/mcp/main/main.cpp src/plugins/devices/datasette/main/datasette.cp
 	src/mcp/main/plugin_tool_registry.cpp
 
 # Test Sources
-TEST_SRCS = tests/test_main.cpp \
+TEST_SRCS = tests/src/test_main.cpp \
+	tests/src/test_c64_tape.cpp \
 	src/cli/test/test_cli.cpp \
 	src/gui/test/test_gui_logic.cpp \
 	src/libmem/test/test_flatmembus.cpp \
@@ -209,6 +210,8 @@ PLUGIN_ANTIC_TEST_SRCS = src/plugins/devices/antic/test/test_atari_boot.cpp \
 	src/plugins/devices/cia6526/main/cia6526.o \
 	src/plugins/devices/vic2/main/vic2.o \
 	src/plugins/devices/sid6581/main/sid6581.o \
+	src/plugins/devices/datasette/main/datasette.o \
+	src/plugins/cbm-loader/main/tap_parser.o \
 	src/plugins/machines/c64/main/kbd_c64.o \
 	src/plugins/devices/pia6520/main/pia6520.o \
 	src/plugins/cbm-loader/main/prg_loader.o \
@@ -419,7 +422,7 @@ $(MCP_BIN): $(MCP_OBJS) $(LIBS) | $(BINDIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -rdynamic -o $@ $(MCP_OBJS) $(BASE_LIBS)
 
 $(TEST_BIN): $(TEST_OBJS) $(LIBS) | $(BINDIR)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -DTEST_BUILD -Itests -rdynamic -o $@ $(TEST_OBJS) $(BASE_LIBS) $(WXLIBS) -lasound
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -DTEST_BUILD -Itests/src -rdynamic -o $@ $(TEST_OBJS) $(BASE_LIBS) $(WXLIBS) -lasound
 
 # Generic rules
 %.o: %.cpp

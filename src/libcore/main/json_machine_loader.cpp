@@ -378,30 +378,27 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
         std::string tapeDevName = tw.value("device", "");
         if (devPtrs.count(tapeDevName)) {
             auto* tape = devPtrs[tapeDevName];
-            if (tw.contains("sense")) {
-                ISignalLine* sig = cpu ? cpu->getSignalLine(tw["sense"].get<std::string>().c_str()) : nullptr;
-                if (sig) tape->setSignalLine("sense", sig);
-            }
-            if (tw.contains("motor")) {
-                ISignalLine* sig = cpu ? cpu->getSignalLine(tw["motor"].get<std::string>().c_str()) : nullptr;
-                if (sig) tape->setSignalLine("motor", sig);
-            }
-            if (tw.contains("write")) {
-                ISignalLine* sig = cpu ? cpu->getSignalLine(tw["write"].get<std::string>().c_str()) : nullptr;
-                if (sig) tape->setSignalLine("write", sig);
-            }
-            if (tw.contains("readPulse")) {
-                std::string srcStr = tw["readPulse"].get<std::string>();
+
+            auto getSig = [&](const std::string& key) -> ISignalLine* {
+                if (!tw.contains(key)) return nullptr;
+                std::string srcStr = tw[key].get<std::string>();
                 auto dot = srcStr.find(".");
                 if (dot != std::string::npos) {
                     std::string devName = srcStr.substr(0, dot);
                     std::string subPin  = srcStr.substr(dot + 1);
-                    if (devPtrs.count(devName)) {
-                        ISignalLine* sig = devPtrs[devName]->getSignalLine(subPin.c_str());
-                        if (sig) tape->setSignalLine("readPulse", sig);
-                    }
+                    if (devPtrs.count(devName))
+                        return devPtrs[devName]->getSignalLine(subPin.c_str());
+                } else if (cpu) {
+                    return cpu->getSignalLine(srcStr.c_str());
                 }
-            }
+                return nullptr;
+            };
+
+            ISignalLine* sig;
+            if ((sig = getSig("sense")))     tape->setSignalLine("sense", sig);
+            if ((sig = getSig("motor")))     tape->setSignalLine("motor", sig);
+            if ((sig = getSig("write")))     tape->setSignalLine("write", sig);
+            if ((sig = getSig("readPulse"))) tape->setSignalLine("readPulse", sig);
         }
     }
 

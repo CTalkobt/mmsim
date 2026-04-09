@@ -4,12 +4,24 @@
 #include <cstdio>
 
 PIA6520::PIA6520() : m_name("6520"), m_baseAddr(0xE810) {
+    m_ca1Conduit.m_owner = this; m_ca1Conduit.m_id = 0;
+    m_cb1Conduit.m_owner = this; m_cb1Conduit.m_id = 2;
+    for (int i=0; i<8; ++i) {
+        m_paConduits[i].m_owner = this; m_paConduits[i].m_id = 4 + i;
+        m_pbConduits[i].m_owner = this; m_pbConduits[i].m_id = 12 + i;
+    }
     m_ca1Line = &m_ca1Conduit;
     m_cb1Line = &m_cb1Conduit;
     reset();
 }
 
 PIA6520::PIA6520(const std::string& name, uint32_t baseAddr) : m_name(name), m_baseAddr(baseAddr) {
+    m_ca1Conduit.m_owner = this; m_ca1Conduit.m_id = 0;
+    m_cb1Conduit.m_owner = this; m_cb1Conduit.m_id = 2;
+    for (int i=0; i<8; ++i) {
+        m_paConduits[i].m_owner = this; m_paConduits[i].m_id = 4 + i;
+        m_pbConduits[i].m_owner = this; m_pbConduits[i].m_id = 12 + i;
+    }
     m_ca1Line = &m_ca1Conduit;
     m_cb1Line = &m_cb1Conduit;
     reset();
@@ -85,10 +97,22 @@ void PIA6520::setCB2(bool lvl) {
     m_cb2Prev = lvl;
 }
 
+void PIA6520::signalEdge(int id, bool lvl) {
+    if (id == 0) { // CA1
+        setCA1(lvl);
+    } else if (id == 1) { // CA2
+        setCA2(lvl);
+    } else if (id == 2) { // CB1
+        setCB1(lvl);
+    } else if (id == 3) { // CB2
+        setCB2(lvl);
+    }
+}
+
 void PIA6520::tick(uint64_t /*cycles*/) {
-    if (m_ca1Line) setCA1(m_ca1Line->get());
-    if (m_ca2Line) setCA2(m_ca2Line->get());
-    if (m_cb1Line) setCB1(m_cb1Line->get());
+    if (m_ca1Line && m_ca1Line != &m_ca1Conduit) setCA1(m_ca1Line->get());
+    if (m_ca2Line) setCA2(m_ca2Line->get()); // CA2 doesn't have a conduit yet, but let's be safe
+    if (m_cb1Line && m_cb1Line != &m_cb1Conduit) setCB1(m_cb1Line->get());
     if (m_cb2Line) setCB2(m_cb2Line->get());
 }
 
@@ -106,12 +130,11 @@ bool PIA6520::ioRead(IBus*, uint32_t addr, uint8_t* val) {
     switch (addr & 0x03) {
         case 0x00: // ORA/DDRA
             if (m_cra & 0x04) {
-                if (m_portADevice) {
-                    uint8_t pins = m_portADevice->readPort();
-                    *val = (m_ora & m_ddra) | (pins & ~m_ddra);
-                } else {
-                    *val = m_ora;
-                }
+                uint8_t pins = 0xFF;
+                if (m_portADevice) pins = m_portADevice->readPort();
+                for (int i=0; i<8; ++i) if (!m_paConduits[i].get()) pins &= ~(1 << i);
+                *val = (m_ora & m_ddra) | (pins & ~m_ddra);
+
                 if (m_logger && m_logNamed && *val != 0xFF) {
                     char buf[40]; snprintf(buf, sizeof(buf), "ioRead ORA: %02X (orb=%02X)", *val, m_orb);
                     m_logNamed(m_logger, SIM_LOG_DEBUG, buf);
@@ -131,12 +154,11 @@ bool PIA6520::ioRead(IBus*, uint32_t addr, uint8_t* val) {
             break;
         case 0x02: // ORB/DDRB
             if (m_crb & 0x04) {
-                if (m_portBDevice) {
-                    uint8_t pins = m_portBDevice->readPort();
-                    *val = (m_orb & m_ddrb) | (pins & ~m_ddrb);
-                } else {
-                    *val = m_orb;
-                }
+                uint8_t pins = 0xFF;
+                if (m_portBDevice) pins = m_portBDevice->readPort();
+                for (int i=0; i<8; ++i) if (!m_pbConduits[i].get()) pins &= ~(1 << i);
+                *val = (m_orb & m_ddrb) | (pins & ~m_ddrb);
+
                 m_crb &= ~0x80;
                 if (!(m_crb & 0x20)) m_crb &= ~0x40;
                 updateIrq();
@@ -158,6 +180,7 @@ bool PIA6520::ioWrite(IBus*, uint32_t addr, uint8_t val) {
         case 0x00:
             if (m_cra & 0x04) {
                 m_ora = val;
+                for (int i=0; i<8; ++i) if (m_ddra & (1 << i)) m_paConduits[i].set((val >> i) & 1);
                 if (m_portADevice) m_portADevice->writePort(val);
                 if (m_portAWriteCb) m_portAWriteCb(val);
             } else {
@@ -178,6 +201,7 @@ bool PIA6520::ioWrite(IBus*, uint32_t addr, uint8_t val) {
         case 0x02:
             if (m_crb & 0x04) {
                 m_orb = val;
+                for (int i=0; i<8; ++i) if (m_ddrb & (1 << i)) m_pbConduits[i].set((val >> i) & 1);
                 if (m_portBDevice) m_portBDevice->writePort(val);
                 if (m_portBWriteCb) m_portBWriteCb(val);
                 if (m_logger && m_logNamed) {

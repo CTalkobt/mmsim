@@ -36,6 +36,9 @@
       ],
       "tapeWiring": {
         "device": "Tape",
+        "sense": "PIA1.pb6",
+        "motor": "VIA.ca2",
+        "write": "VIA.pb7",
         "readPulse": "PIA1.ca1"
       },
       "kbdWiring": {
@@ -94,6 +97,9 @@
       ],
       "tapeWiring": {
         "device": "Tape",
+        "sense": "PIA1.pb6",
+        "motor": "VIA.ca2",
+        "write": "VIA.pb7",
         "readPulse": "PIA1.ca1"
       },
       "kbdWiring": {
@@ -152,6 +158,9 @@
       ],
       "tapeWiring": {
         "device": "Tape",
+        "sense": "PIA1.pb6",
+        "motor": "VIA.ca2",
+        "write": "VIA.pb7",
         "readPulse": "PIA1.ca1"
       },
       "kbdWiring": {
