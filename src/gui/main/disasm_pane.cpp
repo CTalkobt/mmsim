@@ -490,6 +490,19 @@ void DisasmPane::OnMouseWheel(wxMouseEvent& e) {
 
 void DisasmPane::OnPaint(wxPaintEvent&) {
     wxAutoBufferedPaintDC dc(m_drawPanel);
+
+    wxColour bgColour = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
+    wxColour fgColour = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+    wxColour selBg    = wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHT);
+    wxColour selFg    = wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT);
+    // Secondary highlight: blend 30% selection into background
+    wxColour hlColour(
+        (bgColour.Red()   * 7 + selBg.Red()   * 3) / 10,
+        (bgColour.Green() * 7 + selBg.Green() * 3) / 10,
+        (bgColour.Blue()  * 7 + selBg.Blue()  * 3) / 10
+    );
+
+    dc.SetBackground(wxBrush(bgColour));
     dc.Clear();
     dc.SetFont(m_fixedFont);
 
@@ -497,7 +510,6 @@ void DisasmPane::OnPaint(wxPaintEvent&) {
 
     int visibleLines = m_drawPanel->GetClientSize().y / m_lineHeight;
     const int w = m_drawPanel->GetClientSize().x;
-    const wxColour hlColour(173, 216, 230);  // light blue for highlight cursor
 
     uint32_t currentAddr = m_viewAddr;
     for (int i = 0; i < visibleLines; ++i) {
@@ -511,16 +523,18 @@ void DisasmPane::OnPaint(wxPaintEvent&) {
         bool isHL = (m_hasHighlight && currentAddr == m_highlightAddr);
 
         if (isPC) {
-            dc.SetBrush(*wxYELLOW_BRUSH);
+            dc.SetBrush(wxBrush(selBg));
             dc.SetPen(*wxTRANSPARENT_PEN);
             dc.DrawRectangle(0, i * m_lineHeight, w, m_lineHeight);
+            dc.SetTextForeground(selFg);
         } else if (isHL) {
             dc.SetBrush(wxBrush(hlColour));
             dc.SetPen(*wxTRANSPARENT_PEN);
             dc.DrawRectangle(0, i * m_lineHeight, w, m_lineHeight);
+            dc.SetTextForeground(fgColour);
+        } else {
+            dc.SetTextForeground(fgColour);
         }
-
-        dc.SetTextForeground(*wxBLACK);
 
         std::stringstream ss;
         ss << std::hex << std::uppercase << std::setfill('0') << std::setw(4) << currentAddr << ": ";
