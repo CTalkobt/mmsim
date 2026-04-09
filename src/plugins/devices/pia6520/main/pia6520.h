@@ -19,14 +19,6 @@ public:
         std::string n(name);
         if (n == "ca1") return &m_ca1Conduit;
         if (n == "cb1") return &m_cb1Conduit;
-        if (n.size() == 3 && n.substr(0, 2) == "pa") {
-            int bit = n[2] - '0';
-            if (bit >= 0 && bit <= 7) return &m_paConduits[bit];
-        }
-        if (n.size() == 3 && n.substr(0, 2) == "pb") {
-            int bit = n[2] - '0';
-            if (bit >= 0 && bit <= 7) return &m_pbConduits[bit];
-        }
         return nullptr;
     }
 
@@ -81,19 +73,12 @@ public:
 
 private:
     struct SignalLine : public ISignalLine {
-        PIA6520* m_owner = nullptr;
-        int      m_id = 0; // 0=ca1, 1=ca2, 2=cb1, 3=cb2, 4-11=pa, 12-19=pb
-        bool     m_level = true;
+        bool m_level = true;
         bool get() const override { return m_level; }
-        void set(bool level) override {
-            if (m_owner && m_level != level) m_owner->signalEdge(m_id, level);
-            m_level = level;
-        }
-        void pulse() override { set(false); set(true); }
+        void set(bool level) override { m_level = level; }
+        void pulse() override { m_level = !m_level; m_level = !m_level; }
     };
     SignalLine m_ca1Conduit, m_cb1Conduit;
-    SignalLine m_paConduits[8], m_pbConduits[8];
-    void signalEdge(int id, bool level);
     void updateIrq();
     void driveCA2(bool level);
     void driveCB2(bool level);
