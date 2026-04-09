@@ -6,14 +6,14 @@
 #include <cstring>
 
 static const RegDescriptor s_regDescriptors[] = {
-    { "A",      RegWidth::R8,  REGFLAG_ACCUMULATOR, nullptr },
-    { "X",      RegWidth::R8,  0,                   nullptr },
-    { "Y",      RegWidth::R8,  0,                   nullptr },
-    { "SP",     RegWidth::R8,  REGFLAG_SP,          nullptr },
-    { "PC",     RegWidth::R16, REGFLAG_PC,          nullptr },
-    { "P",      RegWidth::R8,  REGFLAG_STATUS,      "F"     },
-    { "cycles_lo", RegWidth::R32, REGFLAG_INTERNAL,  nullptr },
-    { "cycles_hi", RegWidth::R32, REGFLAG_INTERNAL,  nullptr }
+    { "A",      RegWidth::R8,  REGFLAG_ACCUMULATOR, nullptr, nullptr    },
+    { "X",      RegWidth::R8,  0,                   nullptr, nullptr    },
+    { "Y",      RegWidth::R8,  0,                   nullptr, nullptr    },
+    { "SP",     RegWidth::R8,  REGFLAG_SP,          nullptr, nullptr    },
+    { "PC",     RegWidth::R16, REGFLAG_PC,          nullptr, nullptr    },
+    { "P",      RegWidth::R8,  REGFLAG_STATUS,      "F",     "NV-BDIZC" },
+    { "cycles_lo", RegWidth::R32, REGFLAG_INTERNAL,  nullptr, nullptr   },
+    { "cycles_hi", RegWidth::R32, REGFLAG_INTERNAL,  nullptr, nullptr   }
 };
 
 MOS6502::MOS6502() {

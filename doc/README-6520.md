@@ -62,6 +62,12 @@ When bit 5 = 1 (output):
 
 CB2 output is triggered by ORB **write** (not read); otherwise identical to CA2.
 
+## Edge Detection
+
+**CA1 and CB1** use immediate-edge conduit objects: the active edge is detected inside `ISignalLine::set()` and IFR/CRA bit 7 is updated at that instant, regardless of when `tick()` next runs. This matters for devices (such as the Datasette) that pulse these lines instantaneously within their own tick.
+
+**CA2 and CB2** in input mode use tick-based polling: the level is sampled each `tick()` call.
+
 ## IRQ Model
 
 ```
@@ -98,7 +104,7 @@ pia.setCB2Line(ISignalLine*);
 pia.ioRead(bus, addr, &val);
 pia.ioWrite(bus, addr, val);
 pia.reset();
-pia.tick(cycles);       // call each CPU cycle for edge detection
+pia.tick(cycles);       // drives CA2/CB2 input edge detection each cycle
 
 // Snapshot (save/restore state, e.g. for savestates)
 PIA6520::Snapshot snap = pia.getSnapshot();

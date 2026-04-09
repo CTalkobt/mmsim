@@ -77,7 +77,9 @@ Anywhere an address or value is required (CLI, GUI dialogs, MCP), you can use co
     - **Decimal**: `4096`.
     - **Character**: `'a'` (returns ASCII 97). Supports escape sequences: `\n`, `\r`, `\t`, `\\`, `\'`.
 - **Symbols**: Use any defined label (e.g., `CHROUT`, `start_vector`).
-- **Registers**: Use current CPU register names (e.g., `PC + 2`, `A`, `X`, `Y`, `P`).
+- **Registers**: Use current CPU register names directly (e.g., `PC + 2`, `A`, `X`, `Y`, `P`).
+- **Register shorthand** (`@`-prefix): `@A`, `@X`, `@Y`, `@SP`, `@PC` — explicitly reads the named register. Case-insensitive. Useful in expressions to avoid ambiguity with symbol names (e.g., `@A + 1`, `@PC == $C000`).
+- **Status flag shorthand** (`.`-prefix): `.C`, `.Z`, `.N`, `.V`, `.I`, `.D`, `.B` — reads a single bit (0 or 1) from the CPU status register by flag letter. Case-insensitive. Useful in breakpoint conditions (e.g., `.Z == 1`, `.C`).
 - **Unary Operators**:
     - `<`: High byte of result (e.g., `<$1234` is `$12`).
     - `>`: Low byte of result (e.g., `>$1234` is `$34`).
@@ -181,7 +183,7 @@ Multi-pane graphical debugging environment built on wxWidgets.
 - **Disassembly Pane**: Real-time ISA decoding with symbol resolution.
 - **Symbols Pane**: Integrated management of labels with search and "Go To" navigation.
 - **Console Pane**: Full parity with `mmemu-cli`.
-- **Register & Memory Panes**: Real-time inspection and editing.
+- **Register Pane**: Real-time inspection of all CPU registers. Status registers (P on the 6502/6510) additionally display individual flag bits in `NV-BDIZC` notation — uppercase letter = bit set, `.` = bit clear — alongside the hex value (e.g. `$36  ..-.IZ.`).
 - **Stack Pane**: JSR/RTS tracking with navigation support.
 - **Tape Pane**: Datasette controls — Mount, Play, Stop, Rewind, Record, and Save. Record arms the write-line capture; Save stops recording and prompts for a destination `.tap` file.
 
@@ -202,7 +204,7 @@ For a complete list of supported hardware, see **[doc/README-PLUGINS.md](doc/REA
 ### Building
 ```bash
 make all      # Build everything
-make test     # Build and run the test suite (153+ tests)
+make test     # Build and run the test suite (161+ tests)
 ```
 
 ---

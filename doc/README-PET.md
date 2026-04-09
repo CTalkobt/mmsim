@@ -53,7 +53,19 @@ The PET machine plugin integrates the 6502 CPU, legacy discrete logic or CRTC vi
 - **Signals**: ATN, DAV, NRFD, NDAC, EOI, SRQ, IFC, REN.
 - Wired to PIA1 (Data) and PIA2 (Control).
 
-### 3.3 Keyboard Matrix
+### 3.3 Datasette (Tape)
+The PET machine includes a Datasette wired through the VIA and PIA1:
+
+| Signal | Source/Destination | Description |
+|--------|--------------------|-------------|
+| Motor | VIA CA2 (PCR `$E84C` bits 3–1 = `110` → manual low) | Motor on when CA2 is driven low. |
+| Write | VIA PB7 (`$E840` bit 7) | Cassette write line from CPU. |
+| Read pulse | PIA1 CA1 → CRA (`$E811` bit 7) | Each pulse sets the PIA1 CA1 IRQ1 flag; cleared by reading ORA (`$E810`). |
+| Sense | PIA1 PB6 (input) | Asserted when tape is mounted. |
+
+See [doc/README-DATASETTE.md](README-DATASETTE.md) for the full Datasette API.
+
+### 3.4 Keyboard Matrix
 - **Graphics Layout (2001/4000)**: 8x8 matrix wired to VIA (columns) and PIA1 (rows).
 - **Business Layout (8000)**: Modified 8x8 matrix for the professional keyboard.
 

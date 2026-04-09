@@ -139,11 +139,80 @@ TEST_CASE(expression_evaluator_symbols_regs) {
     EXPECT_TRUE(ExpressionEvaluator::evaluate("my_symbol + 5", &dbg, res));
     EXPECT_EQ(res, 0x2005);
     
-    // Registers
+    // Registers (bare name)
     cpu.setPc(0x4000);
     EXPECT_TRUE(ExpressionEvaluator::evaluate("PC", &dbg, res));
     EXPECT_EQ(res, 0x4000);
-    
+
     EXPECT_TRUE(ExpressionEvaluator::evaluate("PC + 5", &dbg, res));
     EXPECT_EQ(res, 0x4005);
+}
+
+TEST_CASE(expression_evaluator_flag_and_reg_shortcuts) {
+    FlatMemoryBus bus("test", 16);
+    MOS6502 cpu;
+    DebugContext dbg(&cpu, &bus);
+    uint32_t res;
+
+    // --- @reg shorthand ---
+    cpu.setPc(0x1234);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("@PC", &dbg, res));
+    EXPECT_EQ(res, 0x1234);
+
+    // Case-insensitive
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("@pc", &dbg, res));
+    EXPECT_EQ(res, 0x1234);
+
+    cpu.regWrite(0, 0x42); // A = 0x42
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("@A", &dbg, res));
+    EXPECT_EQ(res, 0x42);
+
+    // @reg in expressions
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("@A + 1", &dbg, res));
+    EXPECT_EQ(res, 0x43);
+
+    // Unknown @reg fails
+    ASSERT(!ExpressionEvaluator::evaluate("@NOPE", &dbg, res));
+
+    // --- .flag shorthand (6502 P register: NV-BDIZC) ---
+    // P = 0x01 → only Carry set
+    cpu.regWrite(5, 0x01);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate(".C", &dbg, res));
+    EXPECT_EQ(res, 1u);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate(".Z", &dbg, res));
+    EXPECT_EQ(res, 0u);
+
+    // P = 0x02 → only Zero set
+    cpu.regWrite(5, 0x02);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate(".Z", &dbg, res));
+    EXPECT_EQ(res, 1u);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate(".C", &dbg, res));
+    EXPECT_EQ(res, 0u);
+
+    // P = 0x80 → Negative set
+    cpu.regWrite(5, 0x80);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate(".N", &dbg, res));
+    EXPECT_EQ(res, 1u);
+
+    // P = 0x40 → Overflow set
+    cpu.regWrite(5, 0x40);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate(".V", &dbg, res));
+    EXPECT_EQ(res, 1u);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate(".N", &dbg, res));
+    EXPECT_EQ(res, 0u);
+
+    // Case-insensitive flag letter
+    cpu.regWrite(5, 0x01);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate(".c", &dbg, res));
+    EXPECT_EQ(res, 1u);
+
+    // .flag in a condition expression
+    EXPECT_TRUE(ExpressionEvaluator::evaluate(".C == 1", &dbg, res));
+    EXPECT_EQ(res, 1u);
+
+    // Unknown flag letter fails
+    ASSERT(!ExpressionEvaluator::evaluate(".Q", &dbg, res));
+
+    // No cpu → flag fails gracefully
+    ASSERT(!ExpressionEvaluator::evaluate(".C", nullptr, res));
 }

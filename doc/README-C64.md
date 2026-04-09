@@ -92,7 +92,19 @@ Required in `roms/c64/` (not distributed; see `.gitignore`):
 
 If any ROM file is absent the machine still initialises; the affected region reads as zeroes.
 
-### 2.8 Scheduler
+### 2.8 Datasette (Tape)
+The C64 machine includes a Datasette device wired to the 6510 I/O port and CIA1:
+
+| Signal | Source/Destination | Description |
+|--------|--------------------|-------------|
+| Motor | 6510 port bit 5 (active-low) | Enables tape transport when CPU drives bit 5 low. |
+| Write | 6510 port bit 3 | Cassette write line from CPU to tape head. |
+| Read pulse | CIA1 FLAG (`$DC0D` bit 4) | Each incoming pulse sets the CIA1 FLAG interrupt. |
+| Sense | 6510 port bit 4 (input) | Asserted by Datasette when a button is pressed/tape mounted. |
+
+See [doc/README-DATASETTE.md](README-DATASETTE.md) for the full Datasette API.
+
+### 2.9 Scheduler
 One `schedulerStep` call executes one CPU instruction (via `ICore::step()`), then ticks all IORegistry devices by the returned cycle count. The GUI timer calls this in a tight loop for ~33 333 cycles per 33 ms frame (~1 MHz effective).
 
 ---

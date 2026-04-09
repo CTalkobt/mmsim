@@ -32,7 +32,19 @@ The VIC-20 machine plugin acts as the composition layer that integrates individu
 | $C000-$DFFF | 8 KB | BASIC ROM |
 | $E000-$FFFF | 8 KB | KERNAL ROM |
 
-### 2.3 Scheduler
+### 2.3 Datasette (Tape)
+The VIC-20 machine includes a Datasette wired through VIA2 and VIA1:
+
+| Signal | Source/Destination | Description |
+|--------|--------------------|-------------|
+| Motor | VIA2 PB3 (`$9120` bit 3, active-low) | Motor on when CPU drives bit 3 low. |
+| Write | VIA2 PB7 (`$9120` bit 7) | Cassette write line from CPU. |
+| Read pulse | VIA1 CA1 → IFR (`$911D` bit 1) | Each pulse sets the VIA1 CA1 interrupt flag. |
+| Sense | VIA2 PB6 (input) | Asserted when tape is mounted. |
+
+See [doc/README-DATASETTE.md](README-DATASETTE.md) for the full Datasette API.
+
+### 2.4 Scheduler
 - Implements a synchronous cycle-stepper that ticks all I/O devices (`tickAll`) in lock-step with CPU instruction execution.
 
 ---

@@ -21,14 +21,29 @@ The implementation exposes the standard 6502 register set to the host:
 | **P**    | Status Register | 8-bit | Individual flag bits representing the CPU state. |
 
 ### 1.2 Status Flags (P Register)
-- **C (Carry)**: Set if the last operation caused an overflow from bit 7 or a borrow during subtraction.
-- **Z (Zero)**: Set if the result of the last operation was zero.
-- **I (IRQ Disable)**: When set, prevents the CPU from responding to maskable interrupts.
-- **D (Decimal Mode)**: When set, arithmetic operations are performed in Binary Coded Decimal (BCD).
-- **B (Break Command)**: Set when a `BRK` instruction is executed and pushed onto the stack.
-- **U (Unused)**: Always reads as 1 on the 6502.
-- **V (Overflow)**: Set if an arithmetic operation resulted in a signed overflow.
-- **N (Negative)**: Set if the most significant bit (bit 7) of the result was set.
+
+The P register bit layout, from MSB (bit 7) to LSB (bit 0):
+
+| Bit | Letter | Name | Description |
+|-----|--------|------|-------------|
+| 7 | **N** | Negative | Set if the most significant bit of the result was set. |
+| 6 | **V** | Overflow | Set if an arithmetic operation resulted in a signed overflow. |
+| 5 | **-** | Unused | Always reads as 1 on the 6502. |
+| 4 | **B** | Break | Set when a `BRK` instruction is pushed onto the stack. |
+| 3 | **D** | Decimal | When set, arithmetic uses Binary Coded Decimal (BCD). |
+| 2 | **I** | IRQ Disable | When set, maskable interrupts are ignored. |
+| 1 | **Z** | Zero | Set if the result of the last operation was zero. |
+| 0 | **C** | Carry | Set if the last operation caused a carry out or borrow. |
+
+**Register Pane display**: The GUI Register Pane shows P as both a hex value and a flag string in `NV-BDIZC` order — uppercase letter if the bit is set, `.` if clear, `-` for the unused bit. Example: `$36  ..-.IZ.`
+
+**Expression evaluator shortcuts**: Individual flag bits can be read in the expression evaluator using the `.`-prefix shorthand:
+- `.C` — Carry, `.Z` — Zero, `.N` — Negative, `.V` — Overflow
+- `.I` — IRQ Disable, `.D` — Decimal, `.B` — Break
+
+Each returns 0 or 1. Useful in breakpoint conditions: `.Z == 1`, `!.C`.
+
+Register values can be read with the `@`-prefix: `@A`, `@X`, `@Y`, `@SP`, `@PC`. Both prefixes are case-insensitive.
 
 ---
 

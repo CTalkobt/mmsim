@@ -191,6 +191,41 @@ bool ExpressionEvaluator::evaluate(const std::string& expression, DebugContext* 
         return false;
     }
 
+    // Status flag shorthand: .C .Z .N .V .B .D .I etc.
+    // Returns 0 or 1 for the named bit in the CPU's status register.
+    if (expr.size() == 2 && expr[0] == '.') {
+        if (dbg && dbg->cpu()) {
+            char flagLetter = (char)std::toupper((unsigned char)expr[1]);
+            ICore* cpu = dbg->cpu();
+            for (int i = 0; i < cpu->regCount(); ++i) {
+                const RegDescriptor* d = cpu->regDescriptor(i);
+                if (!(d->flags & REGFLAG_STATUS) || !d->flagNames) continue;
+                int nbits = (d->width == RegWidth::R8) ? 8 : 16;
+                for (int b = 0; b < nbits; ++b) {
+                    if (std::toupper((unsigned char)d->flagNames[b]) == flagLetter) {
+                        result = (cpu->regRead(i) >> (nbits - 1 - b)) & 1;
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    // Register value shorthand: @A @X @Y @SP @PC etc. (case-insensitive after @).
+    if (!expr.empty() && expr[0] == '@') {
+        if (dbg && dbg->cpu() && expr.size() >= 2) {
+            std::string regName = expr.substr(1);
+            std::transform(regName.begin(), regName.end(), regName.begin(), ::toupper);
+            int regIdx = dbg->cpu()->regIndexByName(regName.c_str());
+            if (regIdx != -1) {
+                result = dbg->cpu()->regRead(regIdx);
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Symbol or Register
     if (dbg) {
         // Try Symbol Table
@@ -205,7 +240,7 @@ bool ExpressionEvaluator::evaluate(const std::string& expression, DebugContext* 
             // Case-insensitive register names for convenience
             std::string upperName = expr;
             std::transform(upperName.begin(), upperName.end(), upperName.begin(), ::toupper);
-            
+
             int regIdx = dbg->cpu()->regIndexByName(upperName.c_str());
             if (regIdx != -1) {
                 result = dbg->cpu()->regRead(regIdx);

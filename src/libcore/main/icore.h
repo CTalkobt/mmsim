@@ -43,6 +43,7 @@ struct RegDescriptor {
     RegWidth    width;
     uint32_t    flags;
     const char* alias;      // e.g., "F" for 6502 "P"
+    const char* flagNames;  // For REGFLAG_STATUS: 8 chars MSB→LSB (e.g. "NV-BDIZC"), or nullptr
 };
 
 class ExecutionObserver;

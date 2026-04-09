@@ -49,16 +49,34 @@ void RegisterPane::SetCPU(ICore* cpu) {
 
 void RegisterPane::RefreshValues() {
     if (!m_cpu) return;
-    
+
     int count = m_cpu->regCount();
     for (int i = 0; i < count; ++i) {
         const auto* desc = m_cpu->regDescriptor(i);
         uint32_t val = m_cpu->regRead(i);
-        
+
         std::stringstream ss;
         ss << std::hex << std::uppercase << std::setfill('0');
         if (desc->width == RegWidth::R16) ss << "$" << std::setw(4) << val;
         else ss << "$" << std::setw(2) << val;
+
+        // For status registers with named flags, append the flag display.
+        // Each character in flagNames is the MSB-first flag letter; show uppercase
+        // if the bit is set, '.' if clear.  A '-' placeholder is always shown as '-'.
+        if ((desc->flags & REGFLAG_STATUS) && desc->flagNames) {
+            ss << "  ";
+            const char* fn = desc->flagNames;
+            int nbits = (int)(desc->width == RegWidth::R8 ? 8 : 16);
+            for (int b = 0; b < nbits; ++b) {
+                char letter = fn[b] ? fn[b] : '?';
+                if (letter == '-') {
+                    ss << '-';
+                } else {
+                    bool set = (val >> (nbits - 1 - b)) & 1;
+                    ss << (set ? letter : '.');
+                }
+            }
+        }
         
         m_grid->SetCellValue(i, 1, ss.str());
 

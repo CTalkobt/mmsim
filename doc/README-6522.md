@@ -20,7 +20,22 @@ The MOS 6522 is a highly flexible I/O chip featuring two 8-bit bidirectional por
 - **Timer 1**: Supports one-shot and continuous (auto-reload) modes. Sets the Interrupt Flag Register (IFR) bit 6 on underflow.
 - **Timer 2**: Supports one-shot interval mode. Sets IFR bit 5 on underflow.
 
-### 2.3 Interrupts
+### 2.3 Control Lines & Signal API
+
+The VIA exposes all four handshake/interrupt control lines via `getSignalLine(name)`:
+
+| Name | Direction | IFR bit | Description |
+|------|-----------|---------|-------------|
+| `"ca1"` | Input | bit 1 | Triggers IFR on active edge (PCR bit 0: 0=falling, 1=rising). |
+| `"ca2"` | In/Out | bit 0 | Input edge or output (handshake/pulse/manual per PCR bits 3–1). |
+| `"cb1"` | Input | bit 4 | Triggers IFR on active edge (PCR bit 4: 0=falling, 1=rising). |
+| `"cb2"` | In/Out | bit 3 | Input edge or output (per PCR bits 7–5). |
+| `"pb7"` | Read-only proxy | — | Reads bit 7 of the ORB register. |
+| `"pb0"`–`"pb6"` | Read-only proxy | — | Reads the corresponding bit of ORB. |
+
+**Immediate CA1/CB1 edge detection**: CA1 and CB1 use dedicated conduit objects that detect the active edge inside `set()` and update IFR immediately — without waiting for the next `tick()` call. This ensures devices that pulse these lines instantaneously within their own tick (such as the Datasette) are correctly detected regardless of device tick ordering. CA2 and CB2 in input mode continue to use tick-based polling.
+
+### 2.4 Interrupts
 - **IER/IFR Logic**: Implements the Interrupt Enable and Interrupt Flag registers.
 - **IRQ Signal**: Propagates interrupt state to the CPU via the `ISignalLine` interface.
 
