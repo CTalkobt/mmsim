@@ -9,7 +9,7 @@
       "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
       "devices": [
         { "type": "6520", "name": "PIA1", "baseAddr": "0xE810",
-          "lines": { "ca1": "vsync", "cb1": "vsync" } },
+          "lines": { "cb1": "vsync" } },
         { "type": "6520", "name": "PIA2", "baseAddr": "0xE820" },
         { "type": "6522", "name": "VIA",  "baseAddr": "0xE840",
           "lines": { "cb1": "vsync" } },
@@ -68,7 +68,7 @@
       "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
       "devices": [
         { "type": "6520", "name": "PIA1", "baseAddr": "0xE810",
-          "lines": { "ca1": "vsync", "cb1": "vsync" } },
+          "lines": { "cb1": "vsync" } },
         { "type": "6520", "name": "PIA2", "baseAddr": "0xE820" },
         { "type": "6522", "name": "VIA",  "baseAddr": "0xE840",
           "lines": { "cb1": "vsync" } },
@@ -129,7 +129,7 @@
       "cpu": { "type": "6502", "dataBus": "system", "codeBus": "system" },
       "devices": [
         { "type": "6520", "name": "PIA1", "baseAddr": "0xE810",
-          "lines": { "ca1": "vsync", "cb1": "vsync" } },
+          "lines": { "cb1": "vsync" } },
         { "type": "6520", "name": "PIA2", "baseAddr": "0xE820" },
         { "type": "6522", "name": "VIA",  "baseAddr": "0xE840",
           "lines": { "cb1": "vsync" } },
