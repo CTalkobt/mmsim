@@ -857,7 +857,7 @@ pulse-encoded format for VIC-20, C64, and PET.*
 - [x] Sense line (connected to CPU port bash1 bit 4 on C64): indicates if a button 
       is pressed.
 - [x] Motor control: responds to motor signal from CPU port.
-- [ ] Write pulse capture (for saving to tape).
+- [x] Write pulse capture (for saving to tape).
 - [x] Internal timer/state machine to "play" the pulses into the CPU's IRQ/FLAG 
       lines at the correct cycle-exact intervals.
 
@@ -865,8 +865,8 @@ pulse-encoded format for VIC-20, C64, and PET.*
 
 - [x] **C64**: Wire Datasette to CPU Port bash1 (Sense/Motor) and CIA #1 FLAG 
       line (Pulses).
-- [ ] **VIC-20**: Wire to VIA #1.
-- [ ] **PET**: Wire to PIA #1.
+- [x] **VIC-20**: Wire to VIA #1.
+- [x] **PET**: Wire to PIA #1.
 
 ### Phase 14.4: Tape UI and Controls
 
@@ -891,8 +891,8 @@ for disk access (.d64, .g64, .p00). See .plan/iec.md.*
 
 ### Phase 15.2: Virtual IEC Device (Level 2)
 
-- [ ] Implement `VirtualIECBus` state machine.
-- [ ] Handle ATN/CLK/DATA handshaking signals via `IPortDevice` on CIA #2.
+- [x] Implement `VirtualIECBus` state machine (`src/plugins/devices/virtual_iec/`).
+- [x] Handle ATN/CLK/DATA handshaking signals via `IPortDevice` on CIA #2 (iecWiring in JSON loader).
 - [ ] Stream bits from host-side .d64 or .prg files.
 
 ### Phase 15.3: Disk Image Support (`src/plugins/cbm-loader/`)

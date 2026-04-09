@@ -72,6 +72,9 @@ public:
     virtual bool saveTapeRecording(const std::string& path)  { return false; }
     virtual bool isTapeRecording() const                     { return false; }
 
+    virtual bool mountDisk(int unit, const std::string& path) { return false; }
+    virtual void ejectDisk(int unit)                          {}
+
     // -----------------------------------------------------------------------
     // Identity (pure virtual — every device must provide these)
     // -----------------------------------------------------------------------

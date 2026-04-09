@@ -56,14 +56,53 @@ Supported via the `cbm-loader` plugin:
 - **.T64:** Tape images formatted as virtual disks.
 - **.P00:** Program files with original Commodore metadata headers.
 
-## 5. UI and Controls
-- **Drive Status Pane:** 
-    - Activity LED (Off, Green/Active, Red/Error).
-    - Current Track/Sector display.
-    - Error channel status (e.g., "00, OK, 00, 00").
-- **CLI Commands:** 
-    - `disk mount <unit> <file>`
-    - `disk eject <unit>`
-- **MCP Tools:** 
-    - `mount_disk`
-    - `eject_disk`
+## 6. Phase 15.2: Virtual IEC Device Implementation Plan
+
+### 6.1 `VirtualIECBus` State Machine
+The `VirtualIECBus` class will manage the high-level state of the serial bus protocol. It acts as a bridge between host-side disk images and the signal lines.
+
+**States:**
+- `IDLE`: Bus is inactive. All lines high (false).
+- `ATTENTION`: Host has pulled ATN low. Devices are listening for address/command.
+- `ADDRESSING`: Command byte is being received.
+- `ACKNOWLEDGE`: Device has recognized its address and pulled DATA low.
+- `READY_TO_RECEIVE`: Device is waiting for data from the Talker.
+- `RECEIVING`: Bit-by-bit data transfer into internal buffer.
+- `READY_TO_SEND`: Device has data and is waiting for the Listener.
+- `SENDING`: Bit-by-bit data transfer from internal buffer.
+- `ERROR`: Protocol violation or timeout.
+
+**Internal Components:**
+- `IECSignals`: Struct tracking the current state of ATN, CLK, DATA.
+- `IECBuffer`: Byte buffer for current sector/file data.
+- `FileHandler`: Interface for interacting with `.d64` or `.prg` images.
+
+### 6.2 `IPortDevice` Integration (Level 2)
+The `VirtualIECBus` will implement the `IPortDevice` interface to attach to CIA #2 (C64) or VIA #2 (VIC-20).
+
+**C64 CIA #2 Port A ($DD00) Mapping:**
+- **Bit 3 (Output):** ATN OUT.
+- **Bit 4 (Output):** CLK OUT.
+- **Bit 5 (Output):** DATA OUT.
+- **Bit 6 (Input):** CLK IN (Inverse of bus CLK).
+- **Bit 7 (Input):** DATA IN (Inverse of bus DATA).
+
+**Implementation logic:**
+- `writePort(val)`: Observes bits 3-5 to update the host's contribution to the bus.
+- `readPort()`: Combines the host's outputs with the virtual device's outputs (wired-OR) and returns bits 6-7.
+- `setDdr(ddr)`: Respects the Data Direction Register.
+
+### 6.3 Handshake Timing and Ticking
+Since the IEC bus is asynchronous but depends on timing (e.g., 1ms ATN delay, 60µs bit width), the `VirtualIECBus` must be ticked.
+- `tick(uint64_t cycles)`: Updates the internal state machine based on elapsed cycles.
+- **Sampling:** CLK and DATA lines are sampled periodically.
+- **EOI detection:** Monitor the delay between CLK pulses.
+
+### 6.4 Disk Image Streaming
+- **Sector Read:** Map `TRACK/SECTOR` to image offset.
+- **PRG Stream:** Read byte-by-byte from the host file and feed into the bit-shifter.
+- **Status Channel:** Implement basic "00, OK, 00, 00" responses for command channel (secondary address 15).
+
+### 6.5 Testing Strategy
+- **Unit Test:** Mock `IPortDevice` calls and verify the state machine transitions through IDLE -> ATTENTION -> ACK -> DATA.
+- **Integration Test:** Boot a C64 and use `LOAD "$",8` to verify the bit-level directory listing is received.

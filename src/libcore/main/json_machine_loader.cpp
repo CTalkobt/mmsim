@@ -615,6 +615,31 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
     }
 
     // -----------------------------------------------------------------------
+    // Phase 15.2 — iecWiring: VirtualIEC <-> CIA2 Port A
+    // -----------------------------------------------------------------------
+    if (spec.contains("iecWiring") && !spec["iecWiring"].is_null()) {
+        const auto& iw = spec["iecWiring"];
+        std::string iecDevName = iw.value("device", "");
+        if (devPtrs.count(iecDevName)) {
+            // Note: VirtualIECBus is an IOHandler that also implements IPortDevice
+            IPortDevice* iec = dynamic_cast<IPortDevice*>(devPtrs[iecDevName]);
+            if (iec) {
+                if (iw.contains("busPort")) {
+                    const auto& bp = iw["busPort"];
+                    std::string portDev  = bp.value("device", "");
+                    std::string portName = bp.value("port",   "A");
+                    if (devPtrs.count(portDev)) {
+                        if (portName == "A")
+                            devPtrs[portDev]->setPortADevice(iec);
+                        else
+                            devPtrs[portDev]->setPortBDevice(iec);
+                    }
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Step 8 — Scheduler (simple step_tick or frame-accumulator)
     // -----------------------------------------------------------------------
     bool hasFrameAccum = false;

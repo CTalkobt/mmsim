@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0-dev] - 2026-04-09
+
+### Added
+- **Virtual IEC Bus Device** (`src/plugins/devices/virtual_iec/`):
+    - `VirtualIECBus` class implementing Level 2 (protocol-level) IEC serial bus emulation.
+    - State machine: `IDLE → ATTENTION → ADDRESSING → ACKNOWLEDGE` with correct ATN/CLK/DATA open-collector semantics.
+    - Implements `IPortDevice` for direct attachment to CIA #2 Port A (C64) or VIA #2 (VIC-20).
+    - `IOHandler` interface satisfied: `tick()`, `reset()`, `mountDisk()`, `ejectDisk()`.
+    - Plugin entry point (`plugin_init.cpp`) and `.so` build target (`mmemu-plugin-virtual-iec.so`).
+    - JSON machine-loader wiring via new `iecWiring` section in machine specs.
+    - Unit test `virtual_iec_handshake` verifying ATN detection and DATA acknowledge within a single tick.
+- **`IOHandler` base class**: Added default `mountDisk(int, const std::string&)` and `ejectDisk(int)` virtual methods so plugins exposing disk management don't need to inherit a separate interface.
+- **Build system**: `virtual_iec.o` added to `ALL_PLUGIN_OBJS`; `test_virtual_iec.cpp` added to `TEST_SRCS`; test count grows to 162.
+
+### Fixed
+- **`VirtualIECBus::tick()` timer reset bug**: Transitioning IDLE→ATTENTION previously reset `m_stateTimer` *after* the tick's cycles had been accumulated, making it impossible for the ATTENTION threshold to be satisfied in the same tick as ATN detection. Fixed by preserving the accumulated cycle count across the transition and processing up to two state changes per tick.
+- **Stale-artifact vtable crash**: Adding virtual methods to `IOHandler` without a full rebuild caused a vtable layout mismatch between the statically-linked test binary and the dynamically-loaded `.so` plugins, crashing `c64_tape_load` with `basic_string: construction from null`. Resolved by ensuring all artifacts are rebuilt consistently.
+
 ## [0.4.0-dev] - 2026-04-08
 
 ### Added

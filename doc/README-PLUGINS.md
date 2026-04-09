@@ -32,6 +32,8 @@ Plugins that implement the `IOHandler` interface for memory-mapped hardware.
 | `lib/mmemu-plugin-gtia.so` | Atari GTIA color and PMG chip. | [README-GTIA.md](README-GTIA.md) |
 | `lib/mmemu-plugin-pokey.so` | Atari POKEY audio, timers, and keyboard/SIO. | [README-POKEY.md](README-POKEY.md) |
 
+| `lib/mmemu-plugin-virtual-iec.so` | Commodore IEC Serial Bus (Level 2 virtual device) — ATN/CLK/DATA state machine, attaches to CIA #2 / VIA #2. | [README-IEC.md](README-IEC.md) |
+
 ### 1.2.1 Integrated Devices (no separate .so)
 These devices are compiled into the machine plugins but are documented separately:
 
@@ -90,5 +92,5 @@ The plugin describes its contents via this struct returned from `mmemuPluginInit
 ## 3. Distribution Strategy
 The `lib/` directory contains the dynamic plugins (`.so` files). Standard distribution bundles include:
 - **VIC-20 Support**: `6502`, `via6522`, `vic6560`, `kbd-vic20`, `vic20`, `cbm-loader`, `vice-importer`. (Datasette built-in.)
-- **C64 Support**: `6502`, `c64-pla`, `cia6526`, `vic2`, `sid6581`, `c64`, `cbm-loader`, `vice-importer`. (Datasette built-in.)
+- **C64 Support**: `6502`, `c64-pla`, `cia6526`, `vic2`, `sid6581`, `c64`, `cbm-loader`, `vice-importer`, `virtual-iec` (optional). (Datasette built-in.)
 - **PET Support**: `6502`, `pia6520`, `via6522`, `crtc6545`, `pet-video`, `pet`, `cbm-loader`, `vice-importer`. (Datasette built-in.)
