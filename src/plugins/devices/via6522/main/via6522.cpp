@@ -8,6 +8,8 @@ VIA6522::VIA6522(const std::string& name, uint32_t baseAddr)
     m_ca2Line = &m_ca2Conduit;
     m_cb1Line = &m_cb1Conduit;
     m_cb2Line = &m_cb2Conduit;
+    m_pb7Proxy.m_reg = &m_regs[ORB];
+    m_pb7Proxy.m_bit = 7;
     reset();
 }
 

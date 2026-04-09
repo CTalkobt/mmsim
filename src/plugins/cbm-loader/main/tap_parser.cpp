@@ -1,6 +1,7 @@
 #include "tap_parser.h"
 #include <fstream>
 #include <cstring>
+#include <cstdio>
 
 bool TapArchive::load(const std::string& path) {
     std::ifstream f(path, std::ios::binary);
@@ -20,6 +21,52 @@ bool TapArchive::load(const std::string& path) {
     f.read((char*)m_data.data(), m_header.dataSize);
 
     return true;
+}
+
+void TapArchive::startRecording() {
+    m_recordBuf.clear();
+    m_recording = true;
+}
+
+void TapArchive::appendPulse(uint32_t cycles) {
+    uint32_t val = cycles / 8;
+    if (val > 0 && val <= 0xFF) {
+        m_recordBuf.push_back((uint8_t)val);
+    } else {
+        // Long pulse: leading zero + 3 LE bytes of raw cycle count
+        m_recordBuf.push_back(0x00);
+        m_recordBuf.push_back((uint8_t)(cycles & 0xFF));
+        m_recordBuf.push_back((uint8_t)((cycles >> 8) & 0xFF));
+        m_recordBuf.push_back((uint8_t)((cycles >> 16) & 0xFF));
+    }
+}
+
+bool TapArchive::saveRecording(const std::string& path) const {
+    std::ofstream f(path, std::ios::binary);
+    if (!f.is_open()) return false;
+
+    // Header: 12-byte signature
+    f.write("C64-TAPE-RAW", 12);
+    // Version 1
+    uint8_t ver = 1;
+    f.write((const char*)&ver, 1);
+    // 3 reserved bytes
+    uint8_t reserved[3] = {0, 0, 0};
+    f.write((const char*)reserved, 3);
+    // Data size (little-endian 32-bit)
+    uint32_t sz = (uint32_t)m_recordBuf.size();
+    uint8_t sizeBytes[4] = {
+        (uint8_t)(sz & 0xFF),
+        (uint8_t)((sz >> 8) & 0xFF),
+        (uint8_t)((sz >> 16) & 0xFF),
+        (uint8_t)((sz >> 24) & 0xFF)
+    };
+    f.write((const char*)sizeBytes, 4);
+    // Data
+    if (!m_recordBuf.empty())
+        f.write((const char*)m_recordBuf.data(), m_recordBuf.size());
+
+    return f.good();
 }
 
 uint32_t TapArchive::nextPulse(uint32_t& offset) const {

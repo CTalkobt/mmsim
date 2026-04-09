@@ -27,6 +27,11 @@ public:
     void stop();
     void rewind();
 
+    // Recording controls
+    bool startRecord();
+    void stopRecord();
+    bool saveRecording(const std::string& path);
+
     // Wiring
     void setSenseLine(ISignalLine* line) { m_senseLine = line; }
     void setMotorLine(ISignalLine* line) { m_motorLine = line; }
@@ -35,31 +40,43 @@ public:
 
     bool mountTape(const std::string& path) override { return mount(path); }
     void controlTape(const std::string& op) override {
-        if      (op == "play")   play();
-        else if (op == "stop")   stop();
-        else if (op == "rewind") rewind();
+        if      (op == "play")       play();
+        else if (op == "stop")       stop();
+        else if (op == "rewind")     rewind();
+        else if (op == "record")     startRecord();
+        else if (op == "stoprecord") stopRecord();
     }
+
+    bool startTapeRecord()                          override { return startRecord(); }
+    void stopTapeRecord()                           override { stopRecord(); }
+    bool saveTapeRecording(const std::string& path) override { return saveRecording(path); }
+    bool isTapeRecording() const                    override { return m_recording; }
 
     void setSignalLine(const char* name, ISignalLine* line) override {
         std::string n(name);
-        if (n == "sense") m_senseLine = line;
-        if (n == "motor") m_motorLine = line;
-        if (n == "write") m_writeLine = line;
+        if (n == "sense")     m_senseLine     = line;
+        if (n == "motor")     m_motorLine     = line;
+        if (n == "write")     m_writeLine     = line;
         if (n == "readPulse") m_readPulseLine = line;
     }
 
 private:
     TapArchive m_tape;
     uint32_t   m_offset = 0;
-    int32_t   m_pulseRemaining = 0;
+    int32_t    m_pulseRemaining = 0;
     bool       m_pulseLevel = true;
     bool       m_playing = false;
     bool       m_motorOn = false;
     bool       m_buttonPressed = false;
 
-    ISignalLine* m_senseLine = nullptr;
-    ISignalLine* m_motorLine = nullptr;
-    ISignalLine* m_writeLine = nullptr;
+    bool       m_recording = false;
+    bool       m_lastWriteLevel = true;
+    uint64_t   m_writePulseStart = 0;
+    uint64_t   m_totalCycles = 0;
+
+    ISignalLine* m_senseLine     = nullptr;
+    ISignalLine* m_motorLine     = nullptr;
+    ISignalLine* m_writeLine     = nullptr;
     ISignalLine* m_readPulseLine = nullptr;
     std::string  m_name = "Datasette";
 };

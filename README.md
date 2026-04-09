@@ -134,6 +134,13 @@ The `mmemu-cli` binary provides an interactive REPL for low-level machine contro
     - `load <path> <addr>`: Binary file injection.
 - **Symbol Table**: Full management via the `sym` command.
 - **Disassembly**: Multi-ISA disassembly with integrated symbol resolution.
+- **Datasette (Tape)**:
+    - `tape mount <path>`: Mount a `.tap` file for playback.
+    - `tape play` / `tape stop` / `tape rewind`: Playback transport controls.
+    - `tape record`: Arm the datasette for recording — the machine's cassette write line is captured into an in-memory buffer. The sense line is asserted so the machine believes a button is pressed.
+    - `tape stoprecord`: Stop capturing. The buffer is retained in memory.
+    - `tape save <path>`: Write the captured buffer to a `.tap` file in standard `C64-TAPE-RAW` format.
+    - Typical save workflow: `tape record` → run the machine's SAVE command → `tape stoprecord` → `tape save output.tap`.
 
 ---
 
@@ -152,6 +159,10 @@ The `mmemu-mcp` binary implements the **Model Context Protocol**, allowing AI ag
 - `set_breakpoint` / `set_watchpoint` / `delete_breakpoint`: Breakpoint management.
 - `get_stack(machine_id, count)`: Show the call stack trace.
 - `load_image`, `attach_cartridge`, `reset_machine`: Lifecycle and media.
+- `mount_tape(machine_id, path)`: Mount a `.tap` file for playback.
+- `control_tape(machine_id, operation)`: Transport control — `play`, `stop`, `rewind`, `record`, `stoprecord`.
+- `record_tape(machine_id)`: Arm the datasette for recording (equivalent to `control_tape` with `record`).
+- `save_tape_recording(machine_id, path)`: Stop recording and write the captured buffer to a `.tap` file.
 - `list_machines`, `create_machine`: Machine management.
 - `list_loggers`, `set_log_level`: Logging control.
 
@@ -172,6 +183,7 @@ Multi-pane graphical debugging environment built on wxWidgets.
 - **Console Pane**: Full parity with `mmemu-cli`.
 - **Register & Memory Panes**: Real-time inspection and editing.
 - **Stack Pane**: JSR/RTS tracking with navigation support.
+- **Tape Pane**: Datasette controls — Mount, Play, Stop, Rewind, Record, and Save. Record arms the write-line capture; Save stops recording and prompts for a destination `.tap` file.
 
 ---
 

@@ -12,6 +12,10 @@ void Datasette::reset() {
     m_playing = false;
     m_motorOn = false;
     m_buttonPressed = false;
+    m_recording = false;
+    m_lastWriteLevel = true;
+    m_writePulseStart = 0;
+    m_totalCycles = 0;
 }
 
 bool Datasette::mount(const std::string& path) {
@@ -41,10 +45,47 @@ void Datasette::rewind() {
     m_pulseRemaining = 0;
 }
 
+bool Datasette::startRecord() {
+    if (!m_writeLine) return false;
+    m_playing = false;
+    m_tape.startRecording();
+    m_recording = true;
+    m_buttonPressed = true;
+    m_lastWriteLevel = m_writeLine->get();
+    m_writePulseStart = m_totalCycles;
+    if (m_senseLine) m_senseLine->set(false);
+    return true;
+}
+
+void Datasette::stopRecord() {
+    if (!m_recording) return;
+    m_tape.stopRecording();
+    m_recording = false;
+    m_buttonPressed = false;
+    if (m_senseLine) m_senseLine->set(true);
+}
+
+bool Datasette::saveRecording(const std::string& path) {
+    return m_tape.saveRecording(path);
+}
+
 void Datasette::tick(uint64_t cycles) {
+    m_totalCycles += cycles;
+
     if (m_motorLine) {
-        // C64 motor control (bit 5) is LOW to turn ON.
+        // Motor control line is active-low (LOW = motor on).
         m_motorOn = !m_motorLine->get();
+    }
+
+    // Recording: capture write-line edges
+    if (m_recording && m_motorOn && m_writeLine) {
+        bool level = m_writeLine->get();
+        if (level != m_lastWriteLevel) {
+            uint32_t pulseLen = (uint32_t)(m_totalCycles - m_writePulseStart);
+            m_tape.appendPulse(pulseLen);
+            m_writePulseStart = m_totalCycles;
+            m_lastWriteLevel = level;
+        }
     }
 
     if (!m_playing || !m_motorOn) return;

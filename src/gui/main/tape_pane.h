@@ -13,11 +13,15 @@ private:
     void OnPlay(wxCommandEvent&);
     void OnStop(wxCommandEvent&);
     void OnRewind(wxCommandEvent&);
+    void OnRecord(wxCommandEvent&);
+    void OnSaveRecording(wxCommandEvent&);
 
     IOHandler* m_tape = nullptr;
     wxStaticText* m_statusLabel;
+    wxButton* m_mountBtn;
     wxButton* m_playBtn;
     wxButton* m_stopBtn;
     wxButton* m_rewindBtn;
-    wxButton* m_mountBtn;
+    wxButton* m_recordBtn;
+    wxButton* m_saveBtn;
 };

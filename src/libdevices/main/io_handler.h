@@ -67,6 +67,10 @@ public:
     virtual ISignalLine* getSignalLine(const char*) { return nullptr; }
     virtual bool mountTape(const std::string& path) { return false; }
     virtual void controlTape(const std::string& op) {}
+    virtual bool startTapeRecord()                           { return false; }
+    virtual void stopTapeRecord()                            {}
+    virtual bool saveTapeRecording(const std::string& path)  { return false; }
+    virtual bool isTapeRecording() const                     { return false; }
 
     // -----------------------------------------------------------------------
     // Identity (pure virtual — every device must provide these)

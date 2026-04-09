@@ -21,6 +21,7 @@ public:
         if (n == "ca2") return &m_ca2Conduit;
         if (n == "cb1") return &m_cb1Conduit;
         if (n == "cb2") return &m_cb2Conduit;
+        if (n == "pb7") return &m_pb7Proxy;
         return nullptr;
     }
 
@@ -77,7 +78,16 @@ private:
         void set(bool level) override { m_level = level; }
         void pulse() override { m_level = !m_level; m_level = !m_level; }
     };
-    SignalLine m_ca1Conduit, m_ca2Conduit, m_cb1Conduit, m_cb2Conduit;
+    // Read-only proxy for a single bit of a register byte (used for port-pin signal lines).
+    struct RegBitSignal : public ISignalLine {
+        const uint8_t* m_reg = nullptr;
+        uint8_t        m_bit = 0;
+        bool get() const override { return m_reg ? ((*m_reg >> m_bit) & 1) != 0 : false; }
+        void set(bool) override {}
+        void pulse() override {}
+    };
+    SignalLine   m_ca1Conduit, m_ca2Conduit, m_cb1Conduit, m_cb2Conduit;
+    RegBitSignal m_pb7Proxy;
     void updateIrq();
     void driveCA2(bool level);
     void driveCB2(bool level);

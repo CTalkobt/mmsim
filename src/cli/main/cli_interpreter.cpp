@@ -436,12 +436,32 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
                 } else {
                     m_output("Usage: tape mount <path>\n");
                 }
+            } else if (sub == "record") {
+                if (tape->startTapeRecord()) {
+                    m_output("Tape: recording started\n");
+                } else {
+                    m_output("Tape: failed to start recording (write line not connected?)\n");
+                }
+            } else if (sub == "stoprecord") {
+                tape->stopTapeRecord();
+                m_output("Tape: recording stopped\n");
+            } else if (sub == "save") {
+                std::string path;
+                if (ss >> path) {
+                    if (tape->saveTapeRecording(path)) {
+                        m_output("Tape recording saved: " + path + "\n");
+                    } else {
+                        m_output("Failed to save tape recording\n");
+                    }
+                } else {
+                    m_output("Usage: tape save <path>\n");
+                }
             } else {
                 tape->controlTape(sub);
                 m_output("Tape: " + sub + "\n");
             }
         } else {
-            m_output("Usage: tape <mount|play|stop|rewind>\n");
+            m_output("Usage: tape <mount|play|stop|rewind|record|stoprecord|save>\n");
         }
     } else if (cmd == "cart") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
@@ -802,7 +822,14 @@ void CliInterpreter::printHelp() {
              "  load <path> [addr]- Load a program/binary file\n"
              "  screenshot <file>  - Save current screen to a PNG file\n"
              "  cart <path>      - Attach a cartridge image\n"
-             "  tape <mount|play|stop|rewind> - Tape controls\n"
+             "  tape mount <path>   - Mount a .tap file for playback\n"
+             "  tape play           - Press Play (start/resume playback)\n"
+             "  tape stop           - Release all tape buttons\n"
+             "  tape rewind         - Rewind to start of tape\n"
+             "  tape record         - Press Record (capture write-line to memory buffer)\n"
+             "  tape stoprecord     - Release Record button (stops capture, buffer retained)\n"
+             "  tape save <path>    - Write captured buffer to a .tap file\n"
+             "  (record/stoprecord/save: use together to save a program to tape)\n"
              "  eject            - Eject currently attached cartridge\n"
              "  run [addr]       - Run from address (or last loaded address)\n"
              "  sym <add|del|list|search|load|clear> - Symbol table management\n"

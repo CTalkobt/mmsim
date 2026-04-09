@@ -208,7 +208,27 @@ Json handleDescribe() {
     ctSchema.oVal["properties"] = ctProps;
     Json ctReq(Json::ARR); ctReq.push_back(Json("machine_id")); ctReq.push_back(Json("operation"));
     ctSchema.oVal["required"] = ctReq;
-    addTool("control_tape", "Control tape: \"play\", \"stop\", \"rewind\"", ctSchema);
+    addTool("control_tape", "Control tape: \"play\", \"stop\", \"rewind\", \"record\", \"stoprecord\"", ctSchema);
+
+    Json rtSchema(Json::OBJ);
+    rtSchema.oVal["type"] = Json("object");
+    Json rtProps(Json::OBJ);
+    rtProps.oVal["machine_id"] = midProp;
+    rtSchema.oVal["properties"] = rtProps;
+    Json rtReq(Json::ARR); rtReq.push_back(Json("machine_id"));
+    rtSchema.oVal["required"] = rtReq;
+    addTool("record_tape", "Start recording to the datasette (arms write-line capture)", rtSchema);
+
+    Json strSchema(Json::OBJ);
+    strSchema.oVal["type"] = Json("object");
+    Json strProps(Json::OBJ);
+    strProps.oVal["machine_id"] = midProp;
+    Json strPathProp(Json::OBJ); strPathProp.oVal["type"] = Json("string");
+    strProps.oVal["path"] = strPathProp;
+    strSchema.oVal["properties"] = strProps;
+    Json strReq(Json::ARR); strReq.push_back(Json("machine_id")); strReq.push_back(Json("path"));
+    strSchema.oVal["required"] = strReq;
+    addTool("save_tape_recording", "Stop recording and save captured tape data to a .tap file", strSchema);
 
     Json kSchema(Json::OBJ);
     kSchema.oVal["type"] = Json("object");
@@ -662,6 +682,46 @@ Json handleToolsCall(const Json& params) {
             } else {
                 textItem.oVal["text"] = Json("Error: No datasette found in machine");
                 textItem.oVal["isError"] = Json(true);
+            }
+        }
+    } else if (name == "record_tape") {
+        std::string mid = args["machine_id"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            IOHandler* tape = ms->machine->ioRegistry ? ms->machine->ioRegistry->findHandler("Tape") : nullptr;
+            if (!tape) {
+                textItem.oVal["text"] = Json("Error: No datasette found in machine");
+                textItem.oVal["isError"] = Json(true);
+            } else if (tape->startTapeRecord()) {
+                textItem.oVal["text"] = Json("Tape: recording started");
+            } else {
+                textItem.oVal["text"] = Json("Error: Could not start recording (write line not connected?)");
+                textItem.oVal["isError"] = Json(true);
+            }
+        }
+    } else if (name == "save_tape_recording") {
+        std::string mid = args["machine_id"].sVal;
+        std::string path = args["path"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            IOHandler* tape = ms->machine->ioRegistry ? ms->machine->ioRegistry->findHandler("Tape") : nullptr;
+            if (!tape) {
+                textItem.oVal["text"] = Json("Error: No datasette found in machine");
+                textItem.oVal["isError"] = Json(true);
+            } else {
+                tape->stopTapeRecord();
+                if (tape->saveTapeRecording(path)) {
+                    textItem.oVal["text"] = Json("Tape recording saved: " + path);
+                } else {
+                    textItem.oVal["text"] = Json("Error: Failed to save tape recording");
+                    textItem.oVal["isError"] = Json(true);
+                }
             }
         }
     } else if (name == "press_key") {
