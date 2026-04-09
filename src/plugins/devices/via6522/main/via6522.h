@@ -12,7 +12,13 @@
  */
 class VIA6522 : public IOHandler {
 public:
-    VIA6522() : m_name("6522"), m_baseAddr(0) { reset(); }
+    VIA6522() : m_name("6522"), m_baseAddr(0) {
+        m_ca1Conduit.m_via = this;
+        m_cb1Conduit.m_via = this;
+        m_pb7Proxy.m_reg = &m_regs[ORB]; m_pb7Proxy.m_bit = 7;
+        for (int i = 0; i < 7; ++i) { m_pbProxy[i].m_reg = &m_regs[ORB]; m_pbProxy[i].m_bit = i; }
+        reset();
+    }
     VIA6522(const std::string& name, uint32_t baseAddr);
     virtual ~VIA6522() = default;
     ISignalLine* getSignalLine(const char* name) override {
@@ -22,6 +28,8 @@ public:
         if (n == "cb1") return &m_cb1Conduit;
         if (n == "cb2") return &m_cb2Conduit;
         if (n == "pb7") return &m_pb7Proxy;
+        if (n.size() == 3 && n[0] == 'p' && n[1] == 'b' && n[2] >= '0' && n[2] <= '6')
+            return &m_pbProxy[n[2] - '0'];
         return nullptr;
     }
 
@@ -86,8 +94,29 @@ private:
         void set(bool) override {}
         void pulse() override {}
     };
-    SignalLine   m_ca1Conduit, m_ca2Conduit, m_cb1Conduit, m_cb2Conduit;
+    // Immediate-edge conduit for CA1/CB1: sets IFR as soon as the active edge occurs,
+    // without waiting for tick() to poll.
+    struct CA1Conduit : public ISignalLine {
+        VIA6522* m_via  = nullptr;
+        bool     m_level = true;
+        bool get() const override { return m_level; }
+        void set(bool level) override;
+        void pulse() override { set(false); set(true); }
+    };
+    friend struct CA1Conduit;
+    struct CB1Conduit : public ISignalLine {
+        VIA6522* m_via  = nullptr;
+        bool     m_level = true;
+        bool get() const override { return m_level; }
+        void set(bool level) override;
+        void pulse() override { set(false); set(true); }
+    };
+    friend struct CB1Conduit;
+    CA1Conduit   m_ca1Conduit;
+    CB1Conduit   m_cb1Conduit;
+    SignalLine   m_ca2Conduit, m_cb2Conduit;
     RegBitSignal m_pb7Proxy;
+    RegBitSignal m_pbProxy[7]; // pb0–pb6 read-only proxies into ORB
     void updateIrq();
     void driveCA2(bool level);
     void driveCB2(bool level);

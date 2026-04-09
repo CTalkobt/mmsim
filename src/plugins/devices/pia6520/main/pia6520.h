@@ -78,7 +78,25 @@ private:
         void set(bool level) override { m_level = level; }
         void pulse() override { m_level = !m_level; m_level = !m_level; }
     };
-    SignalLine m_ca1Conduit, m_cb1Conduit;
+    // Immediate-edge conduits: invoke setCA1/setCB1 as soon as the signal changes.
+    struct CA1Conduit : public ISignalLine {
+        PIA6520* m_owner = nullptr;
+        bool     m_level = true;
+        bool get() const override { return m_level; }
+        void set(bool level) override;
+        void pulse() override { set(false); set(true); }
+    };
+    friend struct CA1Conduit;
+    struct CB1Conduit : public ISignalLine {
+        PIA6520* m_owner = nullptr;
+        bool     m_level = true;
+        bool get() const override { return m_level; }
+        void set(bool level) override;
+        void pulse() override { set(false); set(true); }
+    };
+    friend struct CB1Conduit;
+    CA1Conduit m_ca1Conduit;
+    CB1Conduit m_cb1Conduit;
     void updateIrq();
     void driveCA2(bool level);
     void driveCB2(bool level);

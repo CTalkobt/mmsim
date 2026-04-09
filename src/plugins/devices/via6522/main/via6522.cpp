@@ -4,13 +4,46 @@
 VIA6522::VIA6522(const std::string& name, uint32_t baseAddr)
     : m_name(name), m_baseAddr(baseAddr)
 {
+    m_ca1Conduit.m_via = this;
+    m_cb1Conduit.m_via = this;
     m_ca1Line = &m_ca1Conduit;
     m_ca2Line = &m_ca2Conduit;
     m_cb1Line = &m_cb1Conduit;
     m_cb2Line = &m_cb2Conduit;
     m_pb7Proxy.m_reg = &m_regs[ORB];
     m_pb7Proxy.m_bit = 7;
+    for (int i = 0; i < 7; ++i) { m_pbProxy[i].m_reg = &m_regs[ORB]; m_pbProxy[i].m_bit = i; }
     reset();
+}
+
+void VIA6522::CA1Conduit::set(bool level) {
+    bool prev = m_level;
+    m_level = level;
+    if (!m_via) return;
+    bool activeEdge = (m_via->m_regs[VIA6522::PCR] & 0x01)
+        ? (!prev && level)   // positive edge
+        : (prev && !level);  // negative edge
+    if (activeEdge) {
+        m_via->m_regs[VIA6522::IFR] |= 0x02;
+        if ((m_via->m_regs[VIA6522::PCR] & 0x0E) == 0x08) m_via->driveCA2(true); // handshake release
+        m_via->updateIrq();
+    }
+    m_via->m_ca1Prev = level;
+}
+
+void VIA6522::CB1Conduit::set(bool level) {
+    bool prev = m_level;
+    m_level = level;
+    if (!m_via) return;
+    bool activeEdge = (m_via->m_regs[VIA6522::PCR] & 0x10)
+        ? (!prev && level)
+        : (prev && !level);
+    if (activeEdge) {
+        m_via->m_regs[VIA6522::IFR] |= 0x10;
+        if ((m_via->m_regs[VIA6522::PCR] & 0xE0) == 0x80) m_via->driveCB2(true);
+        m_via->updateIrq();
+    }
+    m_via->m_cb1Prev = level;
 }
 
 void VIA6522::reset() {
@@ -226,7 +259,10 @@ void VIA6522::driveCB2(bool level) {
 }
 
 void VIA6522::tick(uint64_t cycles) {
-    // CA1 input edge detection → IFR bit 1; in CA2 handshake mode, active CA1 releases CA2
+    // CA1 input edge detection → IFR bit 1; in CA2 handshake mode, active CA1 releases CA2.
+    // When m_ca1Line == &m_ca1Conduit, CA1Conduit::set() already handled the edge and updated
+    // m_ca1Prev, so this tick path becomes a no-op (same level → no active edge).
+    // For externally set CA1 lines (unit tests, etc.) this path still detects edges.
     if (m_ca1Line) {
         bool lvl = m_ca1Line->get();
         bool activeEdge = (m_regs[PCR] & 0x01) ? (!m_ca1Prev && lvl)  // positive edge
@@ -251,7 +287,7 @@ void VIA6522::tick(uint64_t cycles) {
         m_ca2Prev = lvl;
     }
 
-    // CB1 input edge detection → IFR bit 4; in CB2 handshake mode, active CB1 releases CB2
+    // CB1 input edge detection → IFR bit 4; same dual-path rationale as CA1 above.
     if (m_cb1Line) {
         bool lvl = m_cb1Line->get();
         bool activeEdge = (m_regs[PCR] & 0x10) ? (!m_cb1Prev && lvl)

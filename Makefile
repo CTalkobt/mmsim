@@ -152,6 +152,7 @@ MCP_SRCS = src/mcp/main/main.cpp src/plugins/devices/datasette/main/datasette.cp
 # Test Sources
 TEST_SRCS = tests/src/test_main.cpp \
 	tests/src/test_c64_tape.cpp \
+	tests/src/test_tape_roundtrip.cpp \
 	src/cli/test/test_cli.cpp \
 	src/gui/test/test_gui_logic.cpp \
 	src/libmem/test/test_flatmembus.cpp \

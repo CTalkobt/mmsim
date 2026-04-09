@@ -4,15 +4,29 @@
 #include <cstdio>
 
 PIA6520::PIA6520() : m_name("6520"), m_baseAddr(0xE810) {
+    m_ca1Conduit.m_owner = this;
+    m_cb1Conduit.m_owner = this;
     m_ca1Line = &m_ca1Conduit;
     m_cb1Line = &m_cb1Conduit;
     reset();
 }
 
 PIA6520::PIA6520(const std::string& name, uint32_t baseAddr) : m_name(name), m_baseAddr(baseAddr) {
+    m_ca1Conduit.m_owner = this;
+    m_cb1Conduit.m_owner = this;
     m_ca1Line = &m_ca1Conduit;
     m_cb1Line = &m_cb1Conduit;
     reset();
+}
+
+void PIA6520::CA1Conduit::set(bool level) {
+    m_level = level;
+    if (m_owner) m_owner->setCA1(level);
+}
+
+void PIA6520::CB1Conduit::set(bool level) {
+    m_level = level;
+    if (m_owner) m_owner->setCB1(level);
 }
 
 void PIA6520::reset() {
