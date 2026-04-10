@@ -1,6 +1,7 @@
 #include "include/mmemu_plugin_api.h"
 #include "libcore/main/image_loader.h"
 #include "prg_loader.h"
+#include "disk_loader.h"
 #include "cbm_cart_handler.h"
 #include <vector>
 
@@ -11,12 +12,17 @@ static IImageLoader* createPrgLoader() {
     return new PrgLoader();
 }
 
+static IImageLoader* createDiskLoader() {
+    return new DiskImageLoader();
+}
+
 static ICartridgeHandler* createCbmCartridge(const char* path) {
     return new CbmCartridgeHandler(path);
 }
 
 static ImageLoaderPluginInfo s_loaders[] = {
-    { createPrgLoader }
+    { createPrgLoader },
+    { createDiskLoader }
 };
 
 static CartridgePluginInfo s_cartridges[] = {
@@ -34,7 +40,7 @@ static SimPluginManifest s_manifest = {
     0, nullptr, // Toolchains
     0, nullptr, // Devices
     0, nullptr, // Machines
-    1, s_loaders,
+    2, s_loaders,
     1, s_cartridges
 };
 

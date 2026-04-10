@@ -101,6 +101,10 @@ PLUGIN_PIA6520_SRCS = src/plugins/devices/pia6520/main/pia6520.cpp \
 PLUGIN_CBMLOADER_SRCS = src/plugins/cbm-loader/main/prg_loader.cpp \
 	src/plugins/cbm-loader/main/crt_parser.cpp \
 	src/plugins/cbm-loader/main/cbm_cart_handler.cpp \
+	src/plugins/cbm-loader/main/d64_parser.cpp \
+	src/plugins/cbm-loader/main/g64_parser.cpp \
+	src/plugins/cbm-loader/main/t64_parser.cpp \
+	src/plugins/cbm-loader/main/disk_loader.cpp \
 	src/plugins/cbm-loader/main/plugin_init.cpp
 
 PLUGIN_CRTC6545_SRCS = src/plugins/devices/crtc6545/main/crtc6545.cpp \
@@ -193,7 +197,8 @@ TEST_SRCS = tests/src/test_main.cpp \
 	src/plugins/devices/pokey/test/test_pokey.cpp \
 	src/plugins/devices/cia6526/test/test_cia6526.cpp \
 	src/plugins/devices/virtual_iec/test/test_virtual_iec.cpp \
-	src/plugins/cbm-hle/test/test_kernal_hle.cpp
+	src/plugins/cbm-hle/test/test_kernal_hle.cpp \
+	tests/src/test_cbm_disk_images.cpp
 
 LIBDEBUG_TEST_SRCS = src/libdebug/test/test_breakpoints.cpp
 LIBCORE_TEST_SRCS = src/libcore/test/test_c_compatibility.c
@@ -228,6 +233,10 @@ PLUGIN_ANTIC_TEST_SRCS = src/plugins/devices/antic/test/test_atari_boot.cpp \
 	src/plugins/cbm-loader/main/prg_loader.o \
 	src/plugins/cbm-loader/main/crt_parser.o \
 	src/plugins/cbm-loader/main/cbm_cart_handler.o \
+	src/plugins/cbm-loader/main/d64_parser.o \
+	src/plugins/cbm-loader/main/g64_parser.o \
+	src/plugins/cbm-loader/main/t64_parser.o \
+	src/plugins/cbm-loader/main/disk_loader.o \
 	src/plugins/devices/crtc6545/main/crtc6545.o \
 	src/plugins/devices/pet_video/main/pet_video.o \
 	src/plugins/devices/keyboard/main/keyboard_matrix_pet.o \

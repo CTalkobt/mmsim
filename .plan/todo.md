@@ -895,14 +895,15 @@ for disk access (.d64, .g64, .p00). See .plan/iec.md.*
 - [x] Handle ATN/CLK/DATA handshaking signals via `IPortDevice` on CIA #2 (iecWiring in JSON loader).
 - [x] Stream bits from host-side .d64 or .prg files.
 
-### Phase 15.3: Disk Image Support (`src/plugins/cbm-loader/`)
+### Phase 15.3: Disk Image Support (`src/plugins/cbm-loader/`) [COMPLETED]
 
 *CBM-specific disk image formats co-located with other Commodore format parsers
 in the `cbm-loader` plugin.*
 
-- [ ] `.d64` parser (sector/track mapping for 1541).
-- [ ] `.g64` parser (GCR-encoded pulses for copy-protected images).
-- [ ] `.t64` (tape image formatted as disk) support.
+- [x] `.d64` parser (sector/track mapping for 1541).
+- [x] `.g64` parser (GCR-encoded pulses for copy-protected images).
+- [x] `.t64` (tape image formatted as disk) support.
+- [x] `DiskImageLoader` for loading images via standard image loader interface.
 
 ### Phase 15.4: Disk UI and Controls
 
