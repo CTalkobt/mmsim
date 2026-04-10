@@ -882,18 +882,18 @@ pulse-encoded format for VIC-20, C64, and PET.*
 *Goal: Implement the Commodore Serial Bus (IEC) and High-Level Emulation (HLE) 
 for disk access (.d64, .g64, .p00). See .plan/iec.md.*
 
-### Phase 15.1: KERNAL HLE (Level 1)
+### Phase 15.1: KERNAL HLE (Level 1) [COMPLETED]
 
-- [ ] Implement `KernalTrap` ExecutionObserver to monitor PC for KERNAL entry 
-      points (, , ).
-- [ ] Support for "Flat Directory" mapping (local host folders as disks).
-- [ ] Fast-inject file data into RAM, bypassing bit-banging protocol.
+- [x] Implement `KernalTrap` ExecutionObserver to monitor PC for KERNAL entry 
+      points ($FFD5, $FFD8).
+- [x] Support for "Flat Directory" mapping (local host folders as disks).
+- [x] Fast-inject file data into RAM, bypassing bit-banging protocol.
 
-### Phase 15.2: Virtual IEC Device (Level 2)
+### Phase 15.2: Virtual IEC Device (Level 2) [COMPLETED]
 
 - [x] Implement `VirtualIECBus` state machine (`src/plugins/devices/virtual_iec/`).
 - [x] Handle ATN/CLK/DATA handshaking signals via `IPortDevice` on CIA #2 (iecWiring in JSON loader).
-- [ ] Stream bits from host-side .d64 or .prg files.
+- [x] Stream bits from host-side .d64 or .prg files.
 
 ### Phase 15.3: Disk Image Support (`src/plugins/cbm-loader/`)
 

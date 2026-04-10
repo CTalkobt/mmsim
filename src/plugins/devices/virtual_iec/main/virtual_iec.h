@@ -48,6 +48,7 @@ public:
 private:
     uint8_t m_deviceNumber;
     State m_state;
+    State m_nextState;
 
     // Signal state (Open-collector logic: 1 = Low/True, 0 = High/False)
     bool m_atnIn;
@@ -64,8 +65,15 @@ private:
     // Command/Data buffer
     std::vector<uint8_t> m_buffer;
     size_t m_bufferIdx;
+    uint8_t m_secondaryAddress;
+    std::string m_filename;
+    std::vector<uint8_t> m_fileBuffer;
+    size_t m_fileIdx;
+    bool m_eof;
 
     void handleAttention();
     void handleBitTransfer();
+    void handleByteReceived(uint8_t byte);
+    uint8_t getNextByte();
     void processCommand(uint8_t cmd);
 };

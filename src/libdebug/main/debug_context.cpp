@@ -14,11 +14,18 @@ static std::string toHex(uint32_t v) {
     return ss.str();
 }
 
+#include "observer_registry.h"
+
 DebugContext::DebugContext(ICore* cpu, IBus* bus)
     : m_cpu(cpu), m_bus(bus) {
 }
 
 bool DebugContext::onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
+    bool cont = true;
+    for (auto* obs : ObserverRegistry::instance().observers()) {
+        if (!obs->onStep(cpu, bus, entry)) cont = false;
+    }
+
     TraceEntry te;
     te.addr = entry.addr;
     te.mnemonic = entry.complete;
@@ -45,8 +52,10 @@ bool DebugContext::onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
         m_cpu->log(SIM_LOG_INFO, m_lastHitMessage.c_str());
         m_lastPausedAddr = entry.addr;
         m_paused = true;
-        return false;  // instruction will NOT execute — don't update stack
+        cont = false;
     }
+
+    if (!cont) return false;
 
     trackStack(cpu, entry);
     monitorKernal(cpu, entry);
@@ -150,7 +159,10 @@ void DebugContext::trackStack(ICore* cpu, const DisasmEntry& entry) {
 }
 
 void DebugContext::onMemoryWrite(IBus* bus, uint32_t addr, uint8_t before, uint8_t after) {
-    (void)bus; (void)before; (void)after;
+    for (auto* obs : ObserverRegistry::instance().observers()) {
+        obs->onMemoryWrite(bus, addr, before, after);
+    }
+
     if (auto* bp = m_breakpoints.checkWrite(addr, this)) {
         m_lastHitMessage = "Write watchpoint " + std::to_string(bp->id) + " hit at $" + toHex(addr);
         m_cpu->log(SIM_LOG_INFO, m_lastHitMessage.c_str());
@@ -159,7 +171,10 @@ void DebugContext::onMemoryWrite(IBus* bus, uint32_t addr, uint8_t before, uint8
 }
 
 void DebugContext::onMemoryRead(IBus* bus, uint32_t addr, uint8_t val) {
-    (void)bus; (void)val;
+    for (auto* obs : ObserverRegistry::instance().observers()) {
+        obs->onMemoryRead(bus, addr, val);
+    }
+
     if (auto* bp = m_breakpoints.checkRead(addr, this)) {
         m_lastHitMessage = "Read watchpoint " + std::to_string(bp->id) + " hit at $" + toHex(addr);
         m_cpu->log(SIM_LOG_INFO, m_lastHitMessage.c_str());

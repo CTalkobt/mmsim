@@ -47,10 +47,14 @@ LIBTOOLCHAIN_SRCS = src/libtoolchain/main/symbol_table.cpp src/libtoolchain/main
 LIBDEBUG_SRCS     = src/libdebug/main/breakpoint_list.cpp src/libdebug/main/debug_context.cpp \
 	src/libdebug/main/trace_buffer.cpp src/libdebug/main/libdebug.cpp \
 	src/libdebug/main/expression_evaluator.cpp \
-	src/libdebug/main/stack_trace.cpp
+	src/libdebug/main/stack_trace.cpp \
+	src/libdebug/main/observer_registry.cpp
 LIBPLUGINS_SRCS   = src/plugin_loader/main/plugin_loader.cpp src/plugin_loader/main/logging.cpp
 
 # Plugin Sources
+PLUGIN_CBMHLE_SRCS = src/plugins/cbm-hle/main/kernal_hle.cpp \
+	src/plugins/cbm-hle/main/plugin_init.cpp
+
 PLUGIN_6502_SRCS = src/plugins/6502/main/cpu6502.cpp \
 	src/plugins/6502/main/cpu6510.cpp \
 	src/plugins/6502/main/disassembler_6502.cpp \
@@ -188,7 +192,8 @@ TEST_SRCS = tests/src/test_main.cpp \
 	src/plugins/devices/gtia/test/test_gtia.cpp \
 	src/plugins/devices/pokey/test/test_pokey.cpp \
 	src/plugins/devices/cia6526/test/test_cia6526.cpp \
-	src/plugins/devices/virtual_iec/test/test_virtual_iec.cpp
+	src/plugins/devices/virtual_iec/test/test_virtual_iec.cpp \
+	src/plugins/cbm-hle/test/test_kernal_hle.cpp
 
 LIBDEBUG_TEST_SRCS = src/libdebug/test/test_breakpoints.cpp
 LIBCORE_TEST_SRCS = src/libcore/test/test_c_compatibility.c
@@ -229,7 +234,8 @@ PLUGIN_ANTIC_TEST_SRCS = src/plugins/devices/antic/test/test_atari_boot.cpp \
 	src/plugins/devices/antic/main/antic.o \
 	src/plugins/devices/gtia/main/gtia.o \
 	src/plugins/devices/pokey/main/pokey.o \
-	src/plugins/devices/virtual_iec/main/virtual_iec.o
+	src/plugins/devices/virtual_iec/main/virtual_iec.o \
+	src/plugins/cbm-hle/main/kernal_hle.o
 REGISTRY_OBJS = src/cli/main/cli_interpreter.o \
 	src/cli/main/plugin_command_registry.o \
 	src/mcp/main/plugin_tool_registry.o \
@@ -289,6 +295,7 @@ PLUGIN_GTIA_OBJS = $(PLUGIN_GTIA_SRCS:.cpp=.o)
 PLUGIN_DATASETTE_OBJS = $(PLUGIN_DATASETTE_SRCS:.cpp=.o)
 PLUGIN_POKEY_OBJS = $(PLUGIN_POKEY_SRCS:.cpp=.o)
 PLUGIN_VIRTUALIEC_OBJS = $(PLUGIN_VIRTUALIEC_SRCS:.cpp=.o)
+PLUGIN_CBMHLE_OBJS = $(PLUGIN_CBMHLE_SRCS:.cpp=.o)
 
 GUI_OBJS = $(GUI_SRCS:.cpp=.o)
 
@@ -320,7 +327,8 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
 	$(LIBDIR)/mmemu-plugin-gtia.so \
 	$(LIBDIR)/mmemu-plugin-pokey.so \
         $(LIBDIR)/mmemu-plugin-datasette.so \
-	$(LIBDIR)/mmemu-plugin-virtual-iec.so
+	$(LIBDIR)/mmemu-plugin-virtual-iec.so \
+	$(LIBDIR)/mmemu-plugin-cbm-hle.so
 
 LIBS = $(ILIBDIR)/libmem.a $(ILIBDIR)/libcore.a $(ILIBDIR)/libdevices.a \
 	$(ILIBDIR)/libtoolchain.a $(ILIBDIR)/libdebug.a $(ILIBDIR)/libplugins.a
@@ -421,6 +429,9 @@ $(LIBDIR)/mmemu-plugin-pokey.so: $(PLUGIN_POKEY_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 $(LIBDIR)/mmemu-plugin-virtual-iec.so: $(PLUGIN_VIRTUALIEC_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
+
+$(LIBDIR)/mmemu-plugin-cbm-hle.so: $(PLUGIN_CBMHLE_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 # Binary rules

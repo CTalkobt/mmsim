@@ -21,6 +21,7 @@ class IAssembler;
 class IOHandler;
 class IImageLoader;
 class ICartridgeHandler;
+class ExecutionObserver;
 struct MachineDescriptor;
 #else
 typedef struct ICore ICore;
@@ -29,7 +30,8 @@ typedef struct IAssembler IAssembler;
 typedef struct IOHandler IOHandler;
 typedef struct IImageLoader IImageLoader;
 typedef struct ICartridgeHandler ICartridgeHandler;
-typedef struct MachineDescriptor MachineDescriptor;
+typedef struct ExecutionObserver ExecutionObserver;
+struct MachineDescriptor;
 #endif
 
 /**
@@ -104,6 +106,7 @@ struct SimPluginHostAPI {
     void (*registerPane)(const struct PluginPaneInfo* info);
     void (*registerCommand)(const struct PluginCommandInfo* info);
     void (*registerMcpTool)(const struct PluginMcpToolInfo* info);
+    void (*registerObserver)(ExecutionObserver* obs);
 };
 
 /**

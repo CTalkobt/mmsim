@@ -2,6 +2,8 @@
 
 `VirtualIECBus` provides Level 2 (protocol-level) Commodore Serial Bus (IEC) emulation. It handles the ATN/CLK/DATA handshake at the signal level so that standard KERNAL disk routines work without emulating a full 1541 drive internally.
 
+For a faster alternative that bypasses the serial protocol entirely, see the [CBM KERNAL HLE Plugin](README-CBM-HLE.md).
+
 ---
 
 ## 1. IEC Bus Basics

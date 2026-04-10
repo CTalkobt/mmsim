@@ -66,6 +66,12 @@ static void stubRegisterPane(const PluginPaneInfo*) {}
 static void stubRegisterCommand(const PluginCommandInfo*) {}
 static void stubRegisterMcpTool(const PluginMcpToolInfo*) {}
 
+#include "libdebug/main/observer_registry.h"
+
+static void hostRegisterObserver(ExecutionObserver* obs) {
+    ObserverRegistry::instance().registerObserver(obs);
+}
+
 static SimPluginHostAPI s_hostAPI = {
     hostLog,
     hostGetLogger,
@@ -79,7 +85,8 @@ static SimPluginHostAPI s_hostAPI = {
     hostCreateCartridgeHandler,
     stubRegisterPane,
     stubRegisterCommand,
-    stubRegisterMcpTool
+    stubRegisterMcpTool,
+    hostRegisterObserver
 };
 
 

@@ -1,12 +1,17 @@
 #include "virtual_iec.h"
 #include "libdevices/main/io_handler.h"
 #include "include/util/logging.h"
+#include <fstream>
+#include <iostream>
+#include <iterator>
+#include <cstdio>
 
 VirtualIECBus::VirtualIECBus(uint8_t deviceNumber)
-    : m_deviceNumber(deviceNumber), m_state(IDLE),
+    : m_deviceNumber(deviceNumber), m_state(IDLE), m_nextState(IDLE),
       m_atnIn(false), m_clkIn(false), m_dataIn(false),
       m_clkOut(false), m_dataOut(false),
-      m_currentByte(0), m_bitCount(0), m_stateTimer(0), m_bufferIdx(0)
+      m_currentByte(0), m_bitCount(0), m_stateTimer(0), m_bufferIdx(0),
+      m_secondaryAddress(0), m_fileIdx(0), m_eof(false)
 {
 }
 
@@ -16,13 +21,8 @@ uint8_t VirtualIECBus::readPort() {
     bool dataBus = m_dataIn || m_dataOut;
 
     // C64 CIA2 Port A Mapping:
-    // bits 0-1: VIC-II Bank Select (read-back what was written?)
-    // bit 2: User Port
-    // bit 3: ATN OUT (Output only from Host)
-    // bit 4: CLK OUT (Output from Host)
-    // bit 5: DATA OUT (Output from Host)
-    // bit 6: CLK IN (Inverse of bus CLK)
-    // bit 7: DATA IN (Inverse of bus DATA)
+    // bit 3: ATN OUT, bit 4: CLK OUT, bit 5: DATA OUT
+    // bit 6: CLK IN (Inverse of bus CLK), bit 7: DATA IN (Inverse of bus DATA)
     
     uint8_t val = 0;
     if (clkBus) val |= (1 << 6);
@@ -38,12 +38,12 @@ void VirtualIECBus::writePort(uint8_t val) {
 }
 
 void VirtualIECBus::setDdr(uint8_t ddr) {
-    // We don't really care about DDR for the virtual device,
-    // as it's an external peripheral.
+    (void)ddr;
 }
 
 void VirtualIECBus::reset() {
     m_state = IDLE;
+    m_nextState = IDLE;
     m_atnIn = false;
     m_clkIn = false;
     m_dataIn = false;
@@ -52,29 +52,29 @@ void VirtualIECBus::reset() {
     m_currentByte = 0;
     m_bitCount = 0;
     m_stateTimer = 0;
+    m_fileIdx = 0;
+    m_eof = false;
+    m_secondaryAddress = 0;
+    m_filename.clear();
 }
 
 void VirtualIECBus::tick(uint64_t cycles) {
     m_stateTimer += cycles;
 
-    // Process up to two state transitions per tick so that, e.g., an
-    // IDLE→ATTENTION transition can immediately satisfy the ATTENTION timer
-    // with the same cycle count.
     for (int pass = 0; pass < 2; ++pass) {
         State before = m_state;
         switch (m_state) {
             case IDLE:
                 if (m_atnIn) {
                     m_state = ATTENTION;
-                    // Do NOT reset m_stateTimer here: the cycles already
-                    // accumulated this tick count towards the ATN response delay.
                     m_dataOut = false;
                     m_clkOut = false;
+                    // Note: do NOT reset m_stateTimer here; cycles already spent
+                    // this tick count towards the ATN response timing.
                 }
                 break;
 
             case ATTENTION:
-                // Device pulls DATA low after ~2000 cycles to acknowledge ATN
                 if (m_stateTimer > 2000) {
                     m_dataOut = true;
                     m_state = ADDRESSING;
@@ -84,60 +84,96 @@ void VirtualIECBus::tick(uint64_t cycles) {
                 break;
 
             case ADDRESSING:
-                if (!m_atnIn) {
-                    m_state = IDLE;
-                    m_dataOut = false;
-                    break;
-                }
+                if (!m_atnIn) { m_state = IDLE; m_dataOut = false; break; }
                 handleBitTransfer();
                 if (m_bitCount == 8) {
                     processCommand(m_currentByte);
                     m_state = ACKNOWLEDGE;
                     m_dataOut = true;
-                    m_bitCount = 0;
-                    m_currentByte = 0;
                 }
                 break;
 
             case ACKNOWLEDGE:
                 if (!m_atnIn) {
                     m_dataOut = false;
-                    m_state = IDLE;
+                    m_state = m_nextState;
+                    m_bitCount = 0;
+                    m_currentByte = 0;
+                }
+                break;
+
+            case READY_TO_RECEIVE:
+                if (m_atnIn) { m_state = ATTENTION; m_stateTimer = 0; break; }
+                if (m_dataOut) {
+                    if (m_clkIn) m_dataOut = false;
+                } else {
+                    handleBitTransfer();
+                    if (m_bitCount == 8) {
+                        handleByteReceived(m_currentByte);
+                        m_bitCount = 0;
+                        m_currentByte = 0;
+                        m_dataOut = true;
+                    }
+                }
+                break;
+
+            case READY_TO_SEND:
+                if (m_atnIn) { m_state = ATTENTION; m_stateTimer = 0; break; }
+                if (!m_clkIn) {
+                    m_clkOut = true;
+                    m_currentByte = getNextByte();
+                    m_state = SENDING;
+                    m_bitCount = 0;
+                }
+                break;
+
+            case SENDING:
+                if (m_atnIn) { m_state = ATTENTION; m_stateTimer = 0; break; }
+                if (m_clkOut) {
+                    m_dataOut = (m_currentByte >> m_bitCount) & 1;
+                    m_clkOut = false;
+                } else {
+                    if (m_clkIn) {
+                        m_bitCount++;
+                        if (m_bitCount == 8) {
+                            m_state = READY_TO_SEND;
+                            m_clkOut = false;
+                        } else {
+                            m_clkOut = true;
+                        }
+                    }
                 }
                 break;
 
             default:
                 break;
         }
-        if (m_state == before) break; // no transition — stop early
+        if (m_state == before) break; 
     }
 }
 
 void VirtualIECBus::handleBitTransfer() {
-    // Standard IEC Bit transfer (Host is Talker, Device is Listener):
-    // 1. Host releases CLK (High/False).
-    // 2. Device pulls DATA (Low/True) to acknowledge "Ready for Bit".
-    // 3. Host pulls CLK (Low/True).
-    // 4. Host puts DATA bit on bus.
-    // 5. Host releases CLK (High/False).
-    // 6. Device samples DATA and releases DATA (Low/True -> High/False) to acknowledge "Got Bit".
-    
     static bool lastClkIn = false;
-    
-    // Simple state-less bit sampling for now (Level-based for 15.2 Level 2)
-    // In a real device, this would be more complex.
     if (!lastClkIn && m_clkIn) {
-        // CLK went High (released) -> Low (pulled)
-        // Wait, C64 logic: bit 4 = 1 means CLK pulled Low (True).
-        // So CLK transition 0 -> 1 is CLK going True.
-        
-        // Sample DATA bit (inverted logic)
         bool bit = m_dataIn;
         m_currentByte = (m_currentByte >> 1) | (bit ? 0x80 : 0x00);
         m_bitCount++;
     }
-    
     lastClkIn = m_clkIn;
+}
+
+void VirtualIECBus::handleByteReceived(uint8_t byte) {
+    if (m_secondaryAddress == 0 || m_secondaryAddress == 1) {
+        m_filename += (char)byte;
+    }
+}
+
+uint8_t VirtualIECBus::getNextByte() {
+    if (m_fileIdx < m_fileBuffer.size()) {
+        return m_fileBuffer[m_fileIdx++];
+    }
+    m_eof = true;
+    return 0;
 }
 
 void VirtualIECBus::processCommand(uint8_t cmd) {
@@ -146,29 +182,40 @@ void VirtualIECBus::processCommand(uint8_t cmd) {
 
     if (device == m_deviceNumber) {
         if (action == 0x20) { // LISTEN
-            m_state = READY_TO_RECEIVE;
+            m_nextState = READY_TO_RECEIVE;
+            m_filename.clear();
         } else if (action == 0x40) { // TALK
-            m_state = READY_TO_SEND;
+            m_nextState = READY_TO_SEND;
+            if (!m_filename.empty() && m_fileBuffer.empty()) {
+                mountDisk(m_deviceNumber, m_filename);
+            }
         } else if (action == 0x60) { // SECONDARY ADDRESS
-            // Handle secondary address
+            m_secondaryAddress = cmd & 0x0F;
         }
     } else {
-        // Not for us
-        if (action == 0x3F) { // UNLISTEN
-            m_state = IDLE;
-        } else if (action == 0x5F) { // UNTALK
-            m_state = IDLE;
+        if (cmd == 0x3F) { // UNLISTEN
+            m_nextState = IDLE;
+        } else if (cmd == 0x5F) { // UNTALK
+            m_nextState = IDLE;
         }
     }
 }
 
 bool VirtualIECBus::mountDisk(int unit, const std::string& path) {
     if (unit != m_deviceNumber) return false;
-    // Stub for now
+    std::ifstream file(path, std::ios::binary);
+    if (!file) return false;
+    m_fileBuffer.clear();
+    m_fileBuffer.assign((std::istreambuf_iterator<char>(file)),
+                        (std::istreambuf_iterator<char>()));
+    m_fileIdx = 0;
+    m_eof = m_fileBuffer.empty();
     return true;
 }
 
 void VirtualIECBus::ejectDisk(int unit) {
     if (unit != m_deviceNumber) return;
-    // Stub for now
+    m_fileBuffer.clear();
+    m_fileIdx = 0;
+    m_eof = true;
 }
