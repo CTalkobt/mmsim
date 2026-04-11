@@ -20,7 +20,8 @@
           "clockHz": 985248,
           "portAWriteCallback": "vic2_bank_select", "bankSelectTarget": "VIC-II" },
         { "type": "kbd_c64",          "name": "Keyboard", "baseAddr": null },
-        { "type": "datasette",          "name": "Tape",     "baseAddr": null }
+        { "type": "datasette",          "name": "Tape",     "baseAddr": null },
+        { "type": "virtual_iec",      "name": "Drive8",   "baseAddr": null }
       ],
       "roms": [
         { "label": "basic",  "path": "roms/c64/basic.bin",  "size": 8192,
@@ -57,6 +58,10 @@
         "device": "Keyboard",
         "colPort": { "device": "CIA1", "port": "A" },
         "rowPort": { "device": "CIA1", "port": "B" }
+      },
+      "iecWiring": {
+        "device": "Drive8",
+        "busPort": { "device": "CIA2", "port": "A" }
       },
       "scheduler": { "type": "step_tick", "frameAccumulator": null }
     }

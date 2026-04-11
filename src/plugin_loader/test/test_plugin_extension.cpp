@@ -96,6 +96,7 @@ TEST_CASE(plugin_extension_gui_logic) {
 
     const char* machines[] = {"vic20", nullptr};
     PluginPaneInfo info;
+    std::memset(&info, 0, sizeof(info));
     info.paneId = "vic-only-pane";
     info.displayName = "VIC-20 Tool";
     info.menuSection = "Tools";

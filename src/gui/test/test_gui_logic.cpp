@@ -38,6 +38,7 @@ TEST_CASE(plugin_pane_manager_logic) {
     const char* c64_ids[] = {"c64", nullptr};
 
     PluginPaneInfo universal;
+    std::memset(&universal, 0, sizeof(universal));
     universal.paneId = "universal_pane";
     universal.machineIds = nullptr; // All machines
     universal.createPane = createUniversal;
@@ -47,6 +48,7 @@ TEST_CASE(plugin_pane_manager_logic) {
     universal.ctx = nullptr;
 
     PluginPaneInfo c64_only;
+    std::memset(&c64_only, 0, sizeof(c64_only));
     c64_only.paneId = "c64_pane";
     c64_only.machineIds = c64_ids;
     c64_only.createPane = createC64;

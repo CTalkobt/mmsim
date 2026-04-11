@@ -42,9 +42,11 @@ static void ensureRegistriesReady() {
 static Datasette* findTape(MachineDescriptor* desc) {
     std::vector<IOHandler*> handlers;
     desc->ioRegistry->enumerate(handlers);
-    for (auto* h : handlers)
-        if (std::string(h->name()) == "Tape")
+    for (auto* h : handlers) {
+        const char* name = h->name();
+        if (name && std::string(name) == "Tape")
             return static_cast<Datasette*>(h);
+    }
     return nullptr;
 }
 

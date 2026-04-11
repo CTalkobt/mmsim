@@ -31,7 +31,7 @@ typedef struct IOHandler IOHandler;
 typedef struct IImageLoader IImageLoader;
 typedef struct ICartridgeHandler ICartridgeHandler;
 typedef struct ExecutionObserver ExecutionObserver;
-struct MachineDescriptor;
+typedef struct MachineDescriptor MachineDescriptor;
 #endif
 
 /**

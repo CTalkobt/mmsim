@@ -6,10 +6,6 @@
 #include <vector>
 #include <cstdint>
 
-/**
- * Virtual IEC Bus Device (e.g. Unit 8).
- * Implements Level 2 (protocol-level) IEC serial bus emulation.
- */
 class VirtualIECBus : public IPortDevice, public IOHandler {
 public:
     enum State {
@@ -17,63 +13,74 @@ public:
         ATTENTION,
         ADDRESSING,
         ACKNOWLEDGE,
-        READY_TO_RECEIVE,
-        RECEIVING,
-        READY_TO_SEND,
-        SENDING,
+        LISTENING,
+        TALKING_WAIT,
+        TALKING,
         ERROR
     };
 
     VirtualIECBus(uint8_t deviceNumber = 8);
     virtual ~VirtualIECBus() {}
 
-    // IOHandler interface
-    const char* name() const override { return "VirtualIEC"; }
-    uint32_t baseAddr() const override { return 0; }
-    uint32_t addrMask() const override { return 0; }
-    bool ioRead(IBus*, uint32_t, uint8_t*) override { return false; }
-    bool ioWrite(IBus*, uint32_t, uint8_t) override { return false; }
-    void reset() override;
-    void tick(uint64_t cycles) override;
-
-    // IPortDevice interface
     uint8_t readPort() override;
     void writePort(uint8_t val) override;
     void setDdr(uint8_t ddr) override;
 
-    // Disk/Image management
+    const char* name() const override { return "VirtualIEC"; }
+    uint32_t baseAddr() const override { return 0; }
+    uint32_t addrMask() const override { return 0; }
+    bool ioRead(IBus* bus, uint32_t addr, uint8_t* val) override { return false; }
+    bool ioWrite(IBus* bus, uint32_t addr, uint8_t val) override { return false; }
+    void reset() override;
+    void tick(uint64_t cycles) override;
+
     bool mountDisk(int unit, const std::string& path) override;
     void ejectDisk(int unit) override;
+    bool getDiskStatus(int unit, int& track, int& sector, bool& led) override;
+    std::string getMountedDiskPath(int unit) override;
+
+    void setLogger(void* logger, void (*logFn)(void*, int, const char*)) {
+        m_logger = logger;
+        m_logNamed = logFn;
+    }
 
 private:
     uint8_t m_deviceNumber;
     State m_state;
     State m_nextState;
+    bool  m_isAddressed;
+    bool  m_expectAddressingByte;
+    bool  m_readyToSample;
 
-    // Signal state (Open-collector logic: 1 = Low/True, 0 = High/False)
     bool m_atnIn;
     bool m_clkIn;
     bool m_dataIn;
     bool m_clkOut;
     bool m_dataOut;
+    bool m_lastClkIn;
 
-    // Bit/Byte transfer state
     uint8_t m_currentByte;
     int m_bitCount;
     uint64_t m_stateTimer;
     
-    // Command/Data buffer
-    std::vector<uint8_t> m_buffer;
-    size_t m_bufferIdx;
     uint8_t m_secondaryAddress;
     std::string m_filename;
+    std::string m_mountedPath;
     std::vector<uint8_t> m_fileBuffer;
     size_t m_fileIdx;
-    bool m_eof;
+    bool m_isSendingDir;
 
-    void handleAttention();
+    int  m_track;
+    int  m_sector;
+    bool m_led;
+
+    void* m_logger = nullptr;
+    void (*m_logNamed)(void*, int, const char*) = nullptr;
+
     void handleBitTransfer();
     void handleByteReceived(uint8_t byte);
     uint8_t getNextByte();
     void processCommand(uint8_t cmd);
+    void generateDirectoryListing();
+    void log(const char* fmt, ...);
 };

@@ -22,6 +22,7 @@ public:
     bool onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) override;
     void onMemoryWrite(IBus* bus, uint32_t addr, uint8_t before, uint8_t after) override;
     void onMemoryRead(IBus* bus, uint32_t addr, uint8_t val) override;
+    void onMachineLoad(MachineDescriptor* desc) override;
 
     BreakpointList& breakpoints() { return m_breakpoints; }
     TraceBuffer&    trace()       { return m_trace; }

@@ -1,5 +1,7 @@
 #include "kernal_hle.h"
 #include "include/util/logging.h"
+#include "libcore/main/machine_desc.h"
+#include "libdevices/main/io_handler.h"
 #include <fstream>
 #include <iostream>
 #include <algorithm>
@@ -20,12 +22,30 @@ bool KernalHLE::onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
     if (!m_enabled) return true;
 
     // Check if we are at a known vector
-    if (entry.addr == 0xFFD5) {
-        handleLoad(cpu, bus);
-        return false; // Abort KERNAL's LOAD implementation
-    } else if (entry.addr == 0xFFD8) {
-        handleSave(cpu, bus);
-        return false; // Abort KERNAL's SAVE implementation
+    if (entry.addr == 0xFFD5 || entry.addr == 0xFFD8) {
+        uint8_t device = getDevice(cpu, bus);
+        
+        // If we have machine context, check if a physical device is handling this unit
+        if (m_currentMachine && m_currentMachine->ioRegistry) {
+            std::vector<IOHandler*> handlers;
+            m_currentMachine->ioRegistry->enumerate(handlers);
+            for (auto* h : handlers) {
+                int t, s;
+                bool led;
+                if (h->getDiskStatus(device, t, s, led)) {
+                    // A physical device (e.g. VirtualIEC) is handling this unit.
+                    // Do NOT intercept; let the KERNAL bit-bang to the device.
+                    return true; 
+                }
+            }
+        }
+
+        if (entry.addr == 0xFFD5) {
+            handleLoad(cpu, bus);
+        } else {
+            handleSave(cpu, bus);
+        }
+        return false; // Intercepted
     }
 
     return true;
@@ -62,16 +82,14 @@ void KernalHLE::handleLoad(ICore* cpu, IBus* bus) {
         // File not found
         setStatus(bus, 4); // 4 = File not found
         setCarry(cpu, true);
-        cpu->setPc(0xFFD5 + 1); // This is not quite right, we need to return from the call.
-        // Standard HLE: we intercepted at the call site or at the first instruction of the routine.
-        // If we intercepted at $FFD5 (the JMP in the jump table), we should simulate the routine and then RTS.
-        // But we don't know the return address easily without looking at the stack.
-        // Actually, $FFD5 is usually a JMP to the real routine.
-        // If the user did JSR $FFD5, the return address is on the stack.
-        // We can just set PC to the value popped from stack + 1.
-        // Or simpler: let the CPU execute the RTS.
-        // We can write an RTS to scratch memory and point PC there?
-        // No, let's just use the stack.
+        
+        // Simulate RTS
+        uint16_t sp = 0x0100 | ((cpu->regReadByName("SP") + 1) & 0xFF);
+        uint8_t lo = bus->read8(sp);
+        uint8_t hi = bus->read8(0x0100 | ((cpu->regReadByName("SP") + 2) & 0xFF));
+        uint16_t retAddr = (lo | (hi << 8)) + 1;
+        cpu->regWriteByName("SP", (uint8_t)((cpu->regReadByName("SP") + 2) & 0xFF));
+        cpu->setPc(retAddr);
         return;
     }
 
@@ -103,16 +121,26 @@ void KernalHLE::handleLoad(ICore* cpu, IBus* bus) {
     setStatus(bus, 0);
 
     // Simulate RTS
-    uint8_t lo = bus->read8(0x0100 + ((cpu->sp() + 1) & 0xFF));
-    uint8_t hi = bus->read8(0x0100 + ((cpu->sp() + 2) & 0xFF));
+    uint16_t sp = 0x0100 | ((cpu->regReadByName("SP") + 1) & 0xFF);
+    uint8_t lo = bus->read8(sp);
+    uint8_t hi = bus->read8(0x0100 | ((cpu->regReadByName("SP") + 2) & 0xFF));
     uint16_t retAddr = (lo | (hi << 8)) + 1;
-    cpu->regWriteByName("SP", (uint8_t)(cpu->sp() + 2));
+    cpu->regWriteByName("SP", (uint8_t)((cpu->regReadByName("SP") + 2) & 0xFF));
     cpu->setPc(retAddr);
 }
 
 void KernalHLE::handleSave(ICore* cpu, IBus* bus) {
     // Similar to LOAD
-    setCarry(cpu, true); // Not implemented yet
+    setStatus(bus, 5); // 5 = Device not present / Not implemented
+    setCarry(cpu, true);
+    
+    // Simulate RTS
+    uint16_t sp = 0x0100 | ((cpu->regReadByName("SP") + 1) & 0xFF);
+    uint8_t lo = bus->read8(sp);
+    uint8_t hi = bus->read8(0x0100 | ((cpu->regReadByName("SP") + 2) & 0xFF));
+    uint16_t retAddr = (lo | (hi << 8)) + 1;
+    cpu->regWriteByName("SP", (uint8_t)((cpu->regReadByName("SP") + 2) & 0xFF));
+    cpu->setPc(retAddr);
 }
 
 uint8_t KernalHLE::getDevice(ICore* cpu, IBus* bus) {

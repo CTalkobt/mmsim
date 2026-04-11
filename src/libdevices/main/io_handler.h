@@ -72,9 +72,6 @@ public:
     virtual bool saveTapeRecording(const std::string& path)  { return false; }
     virtual bool isTapeRecording() const                     { return false; }
 
-    virtual bool mountDisk(int unit, const std::string& path) { return false; }
-    virtual void ejectDisk(int unit)                          {}
-
     // -----------------------------------------------------------------------
     // Identity (pure virtual — every device must provide these)
     // -----------------------------------------------------------------------
@@ -115,4 +112,10 @@ public:
      * Tick the device forward. Called each CPU step or cycle.
      */
     virtual void tick(uint64_t cycles) = 0;
+
+    // Disk/Image management (optional overrides)
+    virtual bool mountDisk(int unit, const std::string& path) { return false; }
+    virtual void ejectDisk(int unit)                          {}
+    virtual bool getDiskStatus(int unit, int& track, int& sector, bool& led) { return false; }
+    virtual std::string getMountedDiskPath(int unit) { return ""; }
 };

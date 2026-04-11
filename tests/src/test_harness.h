@@ -66,3 +66,17 @@ inline int runAllTests() {
     std::cout << "Passed " << passed << " / " << cases.size() << " tests." << std::endl;
     return 0;
 }
+
+inline int runTest(const std::string& name) {
+    auto& cases = getTestCases();
+    for (auto& tc : cases) {
+        if (tc.name == name) {
+            std::cout << "Running test: " << name << std::endl;
+            tc.func();
+            std::cout << "Test passed." << std::endl;
+            return 0;
+        }
+    }
+    std::cerr << "Test not found: " << name << std::endl;
+    return 1;
+}

@@ -184,3 +184,56 @@ TEST_CASE(disk_image_loader) {
     
     fs::remove(path);
 }
+
+TEST_CASE(demo_disk_directory) {
+    std::string path = "tests/resources/1541-demo.d64";
+    if (!fs::exists(path)) {
+        std::cout << "Skipping demo_disk_directory: disk image not found." << std::endl;
+        return;
+    }
+
+    D64Parser parser;
+    ASSERT(parser.open(path));
+    
+    auto dir = parser.getDirectory();
+    ASSERT(!dir.empty());
+    
+    std::cout << "Directory of " << path << ":" << std::endl;
+    for (const auto& entry : dir) {
+        std::cout << "  " << entry.filename << " (" << entry.sizeBlocks << " blocks)" << std::endl;
+    }
+}
+
+TEST_CASE(demo_disk_load_first) {
+    std::string path = "tests/resources/1541-demo.d64";
+    if (!fs::exists(path)) {
+        std::cout << "Skipping demo_disk_load_first: disk image not found." << std::endl;
+        return;
+    }
+
+    D64Parser parser;
+    ASSERT(parser.open(path));
+    
+    auto dir = parser.getDirectory();
+    ASSERT(!dir.empty());
+    
+    std::string firstFile = dir[0].filename;
+    std::cout << "Loading first file: " << firstFile << std::endl;
+    
+    std::vector<uint8_t> fileData;
+    ASSERT(parser.readFile(firstFile, fileData));
+    ASSERT(fileData.size() >= 2);
+    
+    uint16_t loadAddr = fileData[0] | (fileData[1] << 8);
+    std::cout << "  Load address: $" << std::hex << loadAddr << std::dec << std::endl;
+    std::cout << "  Size: " << (fileData.size() - 2) << " bytes" << std::endl;
+    
+    FlatMemoryBus bus("test", 16);
+    DiskImageLoader loader;
+    ASSERT(loader.load(path, &bus, nullptr));
+    
+    // Verify first few bytes of the program were loaded into the bus at loadAddr
+    for (size_t i = 0; i < std::min((size_t)10, fileData.size() - 2); ++i) {
+        ASSERT(bus.read8(loadAddr + i) == fileData[i + 2]);
+    }
+}

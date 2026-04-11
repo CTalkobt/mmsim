@@ -11,6 +11,7 @@ public:
     virtual ~KernalHLE() {}
 
     bool onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) override;
+    void onMachineLoad(MachineDescriptor* desc) override { m_currentMachine = desc; }
 
     void setHostPath(const std::string& path) { m_hostPath = path; }
     const std::string& getHostPath() const { return m_hostPath; }
@@ -27,6 +28,7 @@ private:
     bool m_enabled;
     std::string m_hostPath;
     std::map<std::string, Vectors> m_machineVectors;
+    MachineDescriptor* m_currentMachine = nullptr;
 
     void handleLoad(ICore* cpu, IBus* bus);
     void handleSave(ICore* cpu, IBus* bus);

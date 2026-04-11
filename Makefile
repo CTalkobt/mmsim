@@ -130,7 +130,10 @@ PLUGIN_POKEY_SRCS = src/plugins/devices/pokey/main/pokey.cpp \
 	src/plugins/devices/pokey/main/plugin_init.cpp
 
 PLUGIN_VIRTUALIEC_SRCS = src/plugins/devices/virtual_iec/main/virtual_iec.cpp \
-	src/plugins/devices/virtual_iec/main/plugin_init.cpp
+	src/plugins/devices/virtual_iec/main/plugin_init.cpp \
+	src/plugins/cbm-loader/main/d64_parser.cpp \
+	src/plugins/cbm-loader/main/t64_parser.cpp \
+	src/plugins/cbm-loader/main/g64_parser.cpp
 
 GUI_SRCS = src/gui/main/main.cpp \
 	src/gui/main/machine_selector.cpp \
@@ -145,6 +148,7 @@ GUI_SRCS = src/gui/main/main.cpp \
 	src/gui/main/machine_inspector_pane.cpp \
 	src/gui/main/screen_pane.cpp \
         src/gui/main/tape_pane.cpp \
+        src/gui/main/drive_status_pane.cpp \
 	src/gui/main/dialogs/memory_dialogs.cpp \
 	src/gui/main/dialogs/assemble_dialog.cpp \
 	src/gui/main/dialogs/image_dialogs.cpp \
@@ -198,7 +202,8 @@ TEST_SRCS = tests/src/test_main.cpp \
 	src/plugins/devices/cia6526/test/test_cia6526.cpp \
 	src/plugins/devices/virtual_iec/test/test_virtual_iec.cpp \
 	src/plugins/cbm-hle/test/test_kernal_hle.cpp \
-	tests/src/test_cbm_disk_images.cpp
+	tests/src/test_cbm_disk_images.cpp \
+	tests/src/test_plugin_validation.cpp
 
 LIBDEBUG_TEST_SRCS = src/libdebug/test/test_breakpoints.cpp
 LIBCORE_TEST_SRCS = src/libcore/test/test_c_compatibility.c

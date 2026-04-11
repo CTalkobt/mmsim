@@ -6,6 +6,8 @@
 #include "libmem/main/ibus.h"
 #include "libtoolchain/main/idisasm.h"
 
+struct MachineDescriptor;
+
 /**
  * Interface for observing CPU execution and memory events.
  */
@@ -20,6 +22,13 @@ public:
     virtual bool onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
         (void)cpu; (void)bus; (void)entry;
         return true;
+    }
+
+    /**
+     * Called whenever a new machine is loaded.
+     */
+    virtual void onMachineLoad(MachineDescriptor* desc) {
+        (void)desc;
     }
 
     /**
@@ -61,6 +70,12 @@ public:
             if (!obs->onStep(cpu, bus, entry)) cont = false;
         }
         return cont;
+    }
+
+    void onMachineLoad(MachineDescriptor* desc) override {
+        for (auto* obs : m_observers) {
+            obs->onMachineLoad(desc);
+        }
     }
 
     void onMemoryWrite(IBus* bus, uint32_t addr, uint8_t before, uint8_t after) override {

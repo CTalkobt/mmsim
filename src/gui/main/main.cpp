@@ -30,6 +30,7 @@
 #include "screen_pane.h"
 #include "tape_pane.h"
 #include "symbol_pane.h"
+#include "drive_status_pane.h"
 #include "include/util/logging.h"
 #include "gui_utils.h"
 #include <fstream>
@@ -328,6 +329,26 @@ static void onTapeMachineLoad(void* paneHandle, MachineDescriptor* desc, void* /
     pane->SetTapeDevice(tape);
 }
 
+static void* createDrivePane(void* parentHandle, void* /*ctx*/) {
+    auto* parent = static_cast<wxWindow*>(parentHandle);
+    auto* pane = new DriveStatusPane(parent);
+    return static_cast<void*>(pane);
+}
+
+static void onDriveMachineLoad(void* paneHandle, MachineDescriptor* desc, void* /*ctx*/) {
+    auto* pane = static_cast<DriveStatusPane*>(paneHandle);
+    pane->SetMachine(desc);
+}
+
+static void refreshDrivePane(void* paneHandle, uint64_t /*cycles*/, void* /*ctx*/) {
+    static_cast<DriveStatusPane*>(paneHandle)->RefreshStatus();
+}
+
+static PluginPaneInfo s_builtInDrivePane = {
+    "drive", "Drive Status", "Tools", nullptr,
+    createDrivePane, nullptr, refreshDrivePane, onDriveMachineLoad, nullptr
+};
+
 static PluginPaneInfo s_builtInTapePane = {
     "tape", "Tape Control", "Tools", nullptr,
     createTapePane, nullptr, nullptr, onTapeMachineLoad, nullptr
@@ -349,6 +370,7 @@ public:
         });
         PluginPaneManager::instance().registerPane(&s_builtInScreenPane);
         PluginPaneManager::instance().registerPane(&s_builtInTapePane);
+        PluginPaneManager::instance().registerPane(&s_builtInDrivePane);
         PluginLoader::instance().loadFromDir("./lib");
         auto *frame = new MmemuFrame();
         frame->Show(true);
@@ -536,6 +558,7 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             m_dbg = new DebugContext(m_cpu, m_machine->buses[0].bus);
             m_cpu->setObserver(m_dbg);
             m_machine->buses[0].bus->setObserver(m_dbg);
+            m_dbg->onMachineLoad(m_machine);
 
             for (const auto& path : m_machine->symbolFiles) {
                 m_dbg->symbols().loadSym(path);

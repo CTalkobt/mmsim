@@ -97,6 +97,7 @@ static MachineState* getMachine(const std::string& id) {
         ms.dbg = new DebugContext(ms.cpu, ms.bus);
         ms.cpu->setObserver(ms.dbg);
         ms.bus->setObserver(ms.dbg);
+        ms.dbg->onMachineLoad(desc);
         if (ms.disasm && ms.dbg) ms.disasm->setSymbolTable(&ms.dbg->symbols());
 
         g_machines[id] = std::move(ms);
@@ -197,6 +198,28 @@ Json handleDescribe() {
     Json mtReq(Json::ARR); mtReq.push_back(Json("machine_id")); mtReq.push_back(Json("path"));
     mtSchema.oVal["required"] = mtReq;
     addTool("mount_tape", "Mount a .tap image into the datasette", mtSchema);
+
+    Json mdSchema(Json::OBJ);
+    mdSchema.oVal["type"] = Json("object");
+    Json mdProps(Json::OBJ);
+    mdProps.oVal["machine_id"] = midProp;
+    Json unitProp(Json::OBJ); unitProp.oVal["type"] = Json("integer");
+    mdProps.oVal["unit"] = unitProp;
+    mdProps.oVal["path"] = pathProp;
+    mdSchema.oVal["properties"] = mdProps;
+    Json mdReq(Json::ARR); mdReq.push_back(Json("machine_id")); mdReq.push_back(Json("unit")); mdReq.push_back(Json("path"));
+    mdSchema.oVal["required"] = mdReq;
+    addTool("mount_disk", "Mount a disk image into a drive unit", mdSchema);
+
+    Json edSchema(Json::OBJ);
+    edSchema.oVal["type"] = Json("object");
+    Json edProps(Json::OBJ);
+    edProps.oVal["machine_id"] = midProp;
+    edProps.oVal["unit"] = unitProp;
+    edSchema.oVal["properties"] = edProps;
+    Json edReq(Json::ARR); edReq.push_back(Json("machine_id")); edReq.push_back(Json("unit"));
+    edSchema.oVal["required"] = edReq;
+    addTool("eject_disk", "Eject a disk image from a drive unit", edSchema);
 
     Json ctSchema(Json::OBJ);
     ctSchema.oVal["type"] = Json("object");
@@ -659,6 +682,49 @@ Json handleToolsCall(const Json& params) {
                 textItem.oVal["text"] = Json("Error: No datasette found in machine");
                 textItem.oVal["isError"] = Json(true);
             }
+        }
+    } else if (name == "mount_disk") {
+        std::string mid = args["machine_id"].sVal;
+        int unit = (int)args["unit"].nVal;
+        std::string path = args["path"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            bool handled = false;
+            if (ms->machine->ioRegistry) {
+                std::vector<IOHandler*> handlers;
+                ms->machine->ioRegistry->enumerate(handlers);
+                for (auto* h : handlers) {
+                    if (h->mountDisk(unit, path)) {
+                        textItem.oVal["text"] = Json("Mounted disk '" + path + "' on unit " + std::to_string(unit));
+                        handled = true;
+                        break;
+                    }
+                }
+            }
+            if (!handled) {
+                textItem.oVal["text"] = Json("Error: Failed to mount disk on unit " + std::to_string(unit));
+                textItem.oVal["isError"] = Json(true);
+            }
+        }
+    } else if (name == "eject_disk") {
+        std::string mid = args["machine_id"].sVal;
+        int unit = (int)args["unit"].nVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            if (ms->machine->ioRegistry) {
+                std::vector<IOHandler*> handlers;
+                ms->machine->ioRegistry->enumerate(handlers);
+                for (auto* h : handlers) {
+                    h->ejectDisk(unit);
+                }
+            }
+            textItem.oVal["text"] = Json("Ejected disk from unit " + std::to_string(unit));
         }
     } else if (name == "control_tape") {
         std::string mid = args["machine_id"].sVal;

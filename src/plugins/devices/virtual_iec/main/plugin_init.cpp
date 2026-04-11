@@ -1,8 +1,14 @@
 #include "mmemu_plugin_api.h"
 #include "virtual_iec.h"
 
+static const SimPluginHostAPI* g_host = nullptr;
+
 static IOHandler* createVirtualIEC() {
-    return new VirtualIECBus(8);
+    auto* iec = new VirtualIECBus(8);
+    if (g_host && g_host->getLogger && g_host->logNamed) {
+        iec->setLogger(g_host->getLogger("VirtualIEC"), g_host->logNamed);
+    }
+    return iec;
 }
 
 static DevicePluginInfo s_devices[] = {
@@ -25,6 +31,6 @@ static SimPluginManifest s_manifest = {
 };
 
 extern "C" SimPluginManifest* mmemuPluginInit(const SimPluginHostAPI* host) {
-    (void)host;
+    g_host = host;
     return &s_manifest;
 }

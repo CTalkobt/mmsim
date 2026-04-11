@@ -125,6 +125,7 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
                 m_ctx.dbg = new DebugContext(m_ctx.cpu, m_ctx.bus);
                 m_ctx.cpu->setObserver(m_ctx.dbg);
                 m_ctx.bus->setObserver(m_ctx.dbg);
+                m_ctx.dbg->onMachineLoad(md);
 
                 for (const auto& path : md->symbolFiles) {
                     m_ctx.dbg->symbols().loadSym(path);
@@ -462,6 +463,52 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
             }
         } else {
             m_output("Usage: tape <mount|play|stop|rewind|record|stoprecord|save>\n");
+        }
+    } else if (cmd == "disk") {
+        if (!m_ctx.machine) { m_output("No machine created.\n"); return; }
+        std::string sub;
+        if (ss >> sub) {
+            if (sub == "mount") {
+                int unit;
+                std::string path;
+                if (ss >> unit >> path) {
+                    if (m_ctx.machine->ioRegistry) {
+                        std::vector<IOHandler*> handlers;
+                        m_ctx.machine->ioRegistry->enumerate(handlers);
+                        bool handled = false;
+                        for (auto* handler : handlers) {
+                            if (handler->mountDisk(unit, path)) {
+                                m_output("Mounted disk '" + path + "' on unit " + std::to_string(unit) + "\n");
+                                handled = true;
+                                break;
+                            }
+                        }
+                        if (!handled) {
+                            m_output("Failed to mount disk on unit " + std::to_string(unit) + " (unit not found or mount failed)\n");
+                        }
+                    }
+                } else {
+                    m_output("Usage: disk mount <unit> <path>\n");
+                }
+            } else if (sub == "eject") {
+                int unit;
+                if (ss >> unit) {
+                    if (m_ctx.machine->ioRegistry) {
+                        std::vector<IOHandler*> handlers;
+                        m_ctx.machine->ioRegistry->enumerate(handlers);
+                        for (auto* handler : handlers) {
+                            handler->ejectDisk(unit);
+                        }
+                        m_output("Ejected disk from unit " + std::to_string(unit) + "\n");
+                    }
+                } else {
+                    m_output("Usage: disk eject <unit>\n");
+                }
+            } else {
+                m_output("Usage: disk <mount|eject>\n");
+            }
+        } else {
+            m_output("Usage: disk <mount|eject>\n");
         }
     } else if (cmd == "cart") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
@@ -830,6 +877,8 @@ void CliInterpreter::printHelp() {
              "  tape stoprecord     - Release Record button (stops capture, buffer retained)\n"
              "  tape save <path>    - Write captured buffer to a .tap file\n"
              "  (record/stoprecord/save: use together to save a program to tape)\n"
+             "  disk mount <unit> <path> - Mount a disk image\n"
+             "  disk eject <unit>        - Eject a disk image\n"
              "  eject            - Eject currently attached cartridge\n"
              "  run [addr]       - Run from address (or last loaded address)\n"
              "  sym <add|del|list|search|load|clear> - Symbol table management\n"

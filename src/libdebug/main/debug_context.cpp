@@ -182,6 +182,12 @@ void DebugContext::onMemoryRead(IBus* bus, uint32_t addr, uint8_t val) {
     }
 }
 
+void DebugContext::onMachineLoad(MachineDescriptor* desc) {
+    for (auto* obs : ObserverRegistry::instance().observers()) {
+        obs->onMachineLoad(desc);
+    }
+}
+
 int DebugContext::saveSnapshot(const std::string& label) {
     SystemSnapshot snap;
     snap.label = label;
