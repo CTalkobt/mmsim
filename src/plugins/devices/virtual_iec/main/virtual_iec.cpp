@@ -28,8 +28,6 @@ uint8_t VirtualIECBus::readPort() {
     if (!clkBus) val |= (1 << 6);
     if (!dataBus) val |= (1 << 7);
     if (!m_atnIn) val |= (1 << 3);
-    log("readPort(%p): clkIn=%d clkOut=%d dataIn=%d dataOut=%d atnIn=%d -> %02x state=%d",
-        (void*)this, (int)m_clkIn, (int)m_clkOut, (int)m_dataIn, (int)m_dataOut, (int)m_atnIn, val, (int)m_state);
     return val;
 }
 
@@ -51,19 +49,6 @@ void VirtualIECBus::reset() {
     m_filename.clear(); m_track = 0; m_sector = 0; m_led = false;
 }
 
-static const char* stateName(VirtualIECBus::State s) {
-    switch (s) {
-        case VirtualIECBus::IDLE:         return "IDLE";
-        case VirtualIECBus::ATTENTION:    return "ATTENTION";
-        case VirtualIECBus::ADDRESSING:   return "ADDRESSING";
-        case VirtualIECBus::ACKNOWLEDGE:  return "ACKNOWLEDGE";
-        case VirtualIECBus::LISTENING:    return "LISTENING";
-        case VirtualIECBus::TALKING_WAIT: return "TALKING_WAIT";
-        case VirtualIECBus::TALKING:      return "TALKING";
-        default:                          return "UNKNOWN";
-    }
-}
-
 void VirtualIECBus::log(const char* fmt, ...) {
     char buf[256]; va_list args; va_start(args, fmt);
     vsnprintf(buf, sizeof(buf), fmt, args); va_end(args);
@@ -77,16 +62,16 @@ void VirtualIECBus::log(const char* fmt, ...) {
 
 void VirtualIECBus::tick(uint64_t cycles) {
     m_stateTimer += cycles;
-    State before = m_state;
     switch (m_state) {
         case IDLE:
             if (m_atnIn) { m_state = ATTENTION; m_dataOut = true; m_stateTimer = 0; }
             break;
         case ATTENTION:
-            if (m_stateTimer > 1000 && !m_clkIn) {
-                m_dataOut = false; // Release acknowledgment
+            // Hold DATA low as ATN acknowledge. Transition to ADDRESSING
+            // when host starts clocking bits (CLK pulled).
+            if (m_stateTimer > 1000 && m_clkIn) {
                 m_state = ADDRESSING; m_bitCount = 0; m_currentByte = 0;
-                m_stateTimer = 0; m_lastClkIn = m_clkIn; m_readyToSample = false;
+                m_stateTimer = 0; m_lastClkIn = m_clkIn; m_readyToSample = true;
             }
             break;
         case ADDRESSING:
@@ -130,7 +115,6 @@ void VirtualIECBus::tick(uint64_t cycles) {
             if (m_readyToSample && !m_clkIn) {
                 m_state = TALKING; m_bitCount = 0; m_currentByte = getNextByte();
                 m_clkOut = true; m_dataOut = ((m_currentByte >> 0) & 1); m_stateTimer = 0;
-                log("TALKING: Start sending byte %02X (%p clkOut=%d dataOut=%d clkIn=%d)", m_currentByte, (void*)this, (int)m_clkOut, (int)m_dataOut, (int)m_clkIn);
             }
             break;
         case TALKING:
@@ -138,25 +122,21 @@ void VirtualIECBus::tick(uint64_t cycles) {
             if (m_clkOut) {
                 if (m_stateTimer > 500) {
                     m_clkOut = false; m_stateTimer = 0;
-                    log("TALKING: Released CLK for bit %d", m_bitCount);
                 }
             } else {
                 if (m_stateTimer > 500) {
                     m_bitCount++;
                     if (m_bitCount == 8) {
                         m_state = TALKING_WAIT; m_readyToSample = m_clkIn;
-                        log("TALKING: Byte finished");
                     } else {
                         m_clkOut = true; m_dataOut = ((m_currentByte >> m_bitCount) & 1);
                         m_stateTimer = 0;
-                        log("TALKING: Pulled CLK for bit %d (data=%d)", m_bitCount, m_dataOut);
                     }
                 }
             }
             break;
         default: break;
     }
-    if (m_state != before) log("%s -> %s", stateName(before), stateName(m_state));
     m_led = (m_state != IDLE);
 }
 
@@ -178,14 +158,12 @@ uint8_t VirtualIECBus::getNextByte() {
 
 void VirtualIECBus::processCommand(uint8_t cmd) {
     uint8_t device = cmd & 0x1F, action = cmd & 0xE0;
-    log("IEC CMD: %02X (A=%02X, D=%02X, Addressed=%d)", cmd, action, device, m_isAddressed);
-    
+
     if (action == 0x20) { // LISTEN
         if (device == m_deviceNumber) {
             m_isAddressed = true;
             m_nextState = LISTENING;
             m_filename.clear();
-            log("Device %d LISTEN", m_deviceNumber);
         } else {
             m_isAddressed = false;
         }
@@ -193,7 +171,6 @@ void VirtualIECBus::processCommand(uint8_t cmd) {
         if (device == m_deviceNumber) {
             m_isAddressed = true;
             m_nextState = TALKING_WAIT;
-            log("Device %d TALK", m_deviceNumber);
             if (m_filename == "$" || m_filename == "*") generateDirectoryListing();
             else if (!m_filename.empty()) {
                 std::string ext = m_mountedPath.substr(m_mountedPath.find_last_of('.') + 1);
@@ -208,16 +185,13 @@ void VirtualIECBus::processCommand(uint8_t cmd) {
     } else if (action == 0x60) { // SECONDARY ADDRESS
         if (m_isAddressed) {
             m_secondaryAddress = cmd & 0x0F;
-            log("Device %d SECONDARY %d", m_deviceNumber, m_secondaryAddress);
         }
     } else if (cmd == 0x3F) { // UNLISTEN
         if (m_nextState == LISTENING) m_nextState = IDLE;
         m_isAddressed = false;
-        log("UNLISTEN");
     } else if (cmd == 0x5F) { // UNTALK
         if (m_nextState == TALKING_WAIT || m_nextState == TALKING) m_nextState = IDLE;
         m_isAddressed = false;
-        log("UNTALK");
     }
 }
 
@@ -229,7 +203,10 @@ bool VirtualIECBus::mountDisk(int unit, const std::string& path) {
 void VirtualIECBus::ejectDisk(int unit) { if (unit == m_deviceNumber) { m_mountedPath.clear(); m_fileBuffer.clear(); } }
 bool VirtualIECBus::getDiskStatus(int unit, int& t, int& s, bool& led) {
     if (unit != m_deviceNumber) return false;
-    t = 18; s = 0; led = m_led; return true;
+    t = m_mountedPath.empty() ? 0 : 18;
+    s = 0;
+    led = m_led;
+    return true;
 }
 std::string VirtualIECBus::getMountedDiskPath(int unit) { return (unit == m_deviceNumber) ? m_mountedPath : ""; }
 

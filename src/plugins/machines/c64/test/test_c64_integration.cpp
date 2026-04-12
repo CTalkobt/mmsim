@@ -12,8 +12,7 @@
 
 TEST_CASE(c64_iec_directory_load) {
     VirtualIECBus iec(8);
-    fprintf(stderr, "TEST iec @ %p\n", (void*)&iec);
-    
+
     std::string path = "tests/resources/1541-demo.d64";
     ASSERT(iec.mountDisk(8, path));
 
@@ -95,17 +94,11 @@ TEST_CASE(c64_iec_directory_load) {
     writeBus(0x00); // Release CLK (Start)
     iec.tick(500);
 
-    static int rbCall = 0;
     auto readByte = [&]() -> uint8_t {
-        int call = ++rbCall;
         uint8_t byte = 0;
         for (int i = 0; i < 8; ++i) {
             int timeout = 5000;
-            fprintf(stderr, "[RB%d] bit%d pre-loop port=%02x\n", call, i, readBus());
             while ((readBus() & 0x40) != 0 && --timeout > 0) iec.tick(100);
-            uint8_t portNow = readBus();
-            fprintf(stderr, "[RB%d] bit%d CLK-low t=%d port=%02x clk=%d data=%d\n",
-                call, i, timeout, portNow, (portNow>>6)&1, (portNow>>7)&1);
             ASSERT(timeout > 0);
             if (!(readBus() & 0x80)) byte |= (1 << i);
             timeout = 5000;
@@ -113,10 +106,7 @@ TEST_CASE(c64_iec_directory_load) {
             ASSERT(timeout > 0);
         }
         writeBus(0x10); // Host ACK byte
-        iec.tick(1000);
         writeBus(0x00); // Host ready for next
-        iec.tick(1000);
-        fprintf(stderr, "[RB%d] after ACK port=%02x\n", call, readBus());
         return byte;
     };
 
