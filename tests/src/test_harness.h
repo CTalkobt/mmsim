@@ -53,6 +53,14 @@ struct TestRegistrar {
 #define EXPECT_TRUE(expr)   ASSERT(expr)
 #define EXPECT_EQ(a, b)     ASSERT_EQ(a, b)
 
+#define EXPECT_NEAR(a, b, delta) \
+    if (std::abs((a) - (b)) > (delta)) { \
+        std::cerr << "Assertion failed: abs(" << #a << " - " << #b << ") <= " << #delta \
+                  << " (val=" << (a) << ", expected=" << (b) << ")" \
+                  << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+        exit(1); \
+    }
+
 inline int runAllTests() {
     int passed = 0;
     auto& cases = getTestCases();

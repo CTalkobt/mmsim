@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0-dev] - 2026-04-11
+
+### Added
+- **Engineering Calculator** (GUI):
+    - Pop-up modal calculator accessible via **Tools > Calculator** (**Ctrl-Shift-C**).
+    - **28-Button Dynamic Layout**: Key labels and functions adapt automatically based on the selected numerical base.
+    - Supports **Floating Point** and **Integer** modes.
+    - Supports **Hex**, **Decimal**, **Binary**, and **Octal** bases with automatic formatting.
+    - Features **8 persistent memory slots** (`Rcl0`-`Rcl7`) and an `Ans` button for result recall.
+    - **Direct Keyboard Entry**: The display field is editable, allowing manual typing of complex expressions.
+    - Comprehensive function support: `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `sqrt`, `log`, `exp`, `abs`, `^`, `<<`, `>>`, and bitwise complements.
+- **Enhanced Expression Evaluator**:
+    - Refactored `ExpressionEvaluator` to use `double` precision for all internal math.
+    - Added support for bitwise shift operators (`<<`, `>>`).
+    - Added support for power operator (`^`).
+    - Integrated library of math functions: `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `sqrt`, `log` (log10), `exp`, `abs`, and `between(n, val, delta)`.
+    - Added `defaultBase` support to allow parsing literals without prefixes (e.g., `ffd2` in hex mode).
+
+### Fixed
+- **Expression Parsing**: Resolved issue where hex literals like `ffd2` were rejected in Hex mode because they were interpreted as invalid decimals. The evaluator now respects the context-provided default base.
+- **UI Layout**: Fixed status line overflow in the calculator dialog by expanding the minimum width and optimizing sizer alignment.
+
 ## [0.5.0-dev] - 2026-04-09
 
 ### Added

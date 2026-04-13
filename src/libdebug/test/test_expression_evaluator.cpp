@@ -3,6 +3,7 @@
 #include "libdebug/main/debug_context.h"
 #include "plugins/6502/main/cpu6502.h"
 #include "libmem/main/memory_bus.h"
+#include <cmath>
 
 TEST_CASE(expression_evaluator_literals) {
     uint32_t res;
@@ -17,6 +18,10 @@ TEST_CASE(expression_evaluator_literals) {
     EXPECT_TRUE(ExpressionEvaluator::evaluate("%10101010", nullptr, res));
     EXPECT_EQ(res, 0xAA);
     
+    // Octal
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("0777", nullptr, res, 8));
+    EXPECT_EQ(res, 0777);
+
     // Decimal
     EXPECT_TRUE(ExpressionEvaluator::evaluate("1234", nullptr, res));
     EXPECT_EQ(res, 1234);
@@ -45,6 +50,10 @@ TEST_CASE(expression_evaluator_arithmetic) {
     EXPECT_TRUE(ExpressionEvaluator::evaluate("$1000 - $10", nullptr, res));
     EXPECT_EQ(res, 0x0FF0);
     
+    // Multiplication
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("10 * 20", nullptr, res));
+    EXPECT_EQ(res, 200);
+
     // Chained
     EXPECT_TRUE(ExpressionEvaluator::evaluate("100 + 50 - 10", nullptr, res));
     EXPECT_EQ(res, 140);
@@ -62,14 +71,23 @@ TEST_CASE(expression_evaluator_arithmetic) {
     // Precedence: 10 + 20 / 2 => 10 + (20 / 2) = 20
     EXPECT_TRUE(ExpressionEvaluator::evaluate("10 + 20 / 2", nullptr, res));
     EXPECT_EQ(res, 20);
+
+    // Bitwise shifts
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("1 << 4", nullptr, res));
+    EXPECT_EQ(res, 16);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("32 >> 2", nullptr, res));
+    EXPECT_EQ(res, 8);
+
+    // Power
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("2 ^ 8", nullptr, res));
+    EXPECT_EQ(res, 256);
 }
 
 TEST_CASE(expression_evaluator_parentheses) {
     uint32_t res;
     
-    EXPECT_TRUE(ExpressionEvaluator::evaluate("(10 + 20) * 0 + 5", nullptr, res)); // We don't have * yet, but let's see
-    // Wait, I didn't add *. Let me check my binOps.
-    // I only added +, -, &, |, ==, !=, <=, >=, <, >.
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("(10 + 20) * 2", nullptr, res));
+    EXPECT_EQ(res, 60);
     
     EXPECT_TRUE(ExpressionEvaluator::evaluate("(10 + 20) - 5", nullptr, res));
     EXPECT_EQ(res, 25);
@@ -79,6 +97,85 @@ TEST_CASE(expression_evaluator_parentheses) {
     
     EXPECT_TRUE(ExpressionEvaluator::evaluate("((1 + 2) + 3)", nullptr, res));
     EXPECT_EQ(res, 6);
+}
+
+TEST_CASE(expression_evaluator_floating_point) {
+    double res;
+    
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("3.14159", nullptr, res));
+    EXPECT_NEAR(res, 3.14159, 0.00001);
+    
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("1.5 * 2", nullptr, res));
+    EXPECT_NEAR(res, 3.0, 0.00001);
+
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("10 / 4.0", nullptr, res));
+    EXPECT_NEAR(res, 2.5, 0.00001);
+}
+
+TEST_CASE(expression_evaluator_functions) {
+    double res;
+    
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("abs(-5.5)", nullptr, res));
+    EXPECT_NEAR(res, 5.5, 0.00001);
+
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("sqrt(16)", nullptr, res));
+    EXPECT_NEAR(res, 4.0, 0.00001);
+
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("sin(0)", nullptr, res));
+    EXPECT_NEAR(res, 0.0, 0.00001);
+
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("cos(0)", nullptr, res));
+    EXPECT_NEAR(res, 1.0, 0.00001);
+
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("log(100)", nullptr, res));
+    EXPECT_NEAR(res, 2.0, 0.00001);
+
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("exp(1)", nullptr, res));
+    EXPECT_NEAR(res, std::exp(1.0), 0.00001);
+}
+
+TEST_CASE(expression_evaluator_between) {
+    double res;
+    
+    // In range
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("between(10, 10, 1)", nullptr, res));
+    EXPECT_EQ(res, 1.0);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("between(10.5, 10, 1)", nullptr, res));
+    EXPECT_EQ(res, 1.0);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("between(9.5, 10, 1)", nullptr, res));
+    EXPECT_EQ(res, 1.0);
+
+    // Out of range
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("between(11.1, 10, 1)", nullptr, res));
+    EXPECT_EQ(res, 0.0);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("between(8.9, 10, 1)", nullptr, res));
+    EXPECT_EQ(res, 0.0);
+
+    // Symbols
+    FlatMemoryBus bus("test", 16);
+    MOS6502 cpu;
+    DebugContext dbg(&cpu, &bus);
+    dbg.symbols().addSymbol(0x1234, "start");
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("between(start, $1230, 10)", &dbg, res));
+    EXPECT_EQ(res, 1.0);
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("between(start, $1200, 10)", &dbg, res));
+    EXPECT_EQ(res, 0.0);
+}
+
+TEST_CASE(expression_evaluator_default_base) {
+    uint32_t res;
+    
+    // Hex without prefix
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("ffd2", nullptr, res, 16));
+    EXPECT_EQ(res, 0xFFD2);
+
+    // Binary without prefix
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("1010", nullptr, res, 2));
+    EXPECT_EQ(res, 10);
+
+    // Octal without prefix
+    EXPECT_TRUE(ExpressionEvaluator::evaluate("777", nullptr, res, 8));
+    EXPECT_EQ(res, 0777);
 }
 
 TEST_CASE(expression_evaluator_unary) {

@@ -70,11 +70,12 @@ A single plugin module can provide multiple resources, which are automatically r
 **mmsim** features a robust expression evaluator and symbol management system integrated into all targets.
 
 ### 4.1 Expression Evaluator
-Anywhere an address or value is required (CLI, GUI dialogs, MCP), you can use complex expressions:
+Anywhere an address or value is required (CLI, GUI dialogs, MCP, Calculator), you can use complex expressions:
 - **Literal Formats**:
     - **Hex**: `$1000` or `0x1000`. (No space allowed after prefix)
     - **Binary**: `%10101010`. (No space allowed after prefix)
-    - **Decimal**: `4096`.
+    - **Octal**: `0777`.
+    - **Decimal**: `4096` or `3.14159`.
     - **Character**: `'a'` (returns ASCII 97). Supports escape sequences: `\n`, `\r`, `\t`, `\\`, `\'`.
 - **Symbols**: Use any defined label (e.g., `CHROUT`, `start_vector`).
 - **Registers**: Use current CPU register names directly (e.g., `PC + 2`, `A`, `X`, `Y`, `P`).
@@ -85,13 +86,25 @@ Anywhere an address or value is required (CLI, GUI dialogs, MCP), you can use co
     - `>`: Low byte of result (e.g., `>$1234` is `$34`).
     - `!`: Logical negation (0 if non-zero, 1 if zero).
 - **Binary Operators** (in order of precedence):
+    - `^`: Power (exponentiation).
     - `*`, `/`, `%`: Multiplication, Division, Modulus.
         - *Note*: Modulus `%` requires a space or parenthesis if the following operand starts with `0` or `1` (to distinguish from a binary literal).
     - `+`, `-`: Addition, Subtraction.
+    - `<<`, `>>`: Bitwise Left and Right shift.
     - `&`: Bitwise AND.
     - `|`: Bitwise OR.
     - `==`, `!=`, `<`, `>`, `<=`, `>=`: Comparisons (return 1 for true, 0 for false).
+- **Functions**:
+    - `sin(x)`, `cos(x)`, `tan(x)`: Trigonometric functions (radians).
+    - `asin(x)`, `acos(x)`, `atan(x)`: Inverse trigonometric functions.
+    - `sqrt(x)`: Square root.
+    - `log(x)`: Base-10 logarithm.
+    - `exp(x)`: Base-e exponential ($e^x$).
+    - `abs(x)`: Absolute value.
+    - `between(n, val, delta)`: Returns 1 if `n` is in range `[val-delta, val+delta]`, else 0.
 - **Parentheses**: Use `(` and `)` to override precedence (e.g., `(PC + 2) & $FF00`).
+
+> **Note on Precision**: The evaluator uses `double` precision for all calculations. When an integer is required (e.g., for memory addresses or register values), the result is truncated to `uint32_t`.
 
 > **Note on Conditions**: When used in a breakpoint or watchpoint condition, any **non-zero** result is treated as `true` (trigger), while a **zero** result is treated as `false`. An empty condition always defaults to `true`.
 
@@ -179,13 +192,21 @@ Multi-pane graphical debugging environment built on wxWidgets.
 - **Ctrl+B / Ctrl+T / Ctrl+M**: Quick access to Breakpoints, Stack, and Machine tabs.
 - **Debug Menu**: Enhanced with memory fill/copy/swap and symbol management.
 
-### 7.2 Panes
+### 7.2 Panes & Tools
 - **Disassembly Pane**: Real-time ISA decoding with symbol resolution.
 - **Symbols Pane**: Integrated management of labels with search and "Go To" navigation.
 - **Console Pane**: Full parity with `mmemu-cli`.
 - **Register Pane**: Real-time inspection of all CPU registers. Status registers (P on the 6502/6510) additionally display individual flag bits in `NV-BDIZC` notation — uppercase letter = bit set, `.` = bit clear — alongside the hex value (e.g. `$36  ..-.IZ.`).
 - **Stack Pane**: JSR/RTS tracking with navigation support.
-- **Tape Pane**: Datasette controls — Mount, Play, Stop, Rewind, Record, and Save. Record arms the write-line capture; Save stops recording and prompts for a destination `.tap` file.
+- **Tape Pane**: Datasette controls — Mount, Play, Stop, Rewind, Record, and Save.
+- **Engineering Calculator** (**Ctrl-Shift-C**):
+    - **28-Button Dynamic Layout**: Key labels and functions adapt automatically based on the current numerical base.
+    - **Modes**: Toggles between **Floating Point** and **Integer** precision.
+    - **Bases**: Supports **Hex**, **Decimal**, **Binary**, and **Octal**. In Hex mode, `A-F` are primary keys; in other modes, they shift to scientific functions.
+    - **Scientific Functions**: `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `sqrt`, `log`, `exp`, `abs`, `^`, `<<`, `>>`.
+    - **Memory**: 8 persistent memory slots (`Rcl0`-`Rcl7`) and an `Ans` register for the last result.
+    - **Hand-Typing Support**: The display is a fully editable field allowing you to type complex expressions (e.g., `sin(45) * @PC`) directly.
+    - **Keyboard Accessible**: All buttons have keyboard shortcuts; the bottom-rightmost key is always mapped to **Enter** for evaluation.
 
 ---
 

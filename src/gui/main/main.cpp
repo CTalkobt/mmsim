@@ -16,6 +16,7 @@
 #include "dialogs/memory_dialogs.h"
 #include "dialogs/assemble_dialog.h"
 #include "dialogs/image_dialogs.h"
+#include "dialogs/calculator_dialog.h"
 #include "plugin_loader/main/plugin_loader.h"
 #include "plugin_pane_manager.h"
 #include "ikeyboard_capture_pane.h"
@@ -429,10 +430,14 @@ MmemuFrame::MmemuFrame()
     menuDebug->Append(ID_NEW_MEM_VIEW,    "New Memory View\tCtrl-Shift-M");
     menuDebug->Append(ID_RENAME_MEM_VIEW, "Rename Memory View...");
     
+    auto* menuTools = new wxMenu;
+    menuTools->Append(ID_CALCULATOR, "Calculator\tCtrl-Shift-C");
+
     auto* menuBar = new wxMenuBar;
     menuBar->Append(menuFile, "&File");
     menuBar->Append(menuControl, "&Control");
     menuBar->Append(menuDebug, "&Debug");
+    menuBar->Append(menuTools, "&Tools");
     SetMenuBar(menuBar);
     
     // ToolBar
@@ -527,6 +532,7 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_MENU, &MmemuFrame::OnShowMachinePane, this, ID_SHOW_MACHINE_PANE);
     Bind(wxEVT_MENU, &MmemuFrame::OnNewMemView,    this, ID_NEW_MEM_VIEW);
     Bind(wxEVT_MENU, &MmemuFrame::OnRenameMemView, this, ID_RENAME_MEM_VIEW);
+    Bind(wxEVT_MENU, [this](wxCommandEvent&){ CalculatorDialog(this, m_dbg).ShowModal(); }, ID_CALCULATOR);
     Bind(wxEVT_TOOL, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
     Bind(wxEVT_TIMER, &MmemuFrame::OnTimer, this, ID_GUI_TIMER);
     
