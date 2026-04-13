@@ -20,6 +20,7 @@ public:
     bool ioWrite(IBus* bus, uint32_t addr, uint8_t val) override { return false; }
     void reset() override;
     void tick(uint64_t cycles) override;
+    void getDeviceInfo(DeviceInfo& out) const override;
 
     // Tape controls
     bool mount(const std::string& path);

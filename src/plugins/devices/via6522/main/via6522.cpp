@@ -354,3 +354,42 @@ void VIA6522::updateIrq() {
         m_lastIrq = irq;
     }
 }
+
+void VIA6522::getDeviceInfo(DeviceInfo& out) const {
+    out.name = m_name;
+    out.baseAddr = m_baseAddr;
+    out.addrMask = addrMask();
+
+    auto addReg = [&](const std::string& name, Reg reg, const std::string& desc = "") {
+        out.registers.push_back({name, (uint32_t)reg, m_regs[reg], desc});
+    };
+
+    addReg("ORB", ORB);
+    addReg("ORA", ORA);
+    addReg("DDRB", DDRB);
+    addReg("DDRA", DDRA);
+    addReg("T1CL", T1CL);
+    addReg("T1CH", T1CH);
+    addReg("T1LL", T1LL);
+    addReg("T1LH", T1LH);
+    addReg("T2CL", T2CL);
+    addReg("T2CH", T2CH);
+    addReg("SR", SR);
+    addReg("ACR", ACR);
+    addReg("PCR", PCR);
+    addReg("IFR", IFR);
+    addReg("IER", IER);
+    addReg("IORA2", IORA2);
+
+    char buf[32];
+    std::sprintf(buf, "%d", (int)m_t1Counter);
+    out.state.push_back({"Timer 1 Counter", buf});
+    std::sprintf(buf, "%d", (int)m_t2Counter);
+    out.state.push_back({"Timer 2 Counter", buf});
+    out.state.push_back({"Timer 1 Active", m_t1Active ? "true" : "false"});
+    out.state.push_back({"Timer 2 Active", m_t2Active ? "true" : "false"});
+
+    out.dependencies.push_back({"Port A Device", m_portADevice ? "connected" : "none"});
+    out.dependencies.push_back({"Port B Device", m_portBDevice ? "connected" : "none"});
+    out.dependencies.push_back({"IRQ Line", m_irqLine ? "connected" : "none"});
+}

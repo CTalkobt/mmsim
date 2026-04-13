@@ -439,3 +439,101 @@ void VIC2::updateIrq() {
     bool assert = (m_regs[IRQ] & m_regs[IRQEN] & 0x0F) != 0;
     if (m_irqLine) m_irqLine->set(assert);
 }
+
+void VIC2::getDeviceInfo(DeviceInfo& out) const {
+    out.name = m_name;
+    out.baseAddr = m_baseAddr;
+    out.addrMask = addrMask();
+
+    auto addReg = [&](const std::string& name, Reg reg, const std::string& desc = "") {
+        out.registers.push_back({name, (uint32_t)reg, m_regs[reg], desc});
+    };
+
+    addReg("SP0X", SP0X); addReg("SP0Y", SP0Y);
+    addReg("SP1X", SP1X); addReg("SP1Y", SP1Y);
+    addReg("SP2X", SP2X); addReg("SP2Y", SP2Y);
+    addReg("SP3X", SP3X); addReg("SP3Y", SP3Y);
+    addReg("SP4X", SP4X); addReg("SP4Y", SP4Y);
+    addReg("SP5X", SP5X); addReg("SP5Y", SP5Y);
+    addReg("SP6X", SP6X); addReg("SP6Y", SP6Y);
+    addReg("SP7X", SP7X); addReg("SP7Y", SP7Y);
+    addReg("MSIGX", MSIGX, "Sprite X MSBs");
+    addReg("SCR1", SCR1, "Control 1");
+    addReg("RASTER", RASTER, "Raster counter");
+    addReg("LPX", LPX); addReg("LPY", LPY);
+    addReg("SPENA", SPENA, "Sprite enable");
+    addReg("SCR2", SCR2, "Control 2");
+    addReg("YXPAND", YXPAND, "Sprite Y expansion");
+    addReg("VMEM", VMEM, "Memory pointers");
+    addReg("IRQ", IRQ, "IRQ status");
+    addReg("IRQEN", IRQEN, "IRQ enable");
+    addReg("SPBGPR", SPBGPR, "Sprite-BG priority");
+    addReg("SPMC", SPMC, "Sprite multicolor");
+    addReg("XXPAND", XXPAND, "Sprite X expansion");
+    addReg("SSCOL", SSCOL, "Sprite-sprite collision");
+    addReg("SBCOL", SBCOL, "Sprite-BG collision");
+    addReg("EXTCOL", EXTCOL, "Border color");
+    addReg("BGCOL0", BGCOL0); addReg("BGCOL1", BGCOL1);
+    addReg("BGCOL2", BGCOL2); addReg("BGCOL3", BGCOL3);
+    addReg("BGCOL3", BGCOL3);
+    addReg("SPMC0", SPMC0); addReg("SPMC1", SPMC1);
+    addReg("SP0COL", SP0COL); addReg("SP1COL", SP1COL);
+    addReg("SP2COL", SP2COL); addReg("SP3COL", SP3COL);
+    addReg("SP4COL", SP4COL); addReg("SP5COL", SP5COL);
+    addReg("SP6COL", SP6COL); addReg("SP7COL", SP7COL);
+
+    char buf[64];
+    std::sprintf(buf, "%d", m_rasterLine);
+    out.state.push_back({"Raster Line", buf});
+    std::sprintf(buf, "%llu", (unsigned long long)m_cycleAccum);
+    out.state.push_back({"Cycle Accum", buf});
+    std::sprintf(buf, "$%04X", m_bankBase);
+    out.state.push_back({"Bank Base", buf});
+
+    out.dependencies.push_back({"DMA Bus", m_dmaBus ? "connected" : "none"});
+    out.dependencies.push_back({"Char ROM", m_charRom ? "connected" : "none"});
+    out.dependencies.push_back({"Color RAM", m_colorRam ? "connected" : "none"});
+    out.dependencies.push_back({"IRQ Line", m_irqLine ? "connected" : "none"});
+
+    // Sprites
+    uint32_t scrBase = screenBase();
+    for (int i = 0; i < 8; ++i) {
+        bool enabled = (m_regs[SPENA] & (1 << i)) != 0;
+        uint16_t x = m_regs[SP0X + i * 2];
+        if (m_regs[MSIGX] & (1 << i)) x |= 0x100;
+        uint8_t y = m_regs[SP0Y + i * 2];
+        bool xExp = (m_regs[XXPAND] & (1 << i)) != 0;
+        bool yExp = (m_regs[YXPAND] & (1 << i)) != 0;
+        uint8_t colorIdx = m_regs[SP0COL + i] & 0x0F;
+        uint32_t color = palette(colorIdx);
+
+        std::string prefix = "Sprite " + std::to_string(i);
+        out.state.push_back({prefix + " Enabled", enabled ? "yes" : "no"});
+        out.state.push_back({prefix + " Pos", std::to_string(x) + ", " + std::to_string(y)});
+        out.state.push_back({prefix + " Expansion", std::string(xExp ? "X" : "") + (yExp ? "Y" : "")});
+        out.state.push_back({prefix + " Color", std::to_string((int)colorIdx)});
+
+        // Bitmap
+        DeviceBitmap db;
+        db.name = prefix;
+        db.width = 24;
+        db.height = 21;
+        db.pixels.resize(24 * 21, 0); // Transparent black
+
+        uint32_t ptrAddr = scrBase + 0x03F8 + i;
+        uint8_t  ptrVal  = dmaPeek(ptrAddr);
+        uint32_t dataAddr = ptrVal * 64;
+
+        for (int r = 0; r < 21; ++r) {
+            uint32_t rowBits = (dmaPeek(dataAddr + r * 3) << 16) |
+                               (dmaPeek(dataAddr + r * 3 + 1) << 8) |
+                               (dmaPeek(dataAddr + r * 3 + 2));
+            for (int b = 0; b < 24; ++b) {
+                if ((rowBits >> (23 - b)) & 1) {
+                    db.pixels[r * 24 + b] = color;
+                }
+            }
+        }
+        out.bitmaps.push_back(std::move(db));
+    }
+}

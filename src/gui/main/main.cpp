@@ -12,6 +12,7 @@
 #include "breakpoint_pane.h"
 #include "stack_pane.h"
 #include "machine_inspector_pane.h"
+#include "device_info_pane.h"
 #include "libdebug/main/debug_context.h"
 #include "dialogs/memory_dialogs.h"
 #include "dialogs/assemble_dialog.h"
@@ -70,6 +71,7 @@ private:
     void OnShowSymPane(wxCommandEvent& event);
     void OnShowStackPane(wxCommandEvent& event);
     void OnShowMachinePane(wxCommandEvent& event);
+    void OnShowDevicePane(wxCommandEvent& event);
     void OnNewMemView(wxCommandEvent& event);
     void OnRenameMemView(wxCommandEvent& event);
     void OnTimer(wxTimerEvent& event);
@@ -78,6 +80,7 @@ private:
     void ShowSymbolPane();
     void ShowStackPane();
     void ShowMachineInspectorPane();
+    void ShowDeviceInfoPane();
 
     // Returns the currently-selected MemoryPane, or nullptr if none exist.
     MemoryPane* activeMemPane() const {
@@ -111,6 +114,7 @@ private:
     SymbolPane*     m_symPane   = nullptr;
     StackPane*      m_stackPane = nullptr;
     MachineInspectorPane* m_machineInspectorPane = nullptr;
+    DeviceInfoPane* m_deviceInfoPane = nullptr;
     wxAuiNotebook*  m_notebook  = nullptr;
 
     wxTimer m_timer;
@@ -426,6 +430,7 @@ MmemuFrame::MmemuFrame()
     menuDebug->Append(ID_SHOW_SYM_PANE,   "Symbols\tCtrl-Y");
     menuDebug->Append(ID_SHOW_STACK_PANE, "Stack Trace\tCtrl-T");
     menuDebug->Append(ID_SHOW_MACHINE_PANE, "Machine Explorer\tCtrl-M");
+    menuDebug->Append(ID_SHOW_DEVICE_PANE, "Device Info\tCtrl-D");
     menuDebug->AppendSeparator();
     menuDebug->Append(ID_NEW_MEM_VIEW,    "New Memory View\tCtrl-Shift-M");
     menuDebug->Append(ID_RENAME_MEM_VIEW, "Rename Memory View...");
@@ -456,17 +461,17 @@ MmemuFrame::MmemuFrame()
     // Status Bar
     CreateStatusBar();
     
-    // Main layout: Splitter
+    // Main layout: Overall horizontal split
     auto* mainSplitter = new wxSplitterWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
     
-    // Left: Disasm and Memory (vertical split)
-    auto* leftSplitter = new wxSplitterWindow(mainSplitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
+    // Left Column: Disasm, Memory, and Bottom Row (Registers + CLI)
+    // Split into Top (Disasm) and Bottom (Memory + Bottom Row)
+    auto* leftTopBottomSplitter = new wxSplitterWindow(mainSplitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
+    m_disasmPane = new DisasmPane(leftTopBottomSplitter);
     
-    auto* centerSplitter = new wxSplitterWindow(leftSplitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
-    
-    auto* notebookSplitter = new wxSplitterWindow(centerSplitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
-    m_disasmPane = new DisasmPane(notebookSplitter);
-    m_memNotebook = new wxAuiNotebook(notebookSplitter, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+    // Split Bottom into Memory and Bottom Row
+    auto* leftMemoryBottomRowSplitter = new wxSplitterWindow(leftTopBottomSplitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
+    m_memNotebook = new wxAuiNotebook(leftMemoryBottomRowSplitter, wxID_ANY, wxDefaultPosition, wxDefaultSize,
         wxAUI_NB_TOP | wxAUI_NB_SCROLL_BUTTONS | wxAUI_NB_CLOSE_ON_ALL_TABS | wxAUI_NB_TAB_MOVE);
     addMemView("Memory 1");
     m_memNotebook->Bind(wxEVT_AUINOTEBOOK_PAGE_CLOSE, [this](wxAuiNotebookEvent& event) {
@@ -475,11 +480,22 @@ MmemuFrame::MmemuFrame()
         if (page != wxNOT_FOUND && page < (int)m_memPanes.size())
             m_memPanes.erase(m_memPanes.begin() + page);
     });
-    notebookSplitter->SplitHorizontally(m_disasmPane, m_memNotebook, 300);
     
-    m_notebook = new wxAuiNotebook(centerSplitter, wxID_ANY);
+    // Split Bottom Row into Registers and CLI
+    auto* bottomRowSplitter = new wxSplitterWindow(leftMemoryBottomRowSplitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
+    m_regPane = new RegisterPane(bottomRowSplitter);
+    m_consolePane = new ConsolePane(bottomRowSplitter);
+    
+    bottomRowSplitter->SplitVertically(m_regPane, m_consolePane, 200);
+    leftMemoryBottomRowSplitter->SplitHorizontally(m_memNotebook, bottomRowSplitter, 300);
+    leftTopBottomSplitter->SplitHorizontally(m_disasmPane, leftMemoryBottomRowSplitter, 250);
+    
+    // Right side: Tool Notebook
+    m_notebook = new wxAuiNotebook(mainSplitter, wxID_ANY);
     m_machineInspectorPane = new MachineInspectorPane(m_notebook);
     m_notebook->AddPage(m_machineInspectorPane, "Machine");
+    m_deviceInfoPane = new DeviceInfoPane(m_notebook);
+    m_notebook->AddPage(m_deviceInfoPane, "Devices");
     m_cartPane = new CartridgePane(m_notebook);
     m_notebook->AddPage(m_cartPane, "Cartridge");
     m_bpPane = new BreakpointPane(m_notebook);
@@ -489,15 +505,7 @@ MmemuFrame::MmemuFrame()
     m_stackPane = new StackPane(m_notebook);
     m_notebook->AddPage(m_stackPane, "Stack");
     
-    centerSplitter->SplitVertically(notebookSplitter, m_notebook, 600);
-    
-    m_consolePane = new ConsolePane(leftSplitter);
-    leftSplitter->SplitHorizontally(centerSplitter, m_consolePane, 550);
-    
-    // Right: Register Pane
-    m_regPane = new RegisterPane(mainSplitter);
-    
-    mainSplitter->SplitVertically(leftSplitter, m_regPane, 750);
+    mainSplitter->SplitVertically(leftTopBottomSplitter, m_notebook, 750);
     mainSplitter->SetMinimumPaneSize(200);
     
     SetDropTarget(new MmemuDropTarget(this));
@@ -530,6 +538,7 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_MENU, &MmemuFrame::OnShowSymPane,   this, ID_SHOW_SYM_PANE);
     Bind(wxEVT_MENU, &MmemuFrame::OnShowStackPane, this, ID_SHOW_STACK_PANE);
     Bind(wxEVT_MENU, &MmemuFrame::OnShowMachinePane, this, ID_SHOW_MACHINE_PANE);
+    Bind(wxEVT_MENU, &MmemuFrame::OnShowDevicePane, this, ID_SHOW_DEVICE_PANE);
     Bind(wxEVT_MENU, &MmemuFrame::OnNewMemView,    this, ID_NEW_MEM_VIEW);
     Bind(wxEVT_MENU, &MmemuFrame::OnRenameMemView, this, ID_RENAME_MEM_VIEW);
     Bind(wxEVT_MENU, [this](wxCommandEvent&){ CalculatorDialog(this, m_dbg).ShowModal(); }, ID_CALCULATOR);
@@ -591,6 +600,7 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
             m_stackPane->SetGotoCallback([this](uint32_t addr){ m_disasmPane->GoTo(addr); });
             m_cartPane->SetBus(m_bus);
             m_machineInspectorPane->setMachine(m_machine);
+            m_deviceInfoPane->setMachine(m_machine);
             
             if (m_machine->onReset) m_machine->onReset(*m_machine);
 
@@ -1078,5 +1088,24 @@ void MmemuFrame::OnTimer(wxTimerEvent& event) {
         for (auto* p : m_memPanes) p->UpdatePc(m_cpu->pc());
         m_stackPane->RefreshValues();
         PluginPaneManager::instance().tickAll(m_cpu->cycles());
+        
+        if (m_machineInspectorPane && m_notebook->GetCurrentPage() == m_machineInspectorPane)
+            m_machineInspectorPane->refreshValues();
+        if (m_deviceInfoPane && m_notebook->GetCurrentPage() == m_deviceInfoPane)
+            m_deviceInfoPane->refreshValues();
     }
+}
+
+void MmemuFrame::ShowDeviceInfoPane() {
+    for (size_t i = 0; i < m_notebook->GetPageCount(); ++i) {
+        if (m_notebook->GetPage(i) == m_deviceInfoPane) {
+            m_notebook->SetSelection(i);
+            return;
+        }
+    }
+    m_notebook->AddPage(m_deviceInfoPane, "Devices", true);
+}
+
+void MmemuFrame::OnShowDevicePane(wxCommandEvent&) {
+    ShowDeviceInfoPane();
 }

@@ -109,3 +109,31 @@ void Datasette::tick(uint64_t cycles) {
         }
     }
 }
+
+void Datasette::getDeviceInfo(DeviceInfo& out) const {
+    out.name = m_name;
+    out.baseAddr = 0;
+    out.addrMask = 0;
+
+    out.state.push_back({"Button Pressed", m_buttonPressed ? "yes" : "no"});
+    out.state.push_back({"Motor On", m_motorOn ? "yes" : "no"});
+    out.state.push_back({"Playing", m_playing ? "yes" : "no"});
+    out.state.push_back({"Recording", m_recording ? "yes" : "no"});
+    
+    if (m_buttonPressed) {
+        std::string pos = std::to_string(m_offset) + " / " + std::to_string(m_tape.data().size()) + " pulses";
+        out.state.push_back({"Tape Position", pos});
+    }
+
+    out.dependencies.push_back({"Sense Line", m_senseLine ? "connected" : "none"});
+    out.dependencies.push_back({"Motor Line", m_motorLine ? "connected" : "none"});
+    out.dependencies.push_back({"Write Line", m_writeLine ? "connected" : "none"});
+    out.dependencies.push_back({"Read Pulse Line", m_readPulseLine ? "connected" : "none"});
+    
+    if (m_motorLine) {
+        out.state.push_back({"Motor Line Level", m_motorLine->get() ? "HI" : "LO (active)"});
+    }
+    if (m_senseLine) {
+        out.state.push_back({"Sense Line Level", m_senseLine->get() ? "HI" : "LO (active)"});
+    }
+}

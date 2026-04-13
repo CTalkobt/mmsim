@@ -46,6 +46,7 @@ public:
     bool ioWrite(IBus* bus, uint32_t addr, uint8_t val) override;
     void reset() override;
     void tick(uint64_t cycles) override;
+    void getDeviceInfo(DeviceInfo& out) const override;
 
     // Peripheral attachment
     void setPortADevice(IPortDevice* device) override { m_portADevice = device; }

@@ -373,3 +373,42 @@ uint8_t CIA6526::bcdInc(uint8_t bcd, uint8_t maxBcd) {
     if (decimal > maxBcd) return 0x00; // wrap to zero
     return (hi << 4) | lo;
 }
+
+void CIA6526::getDeviceInfo(DeviceInfo& out) const {
+    out.name = m_name;
+    out.baseAddr = m_baseAddr;
+    out.addrMask = addrMask();
+
+    auto addReg = [&](const std::string& name, Reg reg, uint8_t val, const std::string& desc = "") {
+        out.registers.push_back({name, (uint32_t)reg, val, desc});
+    };
+
+    addReg("PRA", PRA, m_pra);
+    addReg("PRB", PRB, m_prb);
+    addReg("DDRA", DDRA, m_ddra);
+    addReg("DDRB", DDRB, m_ddrb);
+    addReg("TALO", TALO, m_taLatch & 0xFF);
+    addReg("TAHI", TAHI, m_taLatch >> 8);
+    addReg("TBLO", TBLO, m_tbLatch & 0xFF);
+    addReg("TBHI", TBHI, m_tbLatch >> 8);
+    addReg("TODTEN", TODTEN, m_todTen);
+    addReg("TODSEC", TODSEC, m_todSec);
+    addReg("TODMIN", TODMIN, m_todMin);
+    addReg("TODHR", TODHR, m_todHr);
+    addReg("SDR", SDR, 0); // SDR not fully implemented
+    addReg("ICR", ICR, m_icrPending);
+    addReg("CRA", CRA, m_cra);
+    addReg("CRB", CRB, m_crb);
+
+    char buf[32];
+    std::sprintf(buf, "%d", (int)m_taCounter);
+    out.state.push_back({"Timer A Counter", buf});
+    std::sprintf(buf, "%d", (int)m_tbCounter);
+    out.state.push_back({"Timer B Counter", buf});
+    out.state.push_back({"Timer A Running", m_taRunning ? "true" : "false"});
+    out.state.push_back({"Timer B Running", m_tbRunning ? "true" : "false"});
+    
+    out.dependencies.push_back({"Port A Device", m_portADevice ? "connected" : "none"});
+    out.dependencies.push_back({"Port B Device", m_portBDevice ? "connected" : "none"});
+    out.dependencies.push_back({"IRQ Line", m_irqLine ? "connected" : "none"});
+}

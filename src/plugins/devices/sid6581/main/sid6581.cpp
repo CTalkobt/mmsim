@@ -398,3 +398,51 @@ int SID6581::pullSamples(float* buffer, int maxSamples) {
     m_audioBufCount -= n;
     return n;
 }
+
+void SID6581::getDeviceInfo(DeviceInfo& out) const {
+    out.name = m_name;
+    out.baseAddr = m_baseAddr;
+    out.addrMask = addrMask();
+
+    auto addReg = [&](const std::string& name, int reg, const std::string& desc = "") {
+        out.registers.push_back({name, (uint32_t)reg, m_regs[reg], desc});
+    };
+
+    for (int i = 0; i < 3; ++i) {
+        std::string v = "V" + std::to_string(i + 1) + "_";
+        addReg(v + "FREQ_LO", i * 7 + 0);
+        addReg(v + "FREQ_HI", i * 7 + 1);
+        addReg(v + "PW_LO",   i * 7 + 2);
+        addReg(v + "PW_HI",   i * 7 + 3);
+        addReg(v + "CR",      i * 7 + 4);
+        addReg(v + "AD",      i * 7 + 5);
+        addReg(v + "SR",      i * 7 + 6);
+    }
+    addReg("FC_LO", 0x15);
+    addReg("FC_HI", 0x16);
+    addReg("RES_FILT", 0x17);
+    addReg("MODE_VOL", 0x18);
+    addReg("POTX", 0x19);
+    addReg("POTY", 0x1A);
+    addReg("OSC3", 0x1B);
+    addReg("ENV3", 0x1C);
+
+    for (int i = 0; i < 3; ++i) {
+        const char* ph = "UNKNOWN";
+        switch (m_voices[i].envPhase) {
+            case Voice::Env::IDLE: ph = "IDLE"; break;
+            case Voice::Env::ATTACK: ph = "ATTACK"; break;
+            case Voice::Env::DECAY: ph = "DECAY"; break;
+            case Voice::Env::SUSTAIN: ph = "SUSTAIN"; break;
+            case Voice::Env::RELEASE: ph = "RELEASE"; break;
+        }
+        std::string prefix = "Voice " + std::to_string(i+1);
+        out.state.push_back({prefix + " Env Phase", ph});
+        out.state.push_back({prefix + " Env Level", std::to_string(m_voices[i].envLevel)});
+    }
+
+    uint16_t fc = ((m_regs[FC_HI] << 3) | (m_regs[FC_LO] & 0x07));
+    out.state.push_back({"Filter Cutoff", std::to_string(fc)});
+    out.state.push_back({"Filter Res", std::to_string(m_regs[RES_FILT] >> 4)});
+    out.state.push_back({"Main Volume", std::to_string(m_regs[MODE_VOL] & 0x0F)});
+}

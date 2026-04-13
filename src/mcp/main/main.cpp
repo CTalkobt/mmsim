@@ -5,6 +5,8 @@
 #include <sstream>
 #include <iomanip>
 #include <fstream>
+#include <algorithm>
+#include <cctype>
 
 #include "minijson.h"
 #include "libcore/main/machine_desc.h"
@@ -464,6 +466,19 @@ Json handleDescribe() {
     Json gsReq(Json::ARR); gsReq.push_back(Json("machine_id"));
     gsSchema.oVal["required"] = gsReq;
     addTool("get_stack", "Show stack trace (count defaults to 8, 0 = all)", gsSchema);
+
+    // list_devices
+    addTool("list_devices", "List all devices in a machine", cmSchema);
+
+    // get_device_info
+    Json gdiSchema(Json::OBJ); gdiSchema.oVal["type"] = Json("object");
+    Json gdiProps(Json::OBJ); gdiProps.oVal["machine_id"] = midProp;
+    Json devProp(Json::OBJ); devProp.oVal["type"] = Json("string");
+    gdiProps.oVal["device"] = devProp;
+    gdiSchema.oVal["properties"] = gdiProps;
+    Json gdiReq(Json::ARR); gdiReq.push_back(Json("machine_id")); gdiReq.push_back(Json("device"));
+    gdiSchema.oVal["required"] = gdiReq;
+    addTool("get_device_info", "Get detailed information about a device", gdiSchema);
 
     std::vector<std::string> pluginTools;
     PluginToolRegistry::instance().listTools(pluginTools);
@@ -1003,6 +1018,77 @@ Json handleToolsCall(const Json& params) {
                 textItem.oVal["text"] = Json("Symbols loaded from: " + path);
             } else {
                 textItem.oVal["text"] = Json("Error: Failed to load symbols from: " + path);
+                textItem.oVal["isError"] = Json(true);
+            }
+        }
+    } else if (name == "list_devices") {
+        std::string mid = args["machine_id"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            std::vector<IOHandler*> handlers;
+            if (ms->machine->ioRegistry) ms->machine->ioRegistry->enumerate(handlers);
+            std::stringstream ss;
+            for (auto* h : handlers) ss << h->name() << "\n";
+            textItem.oVal["text"] = Json(ss.str().empty() ? "(none)\n" : ss.str());
+        }
+    } else if (name == "get_device_info") {
+        std::string mid = args["machine_id"].sVal;
+        std::string devName = args["device"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            IOHandler* handler = ms->machine->ioRegistry ? ms->machine->ioRegistry->findHandler(devName) : nullptr;
+            if (!handler && ms->machine->ioRegistry) {
+                std::vector<IOHandler*> handlers;
+                ms->machine->ioRegistry->enumerate(handlers);
+                for (auto* h : handlers) {
+                    std::string hname = h->name();
+                    std::string target = devName;
+                    std::transform(hname.begin(), hname.end(), hname.begin(), ::tolower);
+                    std::transform(target.begin(), target.end(), target.begin(), ::tolower);
+                    if (hname == target || hname.find(target) != std::string::npos) {
+                        handler = h;
+                        break;
+                    }
+                }
+            }
+            if (handler) {
+                DeviceInfo info;
+                handler->getDeviceInfo(info);
+                Json res(Json::OBJ);
+                res.oVal["name"] = Json(info.name);
+                res.oVal["baseAddr"] = Json((double)info.baseAddr);
+                res.oVal["addrMask"] = Json((double)info.addrMask);
+                Json deps(Json::ARR);
+                for (const auto& d : info.dependencies) {
+                    Json dj(Json::OBJ); dj.oVal["name"] = Json(d.first); dj.oVal["value"] = Json(d.second);
+                    deps.push_back(dj);
+                }
+                res.oVal["dependencies"] = deps;
+                Json state(Json::ARR);
+                for (const auto& s : info.state) {
+                    Json sj(Json::OBJ); sj.oVal["name"] = Json(s.first); sj.oVal["value"] = Json(s.second);
+                    state.push_back(sj);
+                }
+                res.oVal["state"] = state;
+                Json regs(Json::ARR);
+                for (const auto& r : info.registers) {
+                    Json rj(Json::OBJ);
+                    rj.oVal["name"] = Json(r.name);
+                    rj.oVal["offset"] = Json((double)r.offset);
+                    rj.oVal["value"] = Json((double)r.value);
+                    rj.oVal["description"] = Json(r.description);
+                    regs.push_back(rj);
+                }
+                res.oVal["registers"] = regs;
+                textItem.oVal["text"] = Json(res.stringify());
+            } else {
+                textItem.oVal["text"] = Json("Error: Device '" + devName + "' not found");
                 textItem.oVal["isError"] = Json(true);
             }
         }

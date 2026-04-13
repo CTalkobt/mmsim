@@ -244,3 +244,39 @@ void VirtualIECBus::generateDirectoryListing() {
         m_fileBuffer[p] = link & 0xFF; m_fileBuffer[p+1] = link >> 8; p = next;
     }
 }
+
+void VirtualIECBus::getDeviceInfo(DeviceInfo& out) const {
+    out.name = "VirtualIEC";
+    out.baseAddr = 0;
+    out.addrMask = 0;
+
+    const char* stateStr = "UNKNOWN";
+    switch (m_state) {
+        case IDLE: stateStr = "IDLE"; break;
+        case ATTENTION: stateStr = "ATTENTION"; break;
+        case ADDRESSING: stateStr = "ADDRESSING"; break;
+        case ACKNOWLEDGE: stateStr = "ACKNOWLEDGE"; break;
+        case LISTENING: stateStr = "LISTENING"; break;
+        case TALKING_WAIT: stateStr = "TALKING_WAIT"; break;
+        case TALKING: stateStr = "TALKING"; break;
+        case ERROR: stateStr = "ERROR"; break;
+    }
+    out.state.push_back({"State", stateStr});
+    out.state.push_back({"Device Number", std::to_string(m_deviceNumber)});
+    out.state.push_back({"Is Addressed", m_isAddressed ? "yes" : "no"});
+    
+    out.state.push_back({"ATN In", m_atnIn ? "LO (asserted)" : "HI (released)"});
+    out.state.push_back({"CLK In", m_clkIn ? "LO" : "HI"});
+    out.state.push_back({"DATA In", m_dataIn ? "LO" : "HI"});
+    out.state.push_back({"CLK Out", m_clkOut ? "LO" : "HI"});
+    out.state.push_back({"DATA Out", m_dataOut ? "LO" : "HI"});
+
+    if (!m_mountedPath.empty()) {
+        out.state.push_back({"Mounted Disk", m_mountedPath});
+        out.state.push_back({"Track", std::to_string(m_track)});
+        out.state.push_back({"Sector", std::to_string(m_sector)});
+        out.state.push_back({"Activity LED", m_led ? "ON" : "OFF"});
+    } else {
+        out.state.push_back({"Mounted Disk", "none"});
+    }
+}

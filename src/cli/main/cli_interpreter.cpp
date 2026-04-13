@@ -808,6 +808,56 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         } else {
             m_output("Syntax: key <name> <down|up|1|0>\n");
         }
+    } else if (cmd.size() > 5 && cmd.substr(cmd.size() - 5) == ".info") {
+        std::string deviceName = cmd.substr(0, cmd.size() - 5);
+        if (m_ctx.machine && m_ctx.machine->ioRegistry) {
+            IOHandler* handler = m_ctx.machine->ioRegistry->findHandler(deviceName);
+            if (!handler) {
+                std::vector<IOHandler*> handlers;
+                m_ctx.machine->ioRegistry->enumerate(handlers);
+                for (auto* h : handlers) {
+                    std::string hname = h->name();
+                    std::string target = deviceName;
+                    std::transform(hname.begin(), hname.end(), hname.begin(), ::tolower);
+                    std::transform(target.begin(), target.end(), target.begin(), ::tolower);
+                    if (hname == target || hname.find(target) != std::string::npos) {
+                        handler = h;
+                        break;
+                    }
+                }
+            }
+            if (handler) {
+                DeviceInfo info;
+                handler->getDeviceInfo(info);
+                m_output("Device: " + info.name + "\n");
+                m_output("Base Address: $" + toHex(info.baseAddr) + "\n");
+                m_output("Address Mask: $" + toHex(info.addrMask) + "\n");
+                if (!info.dependencies.empty()) {
+                    m_output("\nDependencies:\n");
+                    for (const auto& d : info.dependencies) m_output("  " + d.first + ": " + d.second + "\n");
+                }
+                if (!info.state.empty()) {
+                    m_output("\nInternal State:\n");
+                    for (const auto& s : info.state) m_output("  " + s.first + ": " + s.second + "\n");
+                }
+                if (!info.registers.empty()) {
+                    m_output("\nRegisters:\n");
+                    for (size_t i = 0; i < info.registers.size(); ++i) {
+                        const auto& r = info.registers[i];
+                        m_output("  " + r.name + " ($" + toHex(r.offset, 2) + "): $" + toHex(r.value, 2));
+                        if (!r.description.empty()) m_output(" (" + r.description + ")");
+                        m_output("  ");
+                        if ((i + 1) % 3 == 0) m_output("\n");
+                    }
+                    if (info.registers.size() % 3 != 0) m_output("\n");
+                }
+                return;
+            } else {
+                m_output("Device '" + deviceName + "' not found.\n");
+            }
+        } else {
+            m_output("No machine or I/O registry available.\n");
+        }
     } else if (cmd == "quit" || cmd == "q") {
         m_ctx.quit = true;
     } else {

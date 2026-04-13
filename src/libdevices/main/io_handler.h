@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <functional>
+#include "device_info.h"
 
 class IBus;
 class ISignalLine;
@@ -112,6 +113,15 @@ public:
      * Tick the device forward. Called each CPU step or cycle.
      */
     virtual void tick(uint64_t cycles) = 0;
+
+    /**
+     * Get detailed information about the device's current state.
+     */
+    virtual void getDeviceInfo(DeviceInfo& out) const {
+        out.name = name();
+        out.baseAddr = baseAddr();
+        out.addrMask = addrMask();
+    }
 
     // Disk/Image management (optional overrides)
     virtual bool mountDisk(int unit, const std::string& path) { return false; }

@@ -33,6 +33,7 @@ public:
     bool ioWrite(IBus* bus, uint32_t addr, uint8_t val) override { return false; }
     void reset() override;
     void tick(uint64_t cycles) override;
+    void getDeviceInfo(DeviceInfo& out) const override;
 
     bool mountDisk(int unit, const std::string& path) override;
     void ejectDisk(int unit) override;
