@@ -88,14 +88,23 @@ TEST_CASE(c64_iec_directory_load) {
     sendByte(0x48); // TALK 8
     
     writeBus(0x00); // Release ATN
-    iec.tick(1000); // Let device transition ADDRESSING -> TALKING_WAIT
-    writeBus(0x10); // Pull CLK (Ready)
-    iec.tick(500);
-    writeBus(0x00); // Release CLK (Start)
-    iec.tick(500);
+    iec.tick(1000); // ADDRESSING -> TURNAROUND -> TALK_READY
+    writeBus(0x20); // Pull DATA (turnaround: host becomes listener)
+    iec.tick(500);  // TALK_READY sub-phase 0 -> 1 (CLK released)
 
     auto readByte = [&]() -> uint8_t {
         uint8_t byte = 0;
+        // Step 0: Pull DATA (listener present)
+        writeBus(0x20);
+        // Wait for CLK released (Step 1: talker ready to send)
+        {
+            int timeout = 5000;
+            while ((readBus() & 0x40) == 0 && --timeout > 0) iec.tick(100);
+            ASSERT(timeout > 0);
+        }
+        // Step 2: Release DATA (ready for data)
+        writeBus(0x00);
+        iec.tick(100);
         for (int i = 0; i < 8; ++i) {
             int timeout = 5000;
             while ((readBus() & 0x40) != 0 && --timeout > 0) iec.tick(100);
@@ -105,8 +114,9 @@ TEST_CASE(c64_iec_directory_load) {
             while ((readBus() & 0x40) == 0 && --timeout > 0) iec.tick(100);
             ASSERT(timeout > 0);
         }
-        writeBus(0x10); // Host ACK byte
-        writeBus(0x00); // Host ready for next
+        // Frame handshake: pull DATA (byte accepted)
+        writeBus(0x20);
+        iec.tick(500);
         return byte;
     };
 

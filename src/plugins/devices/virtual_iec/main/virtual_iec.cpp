@@ -15,7 +15,7 @@ VirtualIECBus::VirtualIECBus(uint8_t deviceNumber)
       m_isAddressed(false), m_expectAddressingByte(false), m_readyToSample(false),
       m_atnIn(false), m_clkIn(false), m_dataIn(false),
       m_clkOut(false), m_dataOut(false), m_lastClkIn(false),
-      m_currentByte(0), m_bitCount(0), m_stateTimer(0),
+      m_currentByte(0), m_bitCount(0), m_stateTimer(0), m_isLastByte(false), m_talkSubPhase(0),
       m_secondaryAddress(0), m_fileIdx(0), m_isSendingDir(false),
       m_track(0), m_sector(0), m_led(false)
 {
@@ -45,7 +45,7 @@ void VirtualIECBus::reset() {
     m_isAddressed = false;
     m_clkOut = false; m_dataOut = false;
     m_lastClkIn = false; m_currentByte = 0; m_bitCount = 0;
-    m_stateTimer = 0; m_fileIdx = 0; m_isSendingDir = false;
+    m_stateTimer = 0; m_fileIdx = 0; m_isSendingDir = false; m_isLastByte = false; m_talkSubPhase = 0;
     m_filename.clear(); m_track = 0; m_sector = 0; m_led = false;
 }
 
@@ -62,16 +62,18 @@ void VirtualIECBus::log(const char* fmt, ...) {
 
 void VirtualIECBus::tick(uint64_t cycles) {
     m_stateTimer += cycles;
+    State oldState = m_state;
     switch (m_state) {
         case IDLE:
             if (m_atnIn) { m_state = ATTENTION; m_dataOut = true; m_stateTimer = 0; }
             break;
         case ATTENTION:
-            // Hold DATA low as ATN acknowledge. Transition to ADDRESSING
-            // when host starts clocking bits (CLK pulled).
-            if (m_stateTimer > 1000 && m_clkIn) {
-                m_state = ADDRESSING; m_bitCount = 0; m_currentByte = 0;
-                m_stateTimer = 0; m_lastClkIn = m_clkIn; m_readyToSample = true;
+            if (m_clkIn) {
+                m_dataOut = false;
+                if (m_stateTimer > 1000) {
+                    m_state = ADDRESSING; m_bitCount = 0; m_currentByte = 0;
+                    m_stateTimer = 0; m_lastClkIn = m_clkIn; m_readyToSample = true;
+                }
             }
             break;
         case ADDRESSING:
@@ -80,6 +82,7 @@ void VirtualIECBus::tick(uint64_t cycles) {
             if (m_readyToSample) handleBitTransfer();
             if (m_bitCount == 8) {
                 processCommand(m_currentByte);
+                log("Processed CMD: %02X, nextState: %d", m_currentByte, m_nextState);
                 m_state = ACKNOWLEDGE; m_dataOut = true; m_stateTimer = 0;
             }
             break;
@@ -91,34 +94,100 @@ void VirtualIECBus::tick(uint64_t cycles) {
                     m_lastClkIn = m_clkIn; m_readyToSample = false;
                 }
             } else if (m_stateTimer > 500) {
-                m_dataOut = false; m_state = m_nextState;
-                if (m_state == LISTENING) m_clkOut = true;
+                m_state = m_nextState;
+                m_bitCount = 0; m_currentByte = 0;
+                m_readyToSample = false;
                 m_stateTimer = 0;
+                if (m_state == LISTENING) {
+                    m_dataOut = true;
+                } else {
+                    m_dataOut = false;
+                }
             }
             break;
         case LISTENING:
             if (m_atnIn) { m_state = ATTENTION; m_dataOut = true; m_stateTimer = 0; break; }
-            if (m_clkOut) { if (m_stateTimer > 1000) { m_clkOut = false; m_stateTimer = 0; m_readyToSample = false; } }
-            else {
+            if (m_dataOut) {
+                if (m_stateTimer > 500) {
+                    m_dataOut = false;
+                    m_readyToSample = false;
+                    m_lastClkIn = m_clkIn;
+                    m_bitCount = 0;
+                    m_currentByte = 0;
+                    m_stateTimer = 0;
+                }
+            } else {
                 if (m_clkIn) m_readyToSample = true;
                 if (m_readyToSample) handleBitTransfer();
                 if (m_bitCount == 8) {
                     handleByteReceived(m_currentByte);
-                    m_state = ACKNOWLEDGE; m_dataOut = true; m_clkOut = true; m_stateTimer = 0;
+                    log("Received Byte: %02X", m_currentByte);
+                    m_state = ACKNOWLEDGE; m_dataOut = true; m_stateTimer = 0;
                 }
             }
             break;
-        case TALKING_WAIT:
-            if (m_atnIn) { m_state = ATTENTION; m_dataOut = true; m_stateTimer = 0; break; }
-            m_dataOut = true;
-            if (m_clkIn) m_readyToSample = true;
-            if (m_readyToSample && !m_clkIn) {
-                m_state = TALKING; m_bitCount = 0; m_currentByte = getNextByte();
-                m_clkOut = true; m_dataOut = ((m_currentByte >> 0) & 1); m_stateTimer = 0;
+        case TURNAROUND:
+            if (m_atnIn) { m_state = ATTENTION; m_dataOut = true; m_clkOut = false; m_stateTimer = 0; break; }
+            if (!m_clkIn) {
+                m_clkOut = true;
+                m_dataOut = false;
+                m_state = TALK_READY;
+                m_talkSubPhase = 0;
+                m_stateTimer = 0;
+            }
+            break;
+        case TALK_READY:
+            if (m_atnIn) { m_state = ATTENTION; m_dataOut = true; m_clkOut = false; m_stateTimer = 0; break; }
+            switch (m_talkSubPhase) {
+            case 0: // Step 0: hold CLK, wait for listener DATA true + Tbb
+                m_clkOut = true;
+                m_dataOut = false;
+                if (m_dataIn && m_stateTimer >= 100) {
+                    m_clkOut = false; // Step 1: release CLK (ready to send)
+                    m_talkSubPhase = 1;
+                    m_stateTimer = 0;
+                }
+                break;
+            case 1: // Step 2: wait for listener to release DATA (ready for data)
+                if (!m_dataIn) {
+                    m_currentByte = getNextByte();
+                    m_isLastByte = (m_fileIdx >= m_fileBuffer.size());
+                    if (m_isLastByte) {
+                        m_talkSubPhase = 2;
+                        m_stateTimer = 0;
+                    } else {
+                        m_state = TALKING;
+                        m_bitCount = 0;
+                        m_clkOut = true;
+                        m_dataOut = ((m_currentByte >> 0) & 1);
+                        m_stateTimer = 0;
+                    }
+                }
+                break;
+            case 2: // EOI: hold CLK released >200us
+                if (m_stateTimer >= 250) {
+                    m_talkSubPhase = 3;
+                }
+                break;
+            case 3: // Wait for listener EOI ack (DATA pulled)
+                if (m_dataIn) {
+                    m_talkSubPhase = 4;
+                    m_stateTimer = 0;
+                }
+                break;
+            case 4: // Wait for listener to release DATA after EOI ack
+                if (!m_dataIn) {
+                    m_state = TALKING;
+                    m_bitCount = 0;
+                    m_clkOut = true;
+                    m_dataOut = ((m_currentByte >> 0) & 1);
+                    m_stateTimer = 0;
+                }
+                break;
             }
             break;
         case TALKING:
-            if (m_atnIn) { m_state = ATTENTION; m_dataOut = true; m_stateTimer = 0; break; }
+            if (m_atnIn) { m_state = ATTENTION; m_dataOut = true; m_clkOut = false; m_stateTimer = 0; break; }
             if (m_clkOut) {
                 if (m_stateTimer > 500) {
                     m_clkOut = false; m_stateTimer = 0;
@@ -127,7 +196,10 @@ void VirtualIECBus::tick(uint64_t cycles) {
                 if (m_stateTimer > 500) {
                     m_bitCount++;
                     if (m_bitCount == 8) {
-                        m_state = TALKING_WAIT; m_readyToSample = m_clkIn;
+                        m_state = TALK_FRAME;
+                        m_clkOut = true;
+                        m_dataOut = false;
+                        m_stateTimer = 0;
                     } else {
                         m_clkOut = true; m_dataOut = ((m_currentByte >> m_bitCount) & 1);
                         m_stateTimer = 0;
@@ -135,8 +207,26 @@ void VirtualIECBus::tick(uint64_t cycles) {
                 }
             }
             break;
+        case TALK_FRAME:
+            if (m_atnIn) { m_state = ATTENTION; m_dataOut = true; m_clkOut = false; m_stateTimer = 0; break; }
+            if (m_dataIn) {
+                if (m_isLastByte) {
+                    m_state = IDLE;
+                    m_clkOut = false;
+                    m_dataOut = false;
+                } else {
+                    m_state = TALK_READY;
+                    m_talkSubPhase = 0;
+                    m_stateTimer = 0;
+                }
+            } else if (m_stateTimer > 1000) {
+                log("Frame handshake timeout in TALK_FRAME");
+                m_state = ERROR;
+            }
+            break;
         default: break;
     }
+    if (m_state != oldState) log("State: %d -> %d", oldState, m_state);
     m_led = (m_state != IDLE);
 }
 
@@ -157,9 +247,24 @@ uint8_t VirtualIECBus::getNextByte() {
 }
 
 void VirtualIECBus::processCommand(uint8_t cmd) {
-    uint8_t device = cmd & 0x1F, action = cmd & 0xE0;
+    // Global commands first (exact match — must precede LISTEN/TALK range checks
+    // since UNLISTEN $3F falls in the LISTEN range and UNTALK $5F in TALK range)
+    if (cmd == 0x3F) { // UNLISTEN
+        m_nextState = IDLE;
+        m_isAddressed = false;
+        return;
+    }
+    if (cmd == 0x5F) { // UNTALK
+        m_nextState = IDLE;
+        m_isAddressed = false;
+        m_clkOut = false;
+        return;
+    }
 
-    if (action == 0x20) { // LISTEN
+    uint8_t action = cmd & 0xE0;
+
+    if (action == 0x20) { // LISTEN ($20-$3E)
+        uint8_t device = cmd & 0x1F;
         if (device == m_deviceNumber) {
             m_isAddressed = true;
             m_nextState = LISTENING;
@@ -167,10 +272,11 @@ void VirtualIECBus::processCommand(uint8_t cmd) {
         } else {
             m_isAddressed = false;
         }
-    } else if (action == 0x40) { // TALK
+    } else if (action == 0x40) { // TALK ($40-$5E)
+        uint8_t device = cmd & 0x1F;
         if (device == m_deviceNumber) {
             m_isAddressed = true;
-            m_nextState = TALKING_WAIT;
+            m_nextState = TURNAROUND;
             if (m_filename == "$" || m_filename == "*") generateDirectoryListing();
             else if (!m_filename.empty()) {
                 std::string ext = m_mountedPath.substr(m_mountedPath.find_last_of('.') + 1);
@@ -182,16 +288,22 @@ void VirtualIECBus::processCommand(uint8_t cmd) {
         } else {
             m_isAddressed = false;
         }
-    } else if (action == 0x60) { // SECONDARY ADDRESS
+    } else if ((cmd & 0xF0) == 0xF0) { // OPEN ($F0-$FF)
+        if (m_isAddressed) {
+            m_secondaryAddress = cmd & 0x0F;
+            m_filename.clear();
+        }
+    } else if ((cmd & 0xF0) == 0xE0) { // CLOSE ($E0-$EF)
+        if (m_isAddressed) {
+            m_secondaryAddress = cmd & 0x0F;
+            m_fileBuffer.clear();
+            m_fileIdx = 0;
+            m_filename.clear();
+        }
+    } else if (action == 0x60) { // SECOND ($60-$7F)
         if (m_isAddressed) {
             m_secondaryAddress = cmd & 0x0F;
         }
-    } else if (cmd == 0x3F) { // UNLISTEN
-        if (m_nextState == LISTENING) m_nextState = IDLE;
-        m_isAddressed = false;
-    } else if (cmd == 0x5F) { // UNTALK
-        if (m_nextState == TALKING_WAIT || m_nextState == TALKING) m_nextState = IDLE;
-        m_isAddressed = false;
     }
 }
 
@@ -257,8 +369,10 @@ void VirtualIECBus::getDeviceInfo(DeviceInfo& out) const {
         case ADDRESSING: stateStr = "ADDRESSING"; break;
         case ACKNOWLEDGE: stateStr = "ACKNOWLEDGE"; break;
         case LISTENING: stateStr = "LISTENING"; break;
-        case TALKING_WAIT: stateStr = "TALKING_WAIT"; break;
+        case TURNAROUND: stateStr = "TURNAROUND"; break;
+        case TALK_READY: stateStr = "TALK_READY"; break;
         case TALKING: stateStr = "TALKING"; break;
+        case TALK_FRAME: stateStr = "TALK_FRAME"; break;
         case ERROR: stateStr = "ERROR"; break;
     }
     out.state.push_back({"State", stateStr});

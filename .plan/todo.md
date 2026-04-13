@@ -905,11 +905,11 @@ in the `cbm-loader` plugin.*
 - [x] `.t64` (tape image formatted as disk) support.
 - [x] `DiskImageLoader` for loading images via standard image loader interface.
 
-### Phase 15.4: Disk UI and Controls
+### Phase 15.4: Disk UI and Controls [COMPLETED]
 
-- [ ] **CLI**: `disk mount <unit> <file>`, `disk eject <unit>`.
-- [ ] **GUI**: "Drive Status" pane showing active track/sector and activity LED.
-- [ ] **MCP**: `mount_disk`, `eject_disk` tools.
+- [x] **CLI**: `disk mount <unit> <file>`, `disk eject <unit>`.
+- [x] **GUI**: "Drive Status" pane showing active track/sector and activity LED.
+- [x] **MCP**: `mount_disk`, `eject_disk` tools.
 
 ## Phase 15.5: Atari SIO and Disk Image Support
 
@@ -2129,3 +2129,71 @@ Applied to all new panes in Phase 8.
 - [x] **Asynchronous refresh**: UI updates at 30-60 Hz, not on every instruction step (too slow).
 - [x] **DPI Awareness**: All panes and icons must scale correctly on High-DPI displays (macOS Retina, 4K Windows).
 - [x] **Device Inspectable**: Every `IOHandler` provides a `ChipRegDescriptor` table for the Device Inspector pane.
+
+---
+
+## Phase 33: Device Info Breakdown & Visual Inspection [COMPLETED]
+
+*Goal: Provide deep introspection into every emulated device, including internal 
+register state, I/O line levels, and visual assets like sprites or tile maps.*
+
+### Phase 33.1: Device Info API and Infrastructure [COMPLETED]
+
+- [x] Define , , and  structures in .
+- [x] Add  to .
+- [x] Implement base reporting (name, address) in  default.
+
+### Phase 33.2: Per-Chip Breakdown Implementation [COMPLETED]
+
+- [x] **VIC-II**: Full register dump, raster/cycle status, and individual sprite 
+      extraction (8 bitmaps).
+- [x] **SID 6581**: All 29 registers, filter settings, and per-voice envelope phases.
+- [x] **CIA 6526 / VIA 6522**: Port latches, DDRs, timer counters, and IRQ status.
+- [x] **Virtual IEC**: Bus state machine phase and ATN/CLK/DATA line levels.
+- [x] **Datasette**: Tape position, motor/sense status, and I/O pulse lines.
+
+### Phase 33.3: Multi-Frontend Inspection [COMPLETED]
+
+- [x] **CLI**:  command with fuzzy name matching.
+- [x] **MCP**:  and  tools returning JSON breakdowns.
+- [x] **GUI**:  featuring:
+    - Device selector dropdown.
+    - Hierarchical tree view for registers and state.
+    - **Visual Inspector**: Scrolled window rendering zoomed-in bitmaps (e.g. sprites) 
+      on a grid layout.
+- [x] **Layout Optimization**: Move Register window beneath Memory; CLI at 
+      bottom-right; expand Tool Notebook for maximum visibility.
+
+---
+
+## Phase 33: Device Info Breakdown & Visual Inspection [COMPLETED]
+
+*Goal: Provide deep introspection into every emulated device, including internal 
+register state, I/O line levels, and visual assets like sprites or tile maps.*
+
+### Phase 33.1: Device Info API and Infrastructure [COMPLETED]
+
+- [x] Define `DeviceInfo`, `DeviceRegister`, and `DeviceBitmap` structures in `libdevices`.
+- [x] Add `virtual void getDeviceInfo(DeviceInfo& out) const` to `IOHandler`.
+- [x] Implement base reporting (name, address) in `IOHandler` default.
+
+### Phase 33.2: Per-Chip Breakdown Implementation [COMPLETED]
+
+- [x] **VIC-II**: Full register dump, raster/cycle status, and individual sprite 
+      extraction (8 bitmaps).
+- [x] **SID 6581**: All 29 registers, filter settings, and per-voice envelope phases.
+- [x] **CIA 6526 / VIA 6522**: Port latches, DDRs, timer counters, and IRQ status.
+- [x] **Virtual IEC**: Bus state machine phase and ATN/CLK/DATA line levels.
+- [x] **Datasette**: Tape position, motor/sense status, and I/O pulse lines.
+
+### Phase 33.3: Multi-Frontend Inspection [COMPLETED]
+
+- [x] **CLI**: `<device>.info` command with fuzzy name matching.
+- [x] **MCP**: `list_devices` and `get_device_info` tools returning JSON breakdowns.
+- [x] **GUI**: `DeviceInfoPane` featuring:
+    - Device selector dropdown.
+    - Hierarchical tree view for registers and state.
+    - **Visual Inspector**: Scrolled window rendering zoomed-in bitmaps (e.g. sprites) 
+      on a grid layout.
+- [x] **Layout Optimization**: Move Register window beneath Memory; CLI at 
+      bottom-right; expand Tool Notebook for maximum visibility.

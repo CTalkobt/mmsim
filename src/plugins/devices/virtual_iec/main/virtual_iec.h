@@ -14,8 +14,10 @@ public:
         ADDRESSING,
         ACKNOWLEDGE,
         LISTENING,
-        TALKING_WAIT,
+        TURNAROUND,
+        TALK_READY,
         TALKING,
+        TALK_FRAME,
         ERROR
     };
 
@@ -63,6 +65,8 @@ private:
     uint8_t m_currentByte;
     int m_bitCount;
     uint64_t m_stateTimer;
+    bool m_isLastByte;
+    int m_talkSubPhase;
     
     uint8_t m_secondaryAddress;
     std::string m_filename;

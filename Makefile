@@ -203,6 +203,7 @@ TEST_SRCS = tests/src/test_main.cpp \
 	src/plugins/devices/pokey/test/test_pokey.cpp \
 	src/plugins/devices/cia6526/test/test_cia6526.cpp \
 	src/plugins/devices/virtual_iec/test/test_virtual_iec.cpp \
+	src/plugins/devices/virtual_iec/test/test_iec_d64.cpp \
 	src/plugins/cbm-hle/test/test_kernal_hle.cpp \
 	tests/src/test_cbm_disk_images.cpp \
 	tests/src/test_plugin_validation.cpp
