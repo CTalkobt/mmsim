@@ -20,8 +20,8 @@ public:
         m_bus.writePort(val);
     }
 
-    bool getCLK() { return (m_bus.readPort() & 0x40) == 0; } // active low
-    bool getDATA() { return (m_bus.readPort() & 0x80) == 0; }
+    bool getCLK() { return (m_bus.readPort() & 0x40) != 0; } // 1 = pulled
+    bool getDATA() { return (m_bus.readPort() & 0x80) != 0; }
 
     void waitState(uint64_t cycles) {
         uint64_t step = 100;

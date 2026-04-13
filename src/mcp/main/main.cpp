@@ -12,6 +12,7 @@
 #include "libcore/main/machine_desc.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libcore/main/image_loader.h"
+#include "libdevices/main/ikeyboard_matrix.h"
 #include "plugin_loader/main/plugin_loader.h"
 #include "libmem/main/memory_bus.h"
 #include "libcore/main/icore.h"
@@ -130,6 +131,17 @@ Json handleDescribe() {
     Json sizeProp(Json::OBJ); sizeProp.oVal["type"] = Json("string"); sizeProp.oVal["description"] = Json("Size expression (hex or decimal)");
     Json pattProp(Json::OBJ); pattProp.oVal["type"] = Json("string");
     Json ishProp(Json::OBJ); ishProp.oVal["type"] = Json("boolean");
+    Json textProp(Json::OBJ); textProp.oVal["type"] = Json("string");
+
+    Json typeSchema(Json::OBJ);
+    typeSchema.oVal["type"] = Json("object");
+    Json typeProps(Json::OBJ);
+    typeProps.oVal["machine_id"] = midProp;
+    typeProps.oVal["text"] = textProp;
+    typeSchema.oVal["properties"] = typeProps;
+    Json typeReq(Json::ARR); typeReq.push_back(Json("machine_id")); typeReq.push_back(Json("text"));
+    typeSchema.oVal["required"] = typeReq;
+    addTool("type_string", "Type text into the machine virtual keyboard", typeSchema);
 
     Json stepSchema(Json::OBJ);
     stepSchema.oVal["type"] = Json("object");
@@ -821,6 +833,30 @@ Json handleToolsCall(const Json& params) {
                 textItem.oVal["text"] = Json("Key " + key + (down ? " pressed" : " released"));
             } else {
                 textItem.oVal["text"] = Json("Error: Unknown key " + key);
+                textItem.oVal["isError"] = Json(true);
+            }
+        }
+    } else if (name == "type_string") {
+        std::string mid = args["machine_id"].sVal;
+        std::string text = args["text"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            IKeyboardMatrix* kbd = nullptr;
+            if (ms->machine->ioRegistry) {
+                std::vector<IOHandler*> handlers;
+                ms->machine->ioRegistry->enumerate(handlers);
+                for (auto* h : handlers) {
+                    if ((kbd = dynamic_cast<IKeyboardMatrix*>(h))) break;
+                }
+            }
+            if (kbd) {
+                kbd->enqueueText(text);
+                textItem.oVal["text"] = Json("Text enqueued for typing on " + mid);
+            } else {
+                textItem.oVal["text"] = Json("Error: Machine has no keyboard matrix device");
                 textItem.oVal["isError"] = Json(true);
             }
         }

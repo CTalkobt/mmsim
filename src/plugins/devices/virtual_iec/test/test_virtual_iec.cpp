@@ -6,22 +6,22 @@
 TEST_CASE(virtual_iec_handshake) {
     VirtualIECBus iec(8);
     
-    // Initial state: all lines released (Voltage High = bit 1)
+    // Initial state: all lines released (Voltage High = bit 0 after inverters)
     iec.writePort(0x00);
-    // bit 3 (ATN), 6 (CLK) and 7 (DATA) should be 1
-    ASSERT((iec.readPort() & 0xC8) == 0xC8);
+    // bits 3 (ATN), 6 (CLK) and 7 (DATA) should be 0
+    ASSERT((iec.readPort() & 0xC8) == 0x00);
     
     // Host pulls ATN (bit 3 = 1)
     iec.writePort(0x08);
     
     // Tick to detect ATN
     iec.tick(100); 
-    // Tick again to allow timer to pass 2000
-    iec.tick(3000);
+    // Tick again to allow timer to pass 1000
+    iec.tick(2000);
     
-    // Device should respond by pulling DATA low (bit 7 in readPort becomes 0)
+    // Device should respond by pulling DATA low (bit 7 in readPort becomes 1 after inverters)
     uint8_t val = iec.readPort();
-    ASSERT((val & 0x80) == 0);
+    ASSERT((val & 0x80) != 0);
     
     // Host sends a byte (e.g. LISTEN 8 = 0x28)
     uint8_t cmd = 0x28;
@@ -35,9 +35,9 @@ TEST_CASE(virtual_iec_handshake) {
         iec.tick(100);
     }
     
-    // After 8 bits, device pulls DATA low to acknowledge byte (bit 7 = 0)
+    // After 8 bits, device pulls DATA low to acknowledge byte (bit 7 = 1)
     val = iec.readPort();
-    ASSERT((val & 0x80) == 0);
+    ASSERT((val & 0x80) != 0);
 }
 
 TEST_CASE(virtual_iec_disk_status) {

@@ -48,6 +48,10 @@ void ConsolePane::SetContext(ICore* cpu, IBus* bus) {
     }
 }
 
+void ConsolePane::SetMachine(MachineDescriptor* machine) {
+    m_ctx.machine = machine;
+}
+
 void ConsolePane::SetDebugContext(DebugContext* dbg) {
     m_ctx.dbg = dbg;
 }

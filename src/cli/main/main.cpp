@@ -18,19 +18,46 @@ int main(int argc, char *argv[]) {
     });
     
     // Register built-ins to prevent collisions
-    const char* builtIns[] = {"help", "?", "list", "create", "reset", "step", "setpc", "regs", "m", "f", "copy", "search", "searcha", "disasm", "asm", "key", "load", "quit", "q", nullptr};
+    const char* builtIns[] = {"help", "?", "list", "create", "reset", "step", "setpc", "regs", "m", "f", "copy", "search", "searcha", "findnext", "findprior", "disasm", "asm", "type", "key", "load", "quit", "q", nullptr};
     for (int i = 0; builtIns[i]; ++i) {
         PluginCommandRegistry::instance().registerBuiltIn(builtIns[i]);
     }
     
-    PluginLoader::instance().loadFromDir("./lib");
+    // Process command line args early (especially for help)
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h" || arg == "-?") {
+            std::cout << "Usage: mmemu-cli [options]\n"
+                      << "Options:\n"
+                      << "  -m, --machine <id>  Create a machine on startup\n"
+                      << "  -i, --mount <path>  Mount a disk/tape/program image\n"
+                      << "  -t, --type <text>   Type text into the machine\n"
+                      << "  -h, -?, --help      Show this help\n";
+            return 0;
+        }
+    }
 
-    std::cout << "Type 'help' for a list of commands.\n";
+    PluginLoader::instance().loadFromDir("./lib");
 
     CliContext ctx;
     CliInterpreter interpreter(ctx, [](const std::string& out) {
         std::cout << out;
+        std::cout.flush();
     });
+
+    // Process other command line args (machine, mount, type)
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if ((arg == "--machine" || arg == "-m") && i + 1 < argc) {
+            interpreter.processLine("create " + std::string(argv[++i]));
+        } else if ((arg == "--mount" || arg == "-i") && i + 1 < argc) {
+            interpreter.processLine("load " + std::string(argv[++i]));
+        } else if ((arg == "--type" || arg == "-t") && i + 1 < argc) {
+            interpreter.processLine("type " + std::string(argv[++i]));
+        }
+    }
+
+    std::cout << "Type 'help' for a list of commands.\n";
     
     std::string line;
     while (!ctx.quit) {

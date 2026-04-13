@@ -19,6 +19,8 @@ public:
     void keyUp(int row, int col) override;
     void clearKeys() override;
     bool pressKeyByName(const std::string& keyName, bool down) override;
+    void enqueueText(const std::string& text) override;
+    void tick(uint64_t cycles);
     IPortDevice* getPort(int index) override {
         if (index == 0) return (IPortDevice*)&m_colPort;
         if (index == 1) return (IPortDevice*)&m_rowPort;
@@ -60,6 +62,13 @@ public:
 private:
     void updateMatrix();
     bool pressCombo(const std::vector<std::string>& keys, bool down);
+
+    struct TypeEvent {
+        std::string keyName;
+        bool        down;
+    };
+    std::vector<TypeEvent> m_typeQueue;
+    uint64_t               m_typeTimer = 0;
 
     uint8_t m_matrix[8]; // 8 rows, each byte is 8 columns
     uint8_t m_rowVal = 0xFF;

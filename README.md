@@ -131,9 +131,17 @@ When enabled, the system will log the routine name and all register states upon 
 
 The `mmemu-cli` binary provides an interactive REPL for low-level machine control and debugging.
 
-### Key Features:
+### 5.1 Command Line Options
+Automate startup tasks via command line arguments:
+- `-m, --machine <id>`: Automatically create a machine on startup (e.g., `c64`, `vic20`).
+- `-i, --mount <path>`: Mount a disk, tape, or program image immediately.
+- `-t, --type <text>`: Type text into the machine virtual keyboard on startup (supports `\n`, `\r`, `\t`).
+- `-h, -?, --help`: Show available options and exit.
+
+### 5.2 Key Features:
 - **Interactive REPL**: Command-driven interface with session management.
 - **Machine Lifecycle**: List available machine types and create instances at runtime via the `create <id>` command.
+- **Virtual Typing**: Use the `type <string>` command to simulate keystrokes (supports `\n`, `\r`, `\t`).
 - **CPU Control**: 
     - `step [n]`: Execute specific number of cycles.
     - `regs`: Detailed register inspection (automatically adapts to the current CPU).
@@ -187,7 +195,14 @@ The `mmemu-mcp` binary implements the **Model Context Protocol**, allowing AI ag
 
 Multi-pane graphical debugging environment built on wxWidgets.
 
-### 7.1 Toolbar & Menus
+### 7.1 Command Line Options
+Automate GUI startup tasks:
+- `-m, --machine <id>`: Automatically load the specified machine.
+- `-i, --mount <path>`: Mount a disk, tape, or program image on startup.
+- `-t, --type "<text>"`: Type text into the machine virtual keyboard upon loading (supports `\n`, `\r`, `\t`).
+- `-h, -?, --help`: Show available options and exit.
+
+### 7.2 Toolbar & Menus
 - **Ctrl+Y**: Show the Symbol Table pane.
 - **Ctrl+B / Ctrl+T / Ctrl+M**: Quick access to Breakpoints, Stack, and Machine tabs.
 - **Debug Menu**: Enhanced with memory fill/copy/swap and symbol management.

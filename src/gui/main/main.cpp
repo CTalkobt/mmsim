@@ -27,6 +27,7 @@
 #include "libcore/main/image_loader.h"
 #include "libdevices/main/iaudio_output.h"
 #include "libdevices/main/io_registry.h"
+#include "libdevices/main/ikeyboard_matrix.h"
 #include "libtoolchain/main/toolchain_registry.h"
 #include "gui_ids.h"
 #include "screen_pane.h"
@@ -74,6 +75,9 @@ private:
     void OnShowDevicePane(wxCommandEvent& event);
     void OnNewMemView(wxCommandEvent& event);
     void OnRenameMemView(wxCommandEvent& event);
+    void OnLoadMachineDirect(wxCommandEvent& event);
+    void OnLoadImageDirect(wxCommandEvent& event);
+    void OnTypeTextDirect(wxCommandEvent& event);
     void OnTimer(wxTimerEvent& event);
     void OnCtrlShiftK(wxKeyEvent& event);
     void ShowBreakpointPane();
@@ -364,9 +368,43 @@ static PluginPaneInfo s_builtInScreenPane = {
     createScreenPane, nullptr, refreshScreenPane, onScreenMachineLoad, nullptr
 };
 
+#include <wx/cmdline.h>
+
+static const wxCmdLineEntryDesc g_cmdLineDesc[] =
+{
+    { wxCMD_LINE_OPTION, "m", "machine", "Create a machine on startup", wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_OPTIONAL },
+    { wxCMD_LINE_OPTION, "i", "mount",   "Mount a disk/tape/program image", wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_OPTIONAL },
+    { wxCMD_LINE_OPTION, "t", "type",    "Type text into the machine", wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_OPTIONAL },
+    { wxCMD_LINE_SWITCH, "h", "help",    "Show this help", wxCMD_LINE_VAL_NONE, wxCMD_LINE_OPTION_HELP },
+    { wxCMD_LINE_SWITCH, "?", "",        "Show this help", wxCMD_LINE_VAL_NONE, wxCMD_LINE_OPTION_HELP },
+    { wxCMD_LINE_NONE, nullptr, nullptr, nullptr, wxCMD_LINE_VAL_NONE, 0 }
+};
+
 class MmemuApp : public wxApp {
 public:
+    void OnInitCmdLine(wxCmdLineParser& parser) override {
+        parser.SetDesc(g_cmdLineDesc);
+        parser.SetSwitchChars("-");
+    }
+
+    bool OnCmdLineParsed(wxCmdLineParser& parser) override {
+        parser.Found("machine", &m_startMachine);
+        parser.Found("mount", &m_startMount);
+        parser.Found("type", &m_startType);
+        return true;
+    }
+
     bool OnInit() override {
+        // Handle help early and exit if requested
+        wxCmdLineParser parser(g_cmdLineDesc, argc, argv);
+        parser.SetSwitchChars("-");
+        if (parser.Parse(false) != 0) {
+            // Error in parsing or help requested
+            // Note: Parse(false) doesn't print help, we do it manually or via Parse(true)
+            parser.Usage();
+            return false;
+        }
+
         LogRegistry::instance().init();
         m_keyFilter.m_logger = LogRegistry::instance().getLogger("gui.keyboard");
         wxEvtHandler::AddFilter(&m_keyFilter);
@@ -379,6 +417,23 @@ public:
         PluginLoader::instance().loadFromDir("./lib");
         auto *frame = new MmemuFrame();
         frame->Show(true);
+
+        if (!m_startMachine.empty()) {
+            wxCommandEvent evt(wxEVT_MENU, ID_LOAD_MACHINE_DIRECT);
+            evt.SetString(m_startMachine);
+            frame->GetEventHandler()->AddPendingEvent(evt);
+        }
+        if (!m_startMount.empty()) {
+            wxCommandEvent evt(wxEVT_MENU, ID_LOAD_IMAGE_DIRECT);
+            evt.SetString(m_startMount);
+            frame->GetEventHandler()->AddPendingEvent(evt);
+        }
+        if (!m_startType.empty()) {
+            wxCommandEvent evt(wxEVT_MENU, ID_TYPE_TEXT_DIRECT);
+            evt.SetString(m_startType);
+            frame->GetEventHandler()->AddPendingEvent(evt);
+        }
+
         return true;
     }
 
@@ -388,6 +443,9 @@ public:
     }
 
     KeyboardCaptureFilter m_keyFilter;
+    wxString m_startMachine;
+    wxString m_startMount;
+    wxString m_startType;
 };
 
 wxIMPLEMENT_APP(MmemuApp);
@@ -545,10 +603,78 @@ MmemuFrame::MmemuFrame()
     Bind(wxEVT_TOOL, &MmemuFrame::OnKbdFocus, this, ID_KBD_FOCUS);
     Bind(wxEVT_TIMER, &MmemuFrame::OnTimer, this, ID_GUI_TIMER);
     
+    Bind(wxEVT_MENU, &MmemuFrame::OnLoadMachineDirect, this, ID_LOAD_MACHINE_DIRECT);
+    Bind(wxEVT_MENU, &MmemuFrame::OnLoadImageDirect,   this, ID_LOAD_IMAGE_DIRECT);
+    Bind(wxEVT_MENU, &MmemuFrame::OnTypeTextDirect,    this, ID_TYPE_TEXT_DIRECT);
+
     // Ctrl+Shift+K toggles capture; FilterEvent routes all other keys.
     Bind(wxEVT_CHAR_HOOK, &MmemuFrame::OnCtrlShiftK, this);
 
     m_timer.Start(33); // ~30 FPS
+}
+
+void MmemuFrame::OnLoadMachineDirect(wxCommandEvent& event) {
+    std::string id = event.GetString().ToStdString();
+    MachineDescriptor* md = MachineRegistry::instance().createMachine(id);
+    if (md) {
+        if (m_machine) delete m_machine;
+        m_machine = md;
+        m_cpu = m_machine->cpus[0].cpu;
+        m_bus = m_machine->cpus[0].dataBus ? m_machine->cpus[0].dataBus : m_machine->buses[0].bus;
+        if (m_disasm) { delete m_disasm; m_disasm = nullptr; }
+        m_disasm = ToolchainRegistry::instance().createDisassembler(m_cpu->isaName());
+        delete m_dbg;
+        m_dbg = new DebugContext(m_cpu, m_machine->buses[0].bus);
+        m_cpu->setObserver(m_dbg);
+        m_machine->buses[0].bus->setObserver(m_dbg);
+        m_dbg->onMachineLoad(m_machine);
+        for (const auto& path : m_machine->symbolFiles) m_dbg->symbols().loadSym(path);
+        if (m_disasm) m_disasm->setSymbolTable(&m_dbg->symbols());
+        m_regPane->SetCPU(m_cpu);
+        for (auto* p : m_memPanes) p->SetBus(m_bus);
+        m_disasmPane->SetBus(m_bus);
+        m_disasmPane->SetDisassembler(m_disasm);
+        m_disasmPane->SetDebugContext(m_dbg);
+        m_consolePane->SetContext(m_cpu, m_bus);
+        m_consolePane->SetMachine(m_machine);
+        m_consolePane->SetDebugContext(m_dbg);
+        m_bpPane->SetDebugContext(m_dbg);
+        m_symPane->SetDebugContext(m_dbg);
+        m_stackPane->SetDebugContext(m_dbg);
+        m_cartPane->SetBus(m_bus);
+        m_machineInspectorPane->setMachine(m_machine);
+        m_deviceInfoPane->setMachine(m_machine);
+        if (m_machine->onReset) m_machine->onReset(*m_machine);
+        PluginPaneManager::instance().onMachineSwitch(id, m_notebook, m_notebook, m_machine);
+        SetTitle("mmemu - " + m_machine->displayName);
+        SetStatusText("Loaded machine: " + id);
+    }
+}
+
+void MmemuFrame::OnLoadImageDirect(wxCommandEvent& event) {
+    if (!m_bus) return;
+    std::string path = event.GetString().ToStdString();
+    auto* loader = ImageLoaderRegistry::instance().findLoader(path);
+    if (loader) {
+        if (loader->load(path, m_bus, m_machine, 0)) {
+            SetStatusText("Loaded " + path);
+            for (auto* p : m_memPanes) p->RefreshValues();
+        }
+    }
+}
+
+void MmemuFrame::OnTypeTextDirect(wxCommandEvent& event) {
+    if (!m_machine) return;
+    std::string text = event.GetString().ToStdString();
+    IKeyboardMatrix* kbd = nullptr;
+    if (m_machine->ioRegistry) {
+        std::vector<IOHandler*> handlers;
+        m_machine->ioRegistry->enumerate(handlers);
+        for (auto* h : handlers) {
+            if ((kbd = dynamic_cast<IKeyboardMatrix*>(h))) break;
+        }
+    }
+    if (kbd) kbd->enqueueText(text);
 }
 
 void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
@@ -592,6 +718,7 @@ void MmemuFrame::OnLoadMachine(wxCommandEvent& event) {
                 if (!m_memPanes.empty()) m_memPanes[0]->SetAddress(addr);
             });
             m_consolePane->SetContext(m_cpu, m_bus);
+            m_consolePane->SetMachine(m_machine);
             m_consolePane->SetDebugContext(m_dbg);
             m_bpPane->SetDebugContext(m_dbg);
             m_symPane->SetDebugContext(m_dbg);

@@ -1,4 +1,5 @@
 #include "kbd_c64.h"
+#include <algorithm>
 
 KbdC64::KbdC64() : m_colPort(this), m_rowPort(this) {
     m_keyMap = {
@@ -33,8 +34,6 @@ void KbdC64::updateMatrix() {
 bool KbdC64::pressCombo(const std::vector<std::string>& keys, bool down) {
     bool ok = true;
     for (const auto& k : keys) {
-        if (!down && (k == "left_shift" || k == "right_shift" || k == "ctrl" || k == "cbm"))
-            continue;
         auto it = m_keyMap.find(k);
         if (it != m_keyMap.end()) {
             int col = it->second.first;
@@ -50,6 +49,14 @@ bool KbdC64::pressCombo(const std::vector<std::string>& keys, bool down) {
 }
 
 bool KbdC64::pressKeyByName(const std::string& keyName, bool down) {
+    if (keyName.empty()) return false;
+
+    // Handle uppercase by shifting
+    if (keyName.size() == 1 && keyName[0] >= 'A' && keyName[0] <= 'Z') {
+        std::string lower(1, (char)std::tolower(keyName[0]));
+        return pressCombo({"left_shift", lower}, down);
+    }
+
     std::string lower = keyName;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
 
@@ -67,6 +74,8 @@ bool KbdC64::pressKeyByName(const std::string& keyName, bool down) {
     if (lower == "greater")       return pressCombo({"left_shift", "period"}, down);
     if (lower == "bracket_left")  return pressCombo({"left_shift", "colon"}, down);
     if (lower == "bracket_right") return pressCombo({"left_shift", "semicolon"}, down);
+    
+    if (lower == "backslash")     return pressKeyByName("arrow_left", down);
 
     if (lower == "uparrow")   lower = "arrow_up";
     if (lower == "leftarrow") lower = "arrow_left";
@@ -74,6 +83,8 @@ bool KbdC64::pressKeyByName(const std::string& keyName, bool down) {
     if (lower == "down")      lower = "crsr_down";
     if (lower == "up")        return pressCombo({"left_shift", "crsr_down"}, down);
     if (lower == "left")      return pressCombo({"left_shift", "crsr_right"}, down);
+    
+    if (lower == "shift")     lower = "left_shift";
 
     auto it = m_keyMap.find(lower);
     if (it != m_keyMap.end()) {
@@ -85,4 +96,82 @@ bool KbdC64::pressKeyByName(const std::string& keyName, bool down) {
         return true;
     }
     return false;
+}
+
+void KbdC64::enqueueText(const std::string& text) {
+    for (size_t i = 0; i < text.size(); ++i) {
+        std::string name;
+        if (text[i] == '\\' && i + 1 < text.size()) {
+            i++;
+            switch (text[i]) {
+                case 'n': case 'r': name = "return"; break;
+                case 't':           name = "space"; break; 
+                case '\\':          name = "arrow_left"; break;
+                default:            name = std::string(1, text[i]); break;
+            }
+        } else {
+            char c = text[i];
+            if (c == '\n' || c == '\r') name = "return";
+            else if (c == '\t')         name = "space";
+            else if (c == '\\')         name = "arrow_left";
+            else {
+                switch (c) {
+                    case ' ': name = "space"; break;
+                    case '!': name = "exclaim"; break;
+                    case '"': name = "dquote"; break;
+                    case '#': name = "hash"; break;
+                    case '$': name = "dollar"; break;
+                    case '%': name = "percent"; break;
+                    case '&': name = "ampersand"; break;
+                    case '\'': name = "squote"; break;
+                    case '(': name = "lparen"; break;
+                    case ')': name = "rparen"; break;
+                    case '*': name = "asterisk"; break;
+                    case '+': name = "plus"; break;
+                    case ',': name = "comma"; break;
+                    case '-': name = "minus"; break;
+                    case '.': name = "period"; break;
+                    case '/': name = "slash"; break;
+                    case ':': name = "colon"; break;
+                    case ';': name = "semicolon"; break;
+                    case '<': name = "less"; break;
+                    case '=': name = "equal"; break;
+                    case '>': name = "greater"; break;
+                    case '?': name = "question"; break;
+                    case '@': name = "at"; break;
+                    case '[': name = "bracket_left"; break;
+                    case ']': name = "bracket_right"; break;
+                    case '^': name = "uparrow"; break;
+                    case '_': name = "leftarrow"; break;
+                    default:  name = std::string(1, c); break;
+                }
+            }
+        }
+        
+        if (!name.empty()) {
+            m_typeQueue.push_back({name, true});
+            m_typeQueue.push_back({name, false});
+            m_typeQueue.push_back({"idle", false});
+        }
+    }
+}
+
+void KbdC64::tick(uint64_t cycles) {
+    if (m_typeQueue.empty()) return;
+
+    if (m_typeTimer > cycles) {
+        m_typeTimer -= cycles;
+        return;
+    }
+
+    TypeEvent ev = m_typeQueue.front();
+    m_typeQueue.erase(m_typeQueue.begin());
+    
+    if (ev.keyName == "idle") {
+        clearKeys();
+    } else {
+        pressKeyByName(ev.keyName, ev.down);
+    }
+    
+    m_typeTimer = 200000; 
 }

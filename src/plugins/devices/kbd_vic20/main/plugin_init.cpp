@@ -19,7 +19,7 @@ public:
     bool ioRead(IBus*, uint32_t, uint8_t*) override { return false; }
     bool ioWrite(IBus*, uint32_t, uint8_t) override { return false; }
     void reset() override { m_kbd->clearKeys(); }
-    void tick(uint64_t) override {}
+    void tick(uint64_t cycles) override { m_kbd->tick(cycles); }
 
     // IKeyboardDevice interface
     void keyDown(int row, int col) override { m_kbd->keyDown(row, col); }
@@ -28,6 +28,7 @@ public:
     bool pressKeyByName(const std::string& keyName, bool down) override { 
         return m_kbd->pressKeyByName(keyName, down); 
     }
+    void enqueueText(const std::string& text) override { m_kbd->enqueueText(text); }
     IPortDevice* getPort(int index) override { return m_kbd->getPort(index); }
 
 private:

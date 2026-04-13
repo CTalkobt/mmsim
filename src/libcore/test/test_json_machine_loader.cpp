@@ -337,6 +337,7 @@ static void setupP3Registries() {
         void keyUp(int, int)   override {}
         void clearKeys()       override {}
         bool pressKeyByName(const std::string&, bool down) override { lastDown = down; return true; }
+        void enqueueText(const std::string&) override {}
         IPortDevice* getPort(int i) override { return i == 0 ? &colPort : &rowPort; }
     };
     DeviceRegistry::instance().registerDevice("mock_kbd",

@@ -4,6 +4,7 @@
 #include "libtoolchain/main/toolchain_registry.h"
 #include "libcore/main/image_loader.h"
 #include "libdevices/main/ivideo_output.h"
+#include "libdevices/main/ikeyboard_matrix.h"
 #include "plugin_command_registry.h"
 #include "libdebug/main/expression_evaluator.h"
 #include <iostream>
@@ -797,6 +798,27 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         } else {
             m_output("Syntax: asm <address>\n");
         }
+    } else if (cmd == "type") {
+        if (!m_ctx.machine) { m_output("No machine created.\n"); return; }
+        std::string text;
+        std::getline(ss, text);
+        if (!text.empty() && text[0] == ' ') text = text.substr(1);
+        
+        IKeyboardMatrix* kbd = nullptr;
+        if (m_ctx.machine->ioRegistry) {
+            std::vector<IOHandler*> handlers;
+            m_ctx.machine->ioRegistry->enumerate(handlers);
+            for (auto* h : handlers) {
+                if ((kbd = dynamic_cast<IKeyboardMatrix*>(h))) break;
+            }
+        }
+        
+        if (kbd) {
+            kbd->enqueueText(text);
+            m_output("Enqueued text for typing.\n");
+        } else {
+            m_output("No keyboard device found in this machine.\n");
+        }
     } else if (cmd == "key") {
         if (!m_ctx.machine || !m_ctx.machine->onKey) { m_output("No machine with keyboard created.\n"); return; }
         std::string keyName, state;
@@ -915,6 +937,7 @@ void CliInterpreter::printHelp() {
              "  findprior        - Find prior occurrence of last search pattern\n"
              "  disasm <addr> [n]- Disassemble N instructions\n"
              "  asm <addr>       - Interactive assembly mode (end with '.')\n"
+             "  type <text>      - Type text into the machine (supports \\n)\n"
              "  key <name> <state>- Press/release a key (state: 1/0 or down/up)\n"
              "  load <path> [addr]- Load a program/binary file\n"
              "  screenshot <file>  - Save current screen to a PNG file\n"

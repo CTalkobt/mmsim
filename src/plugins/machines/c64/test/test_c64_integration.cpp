@@ -39,13 +39,13 @@ TEST_CASE(c64_iec_directory_load) {
         }
         writeBus(0x08); // Release for ACK
         int timeout = 1000;
-        while ((readBus() & 0x80) != 0 && --timeout > 0) iec.tick(100);
+        while ((readBus() & 0x80) == 0 && --timeout > 0) iec.tick(100);
         ASSERT(timeout > 0);
 
         writeBus(0x18); // Host ACKs
         iec.tick(500);
         timeout = 1000;
-        while ((readBus() & 0x80) == 0 && --timeout > 0) iec.tick(100);
+        while ((readBus() & 0x80) != 0 && --timeout > 0) iec.tick(100);
         ASSERT(timeout > 0);
         writeBus(0x08);
         iec.tick(500);
@@ -58,9 +58,9 @@ TEST_CASE(c64_iec_directory_load) {
     iec.tick(2000);
 
     auto sendDataByte = [&](uint8_t byte) {
-        // Listener (Device) should release CLK to signal ready
+        // Listener (Device) should release CLK to signal ready (now bit 6 = 0)
         int timeout = 5000;
-        while ((readBus() & 0x40) == 0 && --timeout > 0) iec.tick(100);
+        while ((readBus() & 0x40) != 0 && --timeout > 0) iec.tick(100);
         ASSERT(timeout > 0);
 
         for (int i = 0; i < 8; ++i) {
@@ -72,9 +72,9 @@ TEST_CASE(c64_iec_directory_load) {
             writeBus(0x00 | (bit ? 0x20 : 0x00));
             iec.tick(200);
         }
-        // Wait for ACK (Listener pulls DATA low)
+        // Wait for ACK (Listener pulls DATA low, bit 7 = 1)
         timeout = 5000;
-        while ((readBus() & 0x80) != 0 && --timeout > 0) iec.tick(100);
+        while ((readBus() & 0x80) == 0 && --timeout > 0) iec.tick(100);
         ASSERT(timeout > 0);
     };
 
@@ -96,10 +96,10 @@ TEST_CASE(c64_iec_directory_load) {
         uint8_t byte = 0;
         // Step 0: Pull DATA (listener present)
         writeBus(0x20);
-        // Wait for CLK released (Step 1: talker ready to send)
+        // Wait for CLK released (Step 1: talker ready to send, bit 6 = 0)
         {
             int timeout = 5000;
-            while ((readBus() & 0x40) == 0 && --timeout > 0) iec.tick(100);
+            while ((readBus() & 0x40) != 0 && --timeout > 0) iec.tick(100);
             ASSERT(timeout > 0);
         }
         // Step 2: Release DATA (ready for data)
@@ -107,11 +107,11 @@ TEST_CASE(c64_iec_directory_load) {
         iec.tick(100);
         for (int i = 0; i < 8; ++i) {
             int timeout = 5000;
-            while ((readBus() & 0x40) != 0 && --timeout > 0) iec.tick(100);
-            ASSERT(timeout > 0);
-            if (!(readBus() & 0x80)) byte |= (1 << i);
-            timeout = 5000;
             while ((readBus() & 0x40) == 0 && --timeout > 0) iec.tick(100);
+            ASSERT(timeout > 0);
+            if (readBus() & 0x80) byte |= (1 << i);
+            timeout = 5000;
+            while ((readBus() & 0x40) != 0 && --timeout > 0) iec.tick(100);
             ASSERT(timeout > 0);
         }
         // Frame handshake: pull DATA (byte accepted)

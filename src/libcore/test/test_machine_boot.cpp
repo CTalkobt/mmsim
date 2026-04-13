@@ -41,6 +41,7 @@ struct KbdPetBootTestWrapper : public IOHandler, public IKeyboardMatrix {
     bool pressKeyByName(const std::string& n, bool d) override {
         if (d) m_kbd.keyDown(n); else m_kbd.keyUp(n); return true;
     }
+    void enqueueText(const std::string&) override {}
     IPortDevice* getPort(int i) override { (void)i; return &m_kbd; }
     PetKeyboardMatrix m_kbd;
 };
@@ -112,6 +113,7 @@ static void ensureBootTestRegistriesReady() {
                 void keyUp(int r, int c) override { m_kbd->keyUp(r, c); }
                 void clearKeys() override { m_kbd->clearKeys(); }
                 bool pressKeyByName(const std::string& n, bool d) override { return m_kbd->pressKeyByName(n, d); }
+                void enqueueText(const std::string& text) override { m_kbd->enqueueText(text); }
                 IPortDevice* getPort(int i) override { return m_kbd->getPort(i); }
             private:
                 KbdVic20* m_kbd;

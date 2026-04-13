@@ -28,7 +28,7 @@ public:
     bool ioRead (IBus*, uint32_t, uint8_t*) override { return false; }
     bool ioWrite(IBus*, uint32_t, uint8_t)  override { return false; }
     void reset() override { clearKeys(); }
-    void tick(uint64_t) override {}
+    void tick(uint64_t cycles) override;
 
     // IKeyboardMatrix
     void keyDown(int row, int col) override {
@@ -46,6 +46,7 @@ public:
         updateMatrix();
     }
     bool pressKeyByName(const std::string& keyName, bool down) override;
+    void enqueueText(const std::string& text) override;
     IPortDevice* getPort(int index) override {
         return index == 0 ? (IPortDevice*)&m_colPort : (IPortDevice*)&m_rowPort;
     }
@@ -80,6 +81,13 @@ private:
 
     bool pressCombo(const std::vector<std::string>& keys, bool down);
     void updateMatrix();
+
+    struct TypeEvent {
+        std::string keyName;
+        bool        down;
+    };
+    std::vector<TypeEvent> m_typeQueue;
+    uint64_t               m_typeTimer = 0;
 
     uint8_t    m_matrix[8];
     uint8_t    m_rowVal = 0xFF;

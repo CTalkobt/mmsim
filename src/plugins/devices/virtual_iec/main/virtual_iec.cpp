@@ -25,9 +25,9 @@ uint8_t VirtualIECBus::readPort() {
     bool clkBus = m_clkIn || m_clkOut;
     bool dataBus = m_dataIn || m_dataOut;
     uint8_t val = 0;
-    if (!clkBus) val |= (1 << 6);
-    if (!dataBus) val |= (1 << 7);
-    if (!m_atnIn) val |= (1 << 3);
+    if (clkBus) val |= (1 << 6);
+    if (dataBus) val |= (1 << 7);
+    if (m_atnIn) val |= (1 << 3);
     return val;
 }
 

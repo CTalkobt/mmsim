@@ -36,6 +36,12 @@ public:
     virtual bool pressKeyByName(const std::string& keyName, bool down) = 0;
 
     /**
+     * Enqueue a string to be typed into the machine.
+     * Implementation should handle escape sequences like \n.
+     */
+    virtual void enqueueText(const std::string& text) = 0;
+
+    /**
      * Retrieve the raw I/O port for this matrix.
      * Index 0 is the column/output port; Index 1 is the row/input port.
      */

@@ -39,8 +39,6 @@ void KbdVic20::clearKeys() {
     updateMatrix();
 }
 
-// Interface uses (row, col) but for VIC-20 the first arg selects the PB
-// column and the second is the PA row bit — consistent with the key map.
 void KbdVic20::keyDown(int row, int col) {
     if (row >= 0 && row < 8 && col >= 0 && col < 8) {
         m_matrix[row] &= ~(1 << col);
@@ -56,6 +54,14 @@ void KbdVic20::keyUp(int row, int col) {
 }
 
 bool KbdVic20::pressKeyByName(const std::string& keyName, bool down) {
+    if (keyName.empty()) return false;
+
+    // Handle uppercase by shifting
+    if (keyName.size() == 1 && keyName[0] >= 'A' && keyName[0] <= 'Z') {
+        std::string lower(1, (char)std::tolower(keyName[0]));
+        return pressCombo({"left_shift", lower}, down);
+    }
+
     std::string lower = keyName;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
     
@@ -73,13 +79,14 @@ bool KbdVic20::pressKeyByName(const std::string& keyName, bool down) {
     if (lower == "less")      return pressCombo({"left_shift", "comma"}, down);
     if (lower == "greater")   return pressCombo({"left_shift", "period"}, down);
     if (lower == "colon")     return pressCombo({"left_shift", "semicolon"}, down);
-    if (lower == "bracket_left")  return pressCombo({"left_shift", "at"}, down); // Map to shifted @ for now?
-    // Wait, on VIC-20 [ is Shift + : ? No.
-    // I'll just use common host-side names for now.
+    if (lower == "bracket_left")  return pressCombo({"left_shift", "at"}, down);
+    
+    if (lower == "backslash") return pressKeyByName("arrow_left", down);
 
     // Aliases
     if (lower == "uparrow")   lower = "arrow_up";
     if (lower == "leftarrow") lower = "arrow_left";
+    if (lower == "shift")     lower = "left_shift";
 
     if (m_keyMap.count(lower)) {
         auto pos = m_keyMap[lower];
@@ -93,10 +100,6 @@ bool KbdVic20::pressKeyByName(const std::string& keyName, bool down) {
 bool KbdVic20::pressCombo(const std::vector<std::string>& keys, bool down) {
     bool ok = true;
     for (const auto& k : keys) {
-        // Don't release modifiers in a combo; let the host send separate release events.
-        if (!down && (k == "left_shift" || k == "right_shift" || k == "ctrl" || k == "cbm")) {
-            continue;
-        }
         if (m_keyMap.count(k)) {
             auto pos = m_keyMap[k];
             if (down) keyDown(pos.first, pos.second);
@@ -118,4 +121,84 @@ void KbdVic20::updateMatrix() {
         }
     }
     m_rowVal = rows;
+}
+
+void KbdVic20::enqueueText(const std::string& text) {
+    for (size_t i = 0; i < text.size(); ++i) {
+        std::string name;
+        if (text[i] == '\\' && i + 1 < text.size()) {
+            i++;
+            switch (text[i]) {
+                case 'n': case 'r': name = "return"; break;
+                case 't':           name = "space"; break; 
+                case '\\':          name = "arrow_left"; break;
+                default:            name = std::string(1, text[i]); break;
+            }
+        } else {
+            char c = text[i];
+            if (c == '\n' || c == '\r') name = "return";
+            else if (c == '\t')         name = "space";
+            else if (c == '\\')         name = "arrow_left";
+            else {
+                if (c >= 'A' && c <= 'Z') name = std::string(1, c);
+                else {
+                    switch (c) {
+                        case ' ': name = "space"; break;
+                        case '!': name = "exclaim"; break;
+                        case '"': name = "dquote"; break;
+                        case '#': name = "hash"; break;
+                        case '$': name = "dollar"; break;
+                        case '%': name = "percent"; break;
+                        case '&': name = "ampersand"; break;
+                        case '\'': name = "squote"; break;
+                        case '(': name = "lparen"; break;
+                        case ')': name = "rparen"; break;
+                        case '*': name = "asterisk"; break;
+                        case '+': name = "plus"; break;
+                        case ',': name = "comma"; break;
+                        case '-': name = "minus"; break;
+                        case '.': name = "period"; break;
+                        case '/': name = "slash"; break;
+                        case ':': name = "colon"; break;
+                        case ';': name = "semicolon"; break;
+                        case '<': name = "less"; break;
+                        case '=': name = "equal"; break;
+                        case '>': name = "greater"; break;
+                        case '?': name = "question"; break;
+                        case '@': name = "at"; break;
+                        case '[': name = "bracket_left"; break;
+                        case '^': name = "uparrow"; break;
+                        case '_': name = "leftarrow"; break;
+                        default:  name = std::string(1, c); break;
+                    }
+                }
+            }
+        }
+        
+        if (!name.empty()) {
+            m_typeQueue.push_back({name, true});
+            m_typeQueue.push_back({name, false});
+            m_typeQueue.push_back({"idle", false});
+        }
+    }
+}
+
+void KbdVic20::tick(uint64_t cycles) {
+    if (m_typeQueue.empty()) return;
+
+    if (m_typeTimer > cycles) {
+        m_typeTimer -= cycles;
+        return;
+    }
+
+    TypeEvent ev = m_typeQueue.front();
+    m_typeQueue.erase(m_typeQueue.begin());
+    
+    if (ev.keyName == "idle") {
+        clearKeys();
+    } else {
+        pressKeyByName(ev.keyName, ev.down);
+    }
+    
+    m_typeTimer = 200000; 
 }
