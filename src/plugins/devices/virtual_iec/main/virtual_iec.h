@@ -78,6 +78,9 @@ private:
     int  m_track;
     int  m_sector;
     bool m_led;
+    uint8_t m_lastWriteVal = 0xFF;
+    int m_bytesSent = 0;
+    bool m_lastDataIn = false;
 
     void* m_logger = nullptr;
     void (*m_logNamed)(void*, int, const char*) = nullptr;
@@ -88,4 +91,5 @@ private:
     void processCommand(uint8_t cmd);
     void generateDirectoryListing();
     void log(const char* fmt, ...);
+    void logDebug(const char* fmt, ...);
 };

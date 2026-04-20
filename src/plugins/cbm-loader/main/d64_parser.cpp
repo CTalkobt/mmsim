@@ -161,6 +161,56 @@ found:
         t = nextT;
         s = nextS;
     }
-    
+
     return true;
+}
+
+std::string D64Parser::getDiskName() {
+    if (m_data.empty()) return "";
+
+    // Disk name is in directory sector (track 18, sector 1) at offset 0x90
+    uint32_t dirOffset = getSectorOffset(18, 1);
+    if (dirOffset + 0x90 + 16 >= m_data.size()) return "";
+
+    const uint8_t* dirData = &m_data[dirOffset];
+    char name[17];
+    std::memcpy(name, &dirData[0x90], 16);
+    name[16] = '\0';
+
+    // Trim trailing 0xA0 padding
+    for (int i = 15; i >= 0; --i) {
+        if ((uint8_t)name[i] == 0xA0) name[i] = '\0';
+        else break;
+    }
+
+    return name;
+}
+
+std::string D64Parser::getDiskId() {
+    if (m_data.empty()) return "";
+
+    // Disk ID is in directory sector (track 18, sector 1) at offset 0xA2-0xA3
+    uint32_t dirOffset = getSectorOffset(18, 1);
+    if (dirOffset + 0xA3 >= m_data.size()) return "";
+
+    const uint8_t* dirData = &m_data[dirOffset];
+    char id[3];
+    id[0] = (char)dirData[0xA2];
+    id[1] = (char)dirData[0xA3];
+    id[2] = '\0';
+
+    return id;
+}
+
+uint16_t D64Parser::getFreeBlocks() const {
+    if (m_data.empty()) return 0;
+
+    // Free block count is stored in directory sector (track 18, sector 1) at offset 0xBD-0xBE (little-endian)
+    uint32_t dirOffset = getSectorOffset(18, 1);
+    if (dirOffset + 0xBE >= m_data.size()) return 0;
+
+    const uint8_t* dirData = &m_data[dirOffset];
+    uint16_t freeBlocks = dirData[0xBD] | (dirData[0xBE] << 8);
+
+    return freeBlocks;
 }

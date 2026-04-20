@@ -15,4 +15,7 @@ public:
     virtual bool open(const std::string& path) = 0;
     virtual std::vector<CbmDirEntry> getDirectory() = 0;
     virtual bool readFile(const std::string& filename, std::vector<uint8_t>& data) = 0;
+    virtual std::string getDiskName() { return ""; }
+    virtual std::string getDiskId() { return ""; }
+    virtual uint16_t getFreeBlocks() const { return 0; }
 };

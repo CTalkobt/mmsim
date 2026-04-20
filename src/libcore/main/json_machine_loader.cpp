@@ -629,6 +629,10 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
                     std::string portDev  = bp.value("device", "");
                     std::string portName = bp.value("port",   "A");
                     if (devPtrs.count(portDev)) {
+                        fprintf(stderr, "[IEC Wiring] Connecting %s to %s port %s (dev=%p, iec=%p)\n",
+                                iecDevName.c_str(), portDev.c_str(), portName.c_str(),
+                                (void*)devPtrs[portDev], (void*)iec);
+                        fflush(stderr);
                         if (portName == "A")
                             devPtrs[portDev]->setPortADevice(iec);
                         else

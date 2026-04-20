@@ -115,7 +115,16 @@ void KbdC64::enqueueText(const std::string& text) {
             else if (c == '\t')         name = "space";
             else if (c == '\\')         name = "arrow_left";
             else {
-                switch (c) {
+                // On the C64, the default charset is uppercase/graphics.
+                // Unshifted letter keys produce uppercase PETSCII,
+                // shifted letter keys produce lowercase PETSCII.
+                // So ASCII uppercase -> unshifted key (lowercase name),
+                //    ASCII lowercase -> shifted key (uppercase name).
+                if (c >= 'A' && c <= 'Z') {
+                    name = std::string(1, (char)std::tolower(c));
+                } else if (c >= 'a' && c <= 'z') {
+                    name = std::string(1, (char)std::toupper(c));
+                } else switch (c) {
                     case ' ': name = "space"; break;
                     case '!': name = "exclaim"; break;
                     case '"': name = "dquote"; break;
