@@ -1,0 +1,14 @@
+{
+  "machines": [
+    {
+      "id": "rawMega65",
+      "displayName": "Raw MEGA65 (45GS02 / RAM only)",
+      "bus": { "type": "FlatMemoryBus", "name": "system", "addrBits": 28 },
+      "cpu": { "type": "45gs02", "dataBus": "system", "codeBus": "system" },
+      "devices": [
+        { "type": "hyper_serial", "name": "HyperSerial", "baseAddr": "0xD6C0" }
+      ],
+      "roms": []
+    }
+  ]
+}

@@ -89,6 +89,8 @@ public:
     virtual void addRomOverlay   (uint32_t base, uint32_t size, const uint8_t* data) {}
     virtual void removeRomOverlay(uint32_t base) {}
 
+    virtual bool isHaltRequested() { return false; }
+
     void setObserver(ExecutionObserver* obs) { m_observer = obs; }
     ExecutionObserver* getObserver() const { return m_observer; }
 

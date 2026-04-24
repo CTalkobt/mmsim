@@ -69,6 +69,8 @@ public:
     void addRomOverlay   (uint32_t base, uint32_t size, const uint8_t* data) override;
     void removeRomOverlay(uint32_t base) override;
 
+    bool isHaltRequested() override;
+
     /**
      * Direct pointer to the underlying flat RAM array (bypasses overlays and IO
      * hooks).  Use for banking controllers that need to return underlying RAM
@@ -83,6 +85,8 @@ public:
      */
     void setIoHooks(std::function<bool(IBus*, uint32_t, uint8_t*)> readFn,
                     std::function<bool(IBus*, uint32_t, uint8_t)>  writeFn);
+    
+    void setHaltCheck(std::function<bool()> checkFn) { m_haltCheck = std::move(checkFn); }
 
 private:
     std::string m_name;
@@ -95,6 +99,7 @@ private:
 
     std::function<bool(IBus*, uint32_t, uint8_t*)> m_ioRead;
     std::function<bool(IBus*, uint32_t, uint8_t)>  m_ioWrite;
+    std::function<bool()>                          m_haltCheck;
 
     const RomOverlay* findOverlay(uint32_t addr) const;
 };

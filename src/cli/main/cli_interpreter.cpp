@@ -96,6 +96,20 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         } else {
             m_output("Usage: log <list|level>\n");
         }
+    } else if (cmd == "save") {
+        std::string path;
+        std::string addrStr, lenStr;
+        if (ss >> path >> addrStr >> lenStr) {
+            uint32_t addr, len;
+            if (ExpressionEvaluator::evaluate(addrStr, m_ctx.dbg, addr) &&
+                ExpressionEvaluator::evaluate(lenStr, m_ctx.dbg, len)) {
+                saveMemory(path, addr, len);
+            } else {
+                m_output("Invalid address or length.\n");
+            }
+        } else {
+            m_output("Usage: save <path> <addr> <len>\n");
+        }
     } else if (cmd == "create") {
         std::string id;
         if (ss >> id) {
@@ -1005,4 +1019,22 @@ void CliInterpreter::showRegisters() {
     }
     res << "\nCycles: " << std::dec << m_ctx.cpu->cycles() << "\n";
     m_output(res.str());
+}
+
+void CliInterpreter::saveMemory(const std::string& path, uint32_t addr, uint32_t len) {
+    if (!m_ctx.bus) {
+        m_output("No bus available.\n");
+        return;
+    }
+    FILE* f = fopen(path.c_str(), "wb");
+    if (!f) {
+        m_output("Failed to open file for writing: " + path + "\n");
+        return;
+    }
+    for (uint32_t i = 0; i < len; ++i) {
+        uint8_t val = m_ctx.bus->read8(addr + i);
+        fputc(val, f);
+    }
+    fclose(f);
+    m_output("Saved " + std::to_string(len) + " bytes to " + path + "\n");
 }

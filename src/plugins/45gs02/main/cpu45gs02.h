@@ -1,0 +1,114 @@
+#pragma once
+
+#include "libcore/main/icore.h"
+#include <cstdint>
+
+/**
+ * 45GS02 Status Flags (same as 6502).
+ */
+#define FLAG_C 0x01
+#define FLAG_Z 0x02
+#define FLAG_I 0x04
+#define FLAG_D 0x08
+#define FLAG_B 0x10
+#define FLAG_U 0x20
+#define FLAG_V 0x40
+#define FLAG_N 0x80
+
+/**
+ * 45GS02 Internal State.
+ */
+struct CPU45GS02State {
+    uint8_t  a;
+    uint8_t  x;
+    uint8_t  y;
+    uint8_t  z;
+    uint8_t  b;      // Base page register
+    uint16_t sp;     // 16-bit stack pointer
+    uint16_t pc;
+    uint8_t  p;
+    uint64_t cycles;
+    
+    // MMU (MAP) state
+    uint16_t map[4]; // 4 slots of 16KB mapping
+    bool     mapEnabled;
+
+    uint8_t  irqLine;
+    uint8_t  nmiLine;
+    uint8_t  haltLine;
+};
+
+/**
+ * MEGA65 45GS02 CPU Implementation.
+ */
+class MOS45GS02 : public ICore {
+public:
+    MOS45GS02();
+    virtual ~MOS45GS02() {}
+
+    // ISA identification
+    const char* isaName()     const override { return "45GS02"; }
+    const char* variantName() const override { return "MEGA65 45GS02"; }
+    uint32_t    isaCaps()     const override { return 0; }
+
+    // Register descriptor table
+    int                  regCount()             const override;
+    const RegDescriptor* regDescriptor(int idx) const override;
+    uint32_t             regRead (int idx)      const override;
+    void                 regWrite(int idx, uint32_t val) override;
+
+    // Convenience accessors
+    uint32_t pc() const override { return m_state.pc; }
+    void     setPc(uint32_t addr) override { m_state.pc = (uint16_t)addr; }
+    uint32_t sp() const override { return m_state.sp; }
+
+    // Execution
+    int  step()  override;
+    void reset() override;
+
+    // Interrupts
+    void triggerIrq()   override;
+    void triggerNmi()   override;
+    void triggerReset() override { reset(); }
+    void setIrqLine(bool asserted) override { m_state.irqLine = asserted ? 1 : 0; }
+    void setNmiLine(bool asserted) override { m_state.nmiLine = asserted ? 1 : 0; }
+    void setHaltLine(bool asserted) override { m_state.haltLine = asserted ? 1 : 0; }
+
+    // Disassembly (stubs for now)
+    int disassembleOne  (IBus* bus, uint32_t addr, char* buf, int bufsz) override;
+    int disassembleEntry(IBus* bus, uint32_t addr, void* entryOut)      override;
+
+    // Snapshot support
+    size_t stateSize()             const override { return sizeof(CPU45GS02State); }
+    void   saveState(uint8_t* buf) const override;
+    void   loadState(const uint8_t* buf) override;
+
+    // Step-over / step-out heuristics
+    int  isCallAt    (IBus* bus, uint32_t addr) override;
+    bool isReturnAt  (IBus* bus, uint32_t addr) override;
+    bool isProgramEnd(IBus* bus)                override;
+
+    int writeCallHarness(IBus* bus, uint32_t scratch, uint32_t routineAddr) override;
+
+    // Bus attachment
+    void setDataBus(IBus* bus) override { m_bus = bus; }
+    void setCodeBus(IBus* bus) override { m_bus = bus; }
+    void setIoBus  (IBus* bus) override { (void)bus; }
+
+    IBus* getDataBus() const override { return m_bus; }
+    IBus* getCodeBus() const override { return m_bus; }
+    IBus* getIoBus()   const override { return nullptr; }
+    bool isHalted() const override { return m_state.haltLine; }
+
+    uint64_t cycles() const override { return m_state.cycles; }
+
+private:
+    CPU45GS02State m_state;
+    IBus*          m_bus;
+
+    // Helper for address translation (MAP)
+    uint32_t translate(uint16_t addr);
+    uint8_t  read8(uint16_t addr);
+    void     write8(uint16_t addr, uint8_t val);
+    void     updateNZ(uint8_t val);
+};

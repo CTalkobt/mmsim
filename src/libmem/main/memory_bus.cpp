@@ -147,3 +147,8 @@ void FlatMemoryBus::setIoHooks(std::function<bool(IBus*, uint32_t, uint8_t*)> re
     m_ioRead  = std::move(readFn);
     m_ioWrite = std::move(writeFn);
 }
+
+bool FlatMemoryBus::isHaltRequested() {
+    if (m_haltCheck) return m_haltCheck();
+    return false;
+}

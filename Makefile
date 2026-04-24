@@ -18,6 +18,8 @@ INCLUDES  = -Isrc -Isrc/include -Isrc/cli/main -Isrc/gui/main -Isrc/libcore/main
 	-Isrc/plugins/devices/crtc6545/main -Isrc/plugins/devices/pet_video/main \
 	-Isrc/plugins/devices/pokey/main -Isrc/plugins/devices/datasette/main \
 	-Isrc/plugins/devices/keyboard/main \
+	-Isrc/plugins/45gs02/main \
+	-Isrc/plugins/devices/hyper_serial/main \
 	-Isrc/plugins/devices/virtual_iec/main \
 	-Isrc/plugins/machines/pet/main -Itests/src
 
@@ -61,6 +63,12 @@ PLUGIN_6502_SRCS = src/plugins/6502/main/cpu6502.cpp \
 	src/plugins/6502/main/assembler_6502.cpp \
 	src/plugins/6502/main/kickassembler.cpp \
 	src/plugins/6502/main/plugin_init.cpp
+
+PLUGIN_45GS02_SRCS = src/plugins/45gs02/main/cpu45gs02.cpp \
+	src/plugins/45gs02/main/plugin_init.cpp
+
+PLUGIN_HYPERSERIAL_SRCS = src/plugins/devices/hyper_serial/main/hyper_serial.cpp \
+	src/plugins/devices/hyper_serial/main/plugin_init.cpp
 
 PLUGIN_VIA6522_SRCS = src/plugins/devices/via6522/main/via6522.cpp \
 	src/plugins/devices/via6522/main/plugin_init.cpp
@@ -280,6 +288,8 @@ LIBDEBUG_OBJS     = $(LIBDEBUG_SRCS:.cpp=.o)
 LIBPLUGINS_OBJS   = $(LIBPLUGINS_SRCS:.cpp=.o)
 
 PLUGIN_6502_OBJS  = $(PLUGIN_6502_SRCS:.cpp=.o)
+PLUGIN_45GS02_OBJS = $(PLUGIN_45GS02_SRCS:.cpp=.o)
+PLUGIN_HYPERSERIAL_OBJS = $(PLUGIN_HYPERSERIAL_SRCS:.cpp=.o)
 PLUGIN_VIA6522_OBJS = $(PLUGIN_VIA6522_SRCS:.cpp=.o)
 PLUGIN_VIC6560_OBJS = $(PLUGIN_VIC6560_SRCS:.cpp=.o)
 PLUGIN_KBDVIC20_OBJS = $(PLUGIN_KBDVIC20_SRCS:.cpp=.o)
@@ -326,6 +336,8 @@ GUI_BIN = $(BINDIR)/mmemu-gui
 MCP_BIN = $(BINDIR)/mmemu-mcp
 
 PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
+	$(LIBDIR)/mmemu-plugin-45gs02.so \
+	$(LIBDIR)/mmemu-plugin-hyper-serial.so \
 	$(LIBDIR)/mmemu-plugin-via6522.so \
 	$(LIBDIR)/mmemu-plugin-vic6560.so \
 	$(LIBDIR)/mmemu-plugin-vic20.so \
@@ -387,6 +399,12 @@ $(ILIBDIR)/libplugins.a: $(LIBPLUGINS_OBJS) | $(ILIBDIR)
 
 # Plugin rules
 $(LIBDIR)/mmemu-plugin-6502.so: $(PLUGIN_6502_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
+
+$(LIBDIR)/mmemu-plugin-45gs02.so: $(PLUGIN_45GS02_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
+
+$(LIBDIR)/mmemu-plugin-hyper-serial.so: $(PLUGIN_HYPERSERIAL_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 $(LIBDIR)/mmemu-plugin-via6522.so: $(PLUGIN_VIA6522_OBJS) | $(LIBDIR)
@@ -479,8 +497,13 @@ src/mcp/main/main_test.o: src/mcp/main/main.cpp
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-test: $(TEST_BIN) plugins
+test: $(TEST_BIN) plugins test-mega65
 	./$(TEST_BIN)
+
+test-mega65: $(CLI_BIN) plugins
+	@echo "Running 45GS02 Validation Suite..."
+	./tests/45gs02/validate.py tests/45gs02/arithmetic.asm
+	./tests/45gs02/validate.py tests/45gs02/transfers.asm
 
 clean:
 	rm -rf $(BINDIR) $(LIBDIR) $(ILIBDIR)

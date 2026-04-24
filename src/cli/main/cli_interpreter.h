@@ -36,6 +36,7 @@ private:
     void handleAssemblyLine(const std::string& line);
     void printHelp();
     void dumpMemory(uint32_t addr, uint32_t len);
+    void saveMemory(const std::string& path, uint32_t addr, uint32_t len);
     void showRegisters();
 
     CliContext& m_ctx;
