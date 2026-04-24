@@ -7,6 +7,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <stdlib.h>
 
 static void loadAllPlugins() {
     PluginLoader::instance().loadFromDir("./lib");
@@ -14,6 +15,8 @@ static void loadAllPlugins() {
 
 TEST_CASE(validate_all_plugins) {
     loadAllPlugins();
+
+    setenv("XEMU_NO_DIALOGS", "1", 1); 
 
     std::cout << "Validating Cores..." << std::endl;
     std::vector<CoreRegistry::CoreInfo> cores;

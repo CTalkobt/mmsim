@@ -458,6 +458,16 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
                     return io->dispatchWrite(b, a, v);
                 });
         }
+        
+        bus->setHaltCheck([io]() {
+            if (!io) return false;
+            std::vector<IOHandler*> handlers;
+            io->enumerate(handlers);
+            for (auto* h : handlers) {
+                if (h->isHaltRequested()) return true;
+            }
+            return false;
+        });
     }
 
     // -----------------------------------------------------------------------

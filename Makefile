@@ -323,6 +323,7 @@ PLUGIN_GTIA_OBJS = $(PLUGIN_GTIA_SRCS:.cpp=.o)
 PLUGIN_DATASETTE_OBJS = $(PLUGIN_DATASETTE_SRCS:.cpp=.o)
 PLUGIN_POKEY_OBJS = $(PLUGIN_POKEY_SRCS:.cpp=.o)
 PLUGIN_VIRTUALIEC_OBJS = $(PLUGIN_VIRTUALIEC_SRCS:.cpp=.o)
+PLUGIN_EXIT_TRAP_OBJS = src/plugins/devices/exit_trap/main/exit_trap.o
 PLUGIN_CBMHLE_OBJS = $(PLUGIN_CBMHLE_SRCS:.cpp=.o)
 
 GUI_OBJS = $(GUI_SRCS:.cpp=.o)
@@ -358,6 +359,7 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
 	$(LIBDIR)/mmemu-plugin-pokey.so \
         $(LIBDIR)/mmemu-plugin-datasette.so \
 	$(LIBDIR)/mmemu-plugin-virtual-iec.so \
+	$(LIBDIR)/mmemu-plugin-exit-trap.so \
 	$(LIBDIR)/mmemu-plugin-cbm-hle.so
 
 LIBS = $(ILIBDIR)/libmem.a $(ILIBDIR)/libcore.a $(ILIBDIR)/libdevices.a \
@@ -467,6 +469,9 @@ $(LIBDIR)/mmemu-plugin-pokey.so: $(PLUGIN_POKEY_OBJS) | $(LIBDIR)
 $(LIBDIR)/mmemu-plugin-virtual-iec.so: $(PLUGIN_VIRTUALIEC_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
+$(LIBDIR)/mmemu-plugin-exit-trap.so: $(PLUGIN_EXIT_TRAP_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
+
 $(LIBDIR)/mmemu-plugin-cbm-hle.so: $(PLUGIN_CBMHLE_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
@@ -504,6 +509,7 @@ test-mega65: $(CLI_BIN) plugins
 	@echo "Running 45GS02 Validation Suite..."
 	./tests/45gs02/validate.py tests/45gs02/arithmetic.asm
 	./tests/45gs02/validate.py tests/45gs02/transfers.asm
+	./tests/45gs02/validate.py tests/45gs02/advanced.asm
 
 clean:
 	rm -rf $(BINDIR) $(LIBDIR) $(ILIBDIR)

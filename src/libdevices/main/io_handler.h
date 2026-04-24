@@ -72,6 +72,7 @@ public:
     virtual void stopTapeRecord()                            {}
     virtual bool saveTapeRecording(const std::string& path)  { return false; }
     virtual bool isTapeRecording() const                     { return false; }
+    virtual bool isHaltRequested() const                     { return false; }
 
     // -----------------------------------------------------------------------
     // Identity (pure virtual — every device must provide these)

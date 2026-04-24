@@ -1,0 +1,83 @@
+// KickAssembler 45GS02 Advanced Instructions Test
+.cpu _45gs02
+
+.const EXIT_TRIGGER = $d6cf
+.const RESULTS_BASE = $0400
+
+// BASIC header: 10 SYS 2064 ($0810)
+* = $0801
+    .byte $0C, $08, $0A, $00, $9E, $20, $32, $30, $36, $34, $00, $00, $00
+
+* = $0810 "Program"
+
+start:
+    lda #0
+    sta RESULTS_BASE
+    sta RESULTS_BASE+1
+
+    // 1. Test INW / DEW
+    lda #$FF
+    sta $10
+    lda #$00
+    sta $11
+    
+    inw $10         // $00FF -> $0100
+    
+    lda $10
+    cmp #$00
+    bne word_fail
+    lda $11
+    cmp #$01
+    bne word_fail
+    
+    dew $10         // $0100 -> $00FF
+    
+    lda $10
+    cmp #$FF
+    bne word_fail
+    lda $11
+    cmp #$00
+    bne word_fail
+    
+    lda #$01
+    sta RESULTS_BASE
+
+test_bits:
+    // 2. Test SMB / RMB / BBS / BBR
+    lda #%01010101
+    sta $20
+    smb1 $20      // Set bit 1 -> %01010111
+    lda $20
+    cmp #%01010111
+    bne bit_fail
+    
+    rmb0 $20      // Clear bit 0 -> %01010110
+    lda $20
+    cmp #%01010110
+    bne bit_fail
+    
+    bbs1 $20, b1_set
+    jmp bit_fail
+b1_set:
+    bbr0 $20, b0_clr
+    jmp bit_fail
+b0_clr:
+    lda #$01
+    sta RESULTS_BASE + 1
+    jmp end
+
+word_fail:
+    lda #$FF
+    sta RESULTS_BASE
+    jmp end
+
+bit_fail:
+    lda #$FF
+    sta RESULTS_BASE + 1
+    jmp end
+
+end:
+    lda #$42
+    sta EXIT_TRIGGER
+loop:
+    jmp loop

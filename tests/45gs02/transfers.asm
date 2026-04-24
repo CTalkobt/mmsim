@@ -48,4 +48,5 @@ b_ok:
 end:
     lda #$42
     sta EXIT_TRIGGER
-    jmp start
+loop:
+    jmp loop

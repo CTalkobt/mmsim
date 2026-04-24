@@ -17,3 +17,5 @@ GEMINI.md
 ref/
 rom/
 .aider*
+
+tests/45gs02/tests

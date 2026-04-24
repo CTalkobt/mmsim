@@ -49,4 +49,5 @@ end:
     sta SERIAL_DATA
     lda #$42
     sta EXIT_TRIGGER
-    jmp start
+loop:
+    jmp loop

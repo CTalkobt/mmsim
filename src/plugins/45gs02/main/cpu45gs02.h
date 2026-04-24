@@ -111,4 +111,9 @@ private:
     uint8_t  read8(uint16_t addr);
     void     write8(uint16_t addr, uint8_t val);
     void     updateNZ(uint8_t val);
+    void     updateNZ16(uint16_t val);
+    void     push8(uint8_t v);
+    uint8_t  pull8();
+    void     push16(uint16_t v);
+    uint16_t pull16();
 };
