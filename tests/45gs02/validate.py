@@ -4,7 +4,7 @@ import os
 import sys
 import time
 
-XMEGA65 = "/home/duck/src/xemu/build/bin/xmega65.native"
+XMEGA65 = "/usr/local/bin/xemu-xmega65"
 MMSIM_CLI = "./bin/mmemu-cli"
 KICKASS = "tools/KickAss65CE02.jar"
 
