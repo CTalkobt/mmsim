@@ -94,8 +94,23 @@ void MOS45GS02::write8_phys(uint32_t physAddr, uint8_t val) { if (m_bus) m_bus->
 void MOS45GS02::updateNZ(uint8_t val) { m_state.p &= ~(FLAG_N | FLAG_Z); if (!val) m_state.p |= FLAG_Z; if (val & 0x80) m_state.p |= FLAG_N; }
 void MOS45GS02::updateNZ16(uint16_t val) { m_state.p &= ~(FLAG_N | FLAG_Z); if (!val) m_state.p |= FLAG_Z; if (val & 0x8000) m_state.p |= FLAG_N; }
 void MOS45GS02::updateNZ32(uint32_t val) { m_state.p &= ~(FLAG_N | FLAG_Z); if (!val) m_state.p |= FLAG_Z; if (val & 0x80000000) m_state.p |= FLAG_N; }
-void MOS45GS02::push8(uint8_t v) { write8(m_state.sp--, v); }
-uint8_t MOS45GS02::pull8() { return read8(++m_state.sp); }
+
+void MOS45GS02::push8(uint8_t v) {
+    write8(m_state.sp, v);
+    if (m_state.p & FLAG_E) {
+        m_state.sp = 0x0100 | ((m_state.sp - 1) & 0xFF);
+    } else {
+        m_state.sp--;
+    }
+}
+uint8_t MOS45GS02::pull8() {
+    if (m_state.p & FLAG_E) {
+        m_state.sp = 0x0100 | ((m_state.sp + 1) & 0xFF);
+    } else {
+        m_state.sp++;
+    }
+    return read8(m_state.sp);
+}
 void MOS45GS02::push16(uint16_t v) { push8(v >> 8); push8(v & 0xFF); }
 uint16_t MOS45GS02::pull16() { uint8_t l = pull8(); uint8_t h = pull8(); return l | (h << 8); }
 
@@ -129,7 +144,8 @@ int MOS45GS02::step() {
             break;
         } else if (op == 0xEA) {
             uint8_t next = read8(m_state.pc);
-            if (next == 0xB2 || next == 0x92 || next == 0x12) {
+            if (next == 0x12 || next == 0x32 || next == 0x52 || next == 0x72 ||
+                next == 0x92 || next == 0xB2 || next == 0xD2 || next == 0xF2) {
                 is32BitInd = true;
                 continue;
             }
@@ -144,6 +160,14 @@ int MOS45GS02::step() {
     auto getAbsY = [&]() { return getAbs() + m_state.y; };
     auto getZpX  = [&]() { uint8_t z=read8(m_state.pc++); m_state.cycles++; return (uint16_t)((m_state.b << 8) | (uint8_t)(z + m_state.x)); };
     auto getZpY  = [&]() { uint8_t z=read8(m_state.pc++); m_state.cycles++; return (uint16_t)((m_state.b << 8) | (uint8_t)(z + m_state.y)); };
+
+    auto getStackRelIndY = [&]() {
+        uint8_t offset = read8(m_state.pc++);
+        uint16_t ptrAddr = m_state.sp + offset;
+        uint16_t ptr = (uint16_t)read8(ptrAddr) | ((uint16_t)read8(ptrAddr + 1) << 8);
+        m_state.cycles += 4;
+        return ptr + m_state.y;
+    };
 
     auto getIndPhys = [&]() {
         uint16_t zpAddr = getZp();
@@ -199,6 +223,10 @@ int MOS45GS02::step() {
 
     switch (op) {
         case 0x00: m_state.haltLine = 1; break; // BRK
+        case 0x02: m_state.p &= ~FLAG_E; break; // CLE
+        case 0x03: m_state.p |=  FLAG_E; break; // SEE
+        case 0x0B: m_state.y = (uint8_t)(m_state.sp & 0xFF); updateNZ(m_state.y); break; // TSY
+        case 0x2B: m_state.sp = (m_state.sp & 0xFF00) | m_state.y; break; // TYS
         case 0xEA: break; // NOP (naked NOP)
         
         // --- 1. Load / Store ---
@@ -230,6 +258,7 @@ int MOS45GS02::step() {
             break;
         }
         case 0xB5: m_state.a = read8(getZpX()); updateNZ(m_state.a); m_state.cycles++; break;
+        case 0xE2: m_state.a = read8(getStackRelIndY()); updateNZ(m_state.a); break; // LDA (d,S),Y
 
         case 0xB2: { // LDA (zp),z / LDQ (zp),z
             uint32_t base = getIndPhys();
@@ -279,6 +308,7 @@ int MOS45GS02::step() {
             break;
         }
         case 0x95: write8(getZpX(), m_state.a); m_state.cycles++; break;
+        case 0x82: write8(getStackRelIndY(), m_state.a); break; // STA (d,S),Y
 
         case 0x92: { // STA (zp),z / STQ (zp),z
             uint32_t base = getIndPhys();
@@ -454,6 +484,29 @@ int MOS45GS02::step() {
             break;
         }
 
+        case 0x04: { uint16_t a=getZp(); uint8_t v=read8(a); if(!(m_state.a&v)) m_state.p|=FLAG_Z; else m_state.p&=~FLAG_Z; write8(a,v|m_state.a); m_state.cycles++; break; } // TSB zp
+        case 0x0C: { uint16_t a=getAbs(); uint8_t v=read8(a); if(!(m_state.a&v)) m_state.p|=FLAG_Z; else m_state.p&=~FLAG_Z; write8(a,v|m_state.a); m_state.cycles++; break; } // TSB abs
+        case 0x14: { uint16_t a=getZp(); uint8_t v=read8(a); if(!(m_state.a&v)) m_state.p|=FLAG_Z; else m_state.p&=~FLAG_Z; write8(a,v&~m_state.a); m_state.cycles++; break; } // TRB zp
+        case 0x1C: { uint16_t a=getAbs(); uint8_t v=read8(a); if(!(m_state.a&v)) m_state.p|=FLAG_Z; else m_state.p&=~FLAG_Z; write8(a,v&~m_state.a); m_state.cycles++; break; } // TRB abs
+
+        case 0x43: { // ASR A
+            m_state.p = (m_state.p & ~FLAG_C) | (m_state.a & 1);
+            m_state.a = (m_state.a & 0x80) | (m_state.a >> 1);
+            updateNZ(m_state.a); break;
+        }
+        case 0x44: { // ASR zp
+            uint16_t a=getZp(); uint8_t v=read8(a);
+            m_state.p = (m_state.p & ~FLAG_C) | (v & 1);
+            v = (v & 0x80) | (v >> 1);
+            write8(a, v); updateNZ(v); break;
+        }
+        case 0x54: { // ASR zp,X
+            uint16_t a=getZpX(); uint8_t v=read8(a);
+            m_state.p = (m_state.p & ~FLAG_C) | (v & 1);
+            v = (v & 0x80) | (v >> 1);
+            write8(a, v); updateNZ(v); break;
+        }
+
         // --- 3. Increments / Decrements ---
         case 0xE8: m_state.x++; updateNZ(m_state.x); break;
         case 0xCA: m_state.x--; updateNZ(m_state.x); break;
@@ -501,8 +554,11 @@ int MOS45GS02::step() {
         case 0xDB: push8(m_state.z); break;
         case 0xFB: m_state.z = pull8(); updateNZ(m_state.z); break;
 
-        case 0xF4: { uint16_t v = getAbs(); push16(v); break; } // PHW (abs)
-        case 0xE2: { uint16_t l = read8(m_state.pc++); uint16_t h = read8(m_state.pc++); uint16_t v = l | (h << 8); m_state.cycles += 2; push16(v); break; } // PHW #imm
+        case 0x22: { uint16_t a=getAbs(); uint16_t t=read8(a)|(read8(a+1)<<8); push16(m_state.pc-1); m_state.pc=t; m_state.cycles+=2; break; } // JSR (abs)
+        case 0x23: { uint16_t a=(getAbs()+m_state.x); uint16_t t=read8(a)|(read8(a+1)<<8); push16(m_state.pc-1); m_state.pc=t; m_state.cycles+=2; break; } // JSR (abs,X)
+
+        case 0xF4: { uint16_t l=read8(m_state.pc++); uint16_t h=read8(m_state.pc++); uint16_t v=l|(h<<8); m_state.cycles+=2; push16(v); break; } // PHW #imm16
+        case 0xFC: { uint16_t a=getAbs(); uint16_t v=read8(a)|(read8(a+1)<<8); m_state.cycles+=2; push16(v); break; } // PHW abs
 
         // --- 7. Flow Control ---
         case 0x4C: m_state.pc = getAbs(); break;
@@ -512,7 +568,7 @@ int MOS45GS02::step() {
         case 0x40: { m_state.p = pull8() | FLAG_U; m_state.pc = pull16(); m_state.cycles += 3; break; } // RTI
         case 0x80: { int8_t r=(int8_t)read8(m_state.pc++); m_state.pc+=r; m_state.cycles++; break; } // BRA
         case 0x63: { int16_t r=(int16_t)read8(m_state.pc)|((int16_t)read8(m_state.pc+1)<<8); m_state.pc+=2; uint16_t ret=m_state.pc-1; push16(ret); m_state.pc+=r; m_state.cycles+=4; break; } // BSR (16-bit)
-        case 0x62: { m_state.pc = pull16() + 1; m_state.cycles += 3; break; } // RTN (impl as RTS)
+        case 0x62: { uint16_t ret = pull16(); uint8_t imm = read8(m_state.pc++); m_state.pc = ret + 1; m_state.sp += imm; m_state.cycles += 4; break; } // RTN (RTS imm)
 
         case 0xF0: { int8_t r=(int8_t)read8(m_state.pc++); if(m_state.p&FLAG_Z) { m_state.pc+=r; m_state.cycles++; } break; }
         case 0xD0: { int8_t r=(int8_t)read8(m_state.pc++); if(!(m_state.p&FLAG_Z)) { m_state.pc+=r; m_state.cycles++; } break; }
@@ -646,7 +702,8 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         }
         if (op == 0xEA) {
             uint8_t next = bus->peek8(currentAddr + 1);
-            if (next == 0xB2 || next == 0x92 || next == 0x12) {
+            if (next == 0x12 || next == 0x32 || next == 0x52 || next == 0x72 ||
+                next == 0x92 || next == 0xB2 || next == 0xD2 || next == 0xF2) {
                 is32BitInd = true;
                 currentAddr++;
                 continue;
@@ -671,6 +728,10 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
 
     switch (op) {
         case 0x00: snprintf(buf, bufsz, "BRK"); return (int)(currentAddr - addr);
+        case 0x02: snprintf(buf, bufsz, "CLE"); return (int)(currentAddr - addr);
+        case 0x03: snprintf(buf, bufsz, "SEE"); return (int)(currentAddr - addr);
+        case 0x0B: snprintf(buf, bufsz, "TSY"); return (int)(currentAddr - addr);
+        case 0x2B: snprintf(buf, bufsz, "TYS"); return (int)(currentAddr - addr);
         case 0xEA: snprintf(buf, bufsz, "NOP"); return (int)(currentAddr - addr);
         
         case 0xA9: snprintf(buf, bufsz, "LDA #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
@@ -679,6 +740,7 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0xB9: snprintf(buf, bufsz, "LDA $%04X,Y", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0xA5: snprintf(buf, bufsz, "%s $%02X", prefix, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0xB5: snprintf(buf, bufsz, "LDA $%02X,X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xE2: snprintf(buf, bufsz, "LDA ($%02X,SP),Y", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0xB2: 
             if (is32BitInd) snprintf(buf, bufsz, "%s [$%02X],Z", prefix, bus->peek8(currentAddr));
             else snprintf(buf, bufsz, "%s ($%02X),Z", prefix, bus->peek8(currentAddr));
@@ -689,6 +751,7 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0x99: snprintf(buf, bufsz, "STA $%04X,Y", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0x85: snprintf(buf, bufsz, "%s $%02X", s_prefix, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x95: snprintf(buf, bufsz, "STA $%02X,X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x82: snprintf(buf, bufsz, "STA ($%02X,SP),Y", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x92:
             if (is32BitInd) snprintf(buf, bufsz, "%s [$%02X],Z", s_prefix, bus->peek8(currentAddr));
             else snprintf(buf, bufsz, "%s ($%02X),Z", s_prefix, bus->peek8(currentAddr));
@@ -744,6 +807,14 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0x2A: snprintf(buf, bufsz, "%s A", rol_pfx); return (int)(currentAddr - addr);
         case 0x6A: snprintf(buf, bufsz, "%s A", ror_pfx); return (int)(currentAddr - addr);
 
+        case 0x04: snprintf(buf, bufsz, "TSB $%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x0C: snprintf(buf, bufsz, "TSB $%04X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x14: snprintf(buf, bufsz, "TRB $%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x1C: snprintf(buf, bufsz, "TRB $%04X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x43: snprintf(buf, bufsz, "ASR A"); return (int)(currentAddr - addr);
+        case 0x44: snprintf(buf, bufsz, "ASR $%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x54: snprintf(buf, bufsz, "ASR $%02X,X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+
         // LDX
         case 0xA2: snprintf(buf, bufsz, "LDX #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0xAE: snprintf(buf, bufsz, "LDX $%04X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
@@ -789,8 +860,11 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0x1B: snprintf(buf, bufsz, "INZ"); return (int)(currentAddr - addr);
         case 0x3B: snprintf(buf, bufsz, "DEZ"); return (int)(currentAddr - addr);
 
+        case 0x22: snprintf(buf, bufsz, "JSR ($%04X)", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x23: snprintf(buf, bufsz, "JSR ($%04X,X)", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+
         case 0x63: { int16_t r=(int16_t)bus->peek8(currentAddr)|((int16_t)bus->peek8(currentAddr+1)<<8); snprintf(buf, bufsz, "BSR $%04X", (uint16_t)(currentAddr + 2 + r)); return (int)(currentAddr + 2 - addr); }
-        case 0x62: snprintf(buf, bufsz, "RTN"); return (int)(currentAddr - addr);
+        case 0x62: snprintf(buf, bufsz, "RTN #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
 
         case 0x42: snprintf(buf, bufsz, "NEG"); return (int)(currentAddr - addr);
         case 0x5C: snprintf(buf, bufsz, "MAP"); return (int)(currentAddr - addr);
@@ -806,6 +880,9 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0x53: { int16_t r=(int16_t)bus->peek8(currentAddr)|((int16_t)bus->peek8(currentAddr+1)<<8); snprintf(buf, bufsz, "LBVC $%04X", (uint16_t)(currentAddr + 2 + r)); return (int)(currentAddr + 2 - addr); }
         case 0x73: { int16_t r=(int16_t)bus->peek8(currentAddr)|((int16_t)bus->peek8(currentAddr+1)<<8); snprintf(buf, bufsz, "LBVS $%04X", (uint16_t)(currentAddr + 2 + r)); return (int)(currentAddr + 2 - addr); }
 
+        case 0xF4: snprintf(buf, bufsz, "PHW #$%04X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0xFC: snprintf(buf, bufsz, "PHW $%04X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+
         case 0xCB: snprintf(buf, bufsz, "ASW $%04X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0xEB: snprintf(buf, bufsz, "ROW $%04X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
 
@@ -818,14 +895,14 @@ int MOS45GS02::disassembleEntry(IBus* bus, uint32_t addr, void* entryOut) {
     static char s_buf[128]; // Static buffer to avoid dangling pointer, okay for single-threaded simulator
     e->bytes = disassembleOne(bus, addr, s_buf, sizeof(s_buf)); e->complete = s_buf;
     uint8_t op = bus->peek8(addr); 
-    e->isCall = (op==0x20 || op==0x63); e->isReturn = (op==0x60||op==0x40||op==0x62);
+    e->isCall = (op==0x20 || op==0x63 || op==0x22 || op==0x23); e->isReturn = (op==0x60||op==0x40||op==0x62);
     e->isBranch = (op&0x1F)==0x10 || (op==0x80) || (op==0x83) || (op&0x1F)==0x13; return e->bytes;
 }
 
 void MOS45GS02::saveState(uint8_t* buf) const { memcpy(buf, &m_state, sizeof(m_state)); }
 void MOS45GS02::loadState(const uint8_t* buf) { memcpy(&m_state, buf, sizeof(m_state)); }
-int MOS45GS02::isCallAt(IBus* bus, uint32_t addr) { return bus->peek8(addr) == 0x20 ? 3 : 0; }
-bool MOS45GS02::isReturnAt(IBus* bus, uint32_t addr) { uint8_t op = bus->peek8(addr); return op == 0x60 || op == 0x40; }
+int MOS45GS02::isCallAt(IBus* bus, uint32_t addr) { uint8_t op = bus->peek8(addr); return (op == 0x20 || op == 0x22 || op == 0x23) ? 3 : 0; }
+bool MOS45GS02::isReturnAt(IBus* bus, uint32_t addr) { uint8_t op = bus->peek8(addr); return op == 0x60 || op == 0x40 || op == 0x62; }
 bool MOS45GS02::isProgramEnd(IBus* bus) { 
     if (m_state.haltLine) return true;
     if (bus && bus->isHaltRequested()) return true;

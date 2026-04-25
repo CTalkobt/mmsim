@@ -2,6 +2,7 @@
 .cpu _45gs02
 
 .const EXIT_TRIGGER = $d6cf
+.const MEGA65_KEY   = $d02f  // VIC-IV I/O mode key: $47,$53 unlocks MEGA65 I/O space
 .const RESULTS_BASE = $0400
 
 // BASIC header: 10 SYS 2064 ($0810)
@@ -89,7 +90,7 @@ start:
     ldz #$DD
     
     ldz #0
-    .byte $EA, $42, $42, $92, $20  // STQ [$20],z
+    .byte $42, $42, $EA, $92, $20  // STQ [$20],z
     
     lda #0
     ldx #0
@@ -97,7 +98,7 @@ start:
     ldz #0
     
     ldz #0
-    .byte $EA, $42, $42, $B2, $20  // LDQ [$20],z
+    .byte $42, $42, $EA, $B2, $20  // LDQ [$20],z
     
     cpx #$BB
     lbne ind_fail
@@ -178,7 +179,10 @@ shift_fail:
     jmp end
 
 end:
+    lda #$47        // Unlock MEGA65 I/O mode so $D6CF reaches MEGA65 I/O space
+    sta MEGA65_KEY
+    lda #$53
+    sta MEGA65_KEY
     lda #$42
     sta EXIT_TRIGGER
-loop:
-    jmp loop
+    rts

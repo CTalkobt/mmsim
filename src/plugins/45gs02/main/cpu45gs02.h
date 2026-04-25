@@ -11,7 +11,8 @@
 #define FLAG_I 0x04
 #define FLAG_D 0x08
 #define FLAG_B 0x10
-#define FLAG_U 0x20
+#define FLAG_E 0x20
+#define FLAG_U 0x20 // Alias for E flag bit in 6502 (unused)
 #define FLAG_V 0x40
 #define FLAG_N 0x80
 

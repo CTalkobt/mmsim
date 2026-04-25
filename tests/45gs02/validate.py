@@ -66,19 +66,19 @@ def run_xmega65(prg_path):
     if os.path.exists(dump_path):
         with open(dump_path, "rb") as f:
             data = f.read()
-            if len(data) >= 0x0402:
-                return data[0x0400:0x0402]
+            if len(data) >= 0x0410:
+                return data[0x0400:0x0410]
     return b""
 
 def run_mmsim(prg_path):
     dump_path = "mmsim.dump"
     if os.path.exists(dump_path): os.remove(dump_path)
     cli_script = f"create rawMega65\nload {prg_path}\nrun $0810\nsave {dump_path} $0400 16\nquit\n"
-    subprocess.run([MMSIM_CLI], input=cli_script.encode(), timeout=10, 
+    subprocess.run([MMSIM_CLI], input=cli_script.encode(), timeout=10,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if os.path.exists(dump_path):
         with open(dump_path, "rb") as f:
-            return f.read(2)
+            return f.read(16)
     return b""
 
 def main():

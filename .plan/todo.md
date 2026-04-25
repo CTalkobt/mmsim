@@ -1143,11 +1143,13 @@ registers, and Hypervisor mode. See `ref/CBM/Mega65/mega65-book.txt` Appendix K.
 - [x] **Quad arithmetic**: `ADCQ`, `SBCQ`, `ANDQ`, `ORQ`, `EORQ`, `CMPQ` —
       operate on the full Q register (32-bit A+X+Y+Z combined).
 - [x] **Quad shifts**: `ASLQ`, `LSRQ`, `ROLQ`, `RORQ` — 32-bit shift/rotate.
-- [ ] **32-bit flat indirect**: `NOP` prefix ($EA) before `LDA (zp),z` or
+- [x] **32-bit flat indirect**: `NOP` prefix ($EA) before `LDA (zp),z` or
       `STA (zp),z` activates 32-bit indirect mode: the base-page pointer is
       read as 4 bytes (28-bit physical address), Z is added as a byte offset,
       and the access bypasses MAP translation, going directly to the physical
-      28-bit address. KickAssembler syntax: `lda ((zp)),z`.
+      28-bit address. KickAssembler syntax: `lda ((zp)),z`. All 8 indirect
+      opcodes ($12,$32,$52,$72,$92,$B2,$D2,$F2) supported; quad 32-bit flat
+      encoding is `42 42 EA XX nn`. Cross-validated via `tests/45gs02/quad.asm`.
 - [ ] **Variable speed register** (`$D031` bit 4 = FAST): when the CPU reads
       this register via `IORegistry`, it adjusts an internal `m_speed` flag:
       - FAST=0 → 1 MHz / 3.5 MHz (PAL/NTSC); FAST=1 → 40 MHz (full speed).
@@ -2159,3 +2161,9 @@ register state, I/O line levels, and visual assets like sprites or tile maps.*
       on a grid layout.
 - [x] **Layout Optimization**: Move Register window beneath Memory; CLI at 
       bottom-right; expand Tool Notebook for maximum visibility.
+
+### Phase 33.4: Device editing
+
+- [ ] ***GUI**: On the DeviceInfoPane hierarchical view, allow 
+      a) adding, b) editing and c) removign a device. 
+

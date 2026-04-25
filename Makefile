@@ -510,6 +510,7 @@ test-mega65: $(CLI_BIN) plugins
 	./tests/45gs02/validate.py tests/45gs02/arithmetic.asm
 	./tests/45gs02/validate.py tests/45gs02/transfers.asm
 	./tests/45gs02/validate.py tests/45gs02/advanced.asm
+	./tests/45gs02/validate.py tests/45gs02/quad.asm
 
 clean:
 	rm -rf $(BINDIR) $(LIBDIR) $(ILIBDIR)
