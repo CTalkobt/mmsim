@@ -13,7 +13,7 @@ class ICbmDiskImage {
 public:
     virtual ~ICbmDiskImage() {}
     virtual bool open(const std::string& path) = 0;
-    virtual std::vector<CbmDirEntry> getDirectory() = 0;
+    virtual std::vector<CbmDirEntry> getDirectory() const = 0;
     virtual bool readFile(const std::string& filename, std::vector<uint8_t>& data) = 0;
     virtual std::string getDiskName() { return ""; }
     virtual std::string getDiskId() { return ""; }

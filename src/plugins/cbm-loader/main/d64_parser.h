@@ -7,7 +7,7 @@ class D64Parser : public ICbmDiskImage {
 public:
     D64Parser();
     bool open(const std::string& path) override;
-    std::vector<CbmDirEntry> getDirectory() override;
+    std::vector<CbmDirEntry> getDirectory() const override;
     bool readFile(const std::string& filename, std::vector<uint8_t>& data) override;
     std::string getDiskName() override;
     std::string getDiskId() override;

@@ -7,7 +7,7 @@ class T64Parser : public ICbmDiskImage {
 public:
     T64Parser();
     bool open(const std::string& path) override;
-    std::vector<CbmDirEntry> getDirectory() override;
+    std::vector<CbmDirEntry> getDirectory() const override;
     bool readFile(const std::string& filename, std::vector<uint8_t>& data) override;
 
 private:

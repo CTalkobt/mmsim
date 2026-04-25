@@ -481,6 +481,8 @@ void VirtualIECBus::generateDirectoryListing() {
             freeBlocks = p->getFreeBlocks();
         }
         delete p;
+    } else {
+	freeBlocks = 9999;
     }
 
     // Pad disk name to 16 characters
@@ -528,12 +530,8 @@ void VirtualIECBus::generateDirectoryListing() {
         addLine(e.sizeBlocks, fileEntry);
     }
 
-    // Footer line - use free block count as line number
+    // Footer line  
     addLine(freeBlocks, "BLOCKS FREE.             ");
-
-    // End marker
-    m_fileBuffer.push_back(0x00);
-    m_fileBuffer.push_back(0x00);
 
     // Now fix up the link pointers
     size_t pos = 2; // Start after load address

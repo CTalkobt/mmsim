@@ -53,7 +53,7 @@ bool T64Parser::open(const std::string& path) {
     return true;
 }
 
-std::vector<CbmDirEntry> T64Parser::getDirectory() {
+std::vector<CbmDirEntry> T64Parser::getDirectory() const {
     std::vector<CbmDirEntry> dir;
     for (const auto& entry : m_entries) {
         CbmDirEntry de;

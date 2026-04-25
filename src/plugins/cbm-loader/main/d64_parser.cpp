@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cstring>
 
+#include <iostream>
+
 const int D64Parser::s_sectorsPerTrack[] = {
     21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, // 1-17
     19, 19, 19, 19, 19, 19, 19,                                         // 18-24
@@ -41,7 +43,7 @@ uint32_t D64Parser::getSectorOffset(int track, int sector) const {
     return offset;
 }
 
-std::vector<CbmDirEntry> D64Parser::getDirectory() {
+std::vector<CbmDirEntry> D64Parser::getDirectory() const {
     std::vector<CbmDirEntry> entries;
     if (m_data.empty()) return entries;
     
@@ -98,11 +100,11 @@ std::vector<CbmDirEntry> D64Parser::getDirectory() {
 
 bool D64Parser::readFile(const std::string& filename, std::vector<uint8_t>& data) {
     if (m_data.empty()) return false;
-    
+std::cerr << "@0" << std::endl;
     auto entries = getDirectory();
     int startTrack = 0;
     int startSector = 0;
-    
+std::cerr << "@1" << std::endl;
     // Normalize filename for comparison (case-insensitive? Commodore uses PETSCII)
     // For now simple match
     for (int t = 18, s = 1; t != 0; ) {
@@ -205,12 +207,36 @@ std::string D64Parser::getDiskId() {
 uint16_t D64Parser::getFreeBlocks() const {
     if (m_data.empty()) return 0;
 
-    // Free block count is stored in directory sector (track 18, sector 1) at offset 0xBD-0xBE (little-endian)
-    uint32_t dirOffset = getSectorOffset(18, 1);
-    if (dirOffset + 0xBE >= m_data.size()) return 0;
+    // Try to read free blocks from BAM sector (track 18, sector 0)
+    // In standard D64, byte 0 of BAM contains free block count for track 18
+    // But the total free count might be summed from all tracks or stored elsewhere
+    uint32_t bamOffset = getSectorOffset(18, 0);
+    if (bamOffset < m_data.size()) {
+        // Try reading at byte 0 (free blocks in track 18)
+        uint8_t freeInTrack18 = m_data[bamOffset];
+        if (freeInTrack18 > 0 && freeInTrack18 < 30) {
+            // This looks like a valid track 18 free count
+            // For now, sum all track free counts from BAM
+            uint16_t totalFree = 0;
+            for (int track = 1; track <= 35 && bamOffset + track * 4 < m_data.size(); ++track) {
+                totalFree += m_data[bamOffset + (track - 1) * 4];
+            }
+            if (totalFree > 0) return totalFree;
+        }
+    }
 
-    const uint8_t* dirData = &m_data[dirOffset];
-    uint16_t freeBlocks = dirData[0xBD] | (dirData[0xBE] << 8);
+    // Fallback: Calculate from directory entries
+    // 1541 disk capacity: 21*17 + 19*7 + 18*6 + 17*5 = 683 blocks
+    uint16_t totalBlocks = 683;
+    uint16_t reservedBlocks = 19; // Track 18 is reserved
+    uint16_t availableBlocks = totalBlocks - reservedBlocks;
 
-    return freeBlocks;
+    uint16_t usedBlocks = 0;
+    auto entries = getDirectory();
+    for (const auto& e : entries) {
+        usedBlocks += e.sizeBlocks;
+    }
+
+    if (usedBlocks > availableBlocks) return 0;
+    return availableBlocks - usedBlocks;
 }

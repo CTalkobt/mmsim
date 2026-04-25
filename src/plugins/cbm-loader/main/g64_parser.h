@@ -7,7 +7,7 @@ class G64Parser : public ICbmDiskImage {
 public:
     G64Parser();
     bool open(const std::string& path) override;
-    std::vector<CbmDirEntry> getDirectory() override;
+    std::vector<CbmDirEntry> getDirectory() const override;
     bool readFile(const std::string& filename, std::vector<uint8_t>& data) override;
 
     // G64 specific: get raw GCR data for a track

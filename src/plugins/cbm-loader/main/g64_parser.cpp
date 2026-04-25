@@ -43,7 +43,7 @@ bool G64Parser::open(const std::string& path) {
     return true;
 }
 
-std::vector<CbmDirEntry> G64Parser::getDirectory() {
+std::vector<CbmDirEntry> G64Parser::getDirectory() const {
     // Implementing directory parsing for G64 is complex because it requires
     // decoding GCR to sectors. For Phase 15.3, we provide the basic support.
     return std::vector<CbmDirEntry>();
