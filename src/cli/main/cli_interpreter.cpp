@@ -40,8 +40,7 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         }
         std::string instr = line.substr(1);
         uint8_t opcodes[16];
-        int sz = m_ctx.assem->assembleLine(instr, opcodes, sizeof(opcodes), m_ctx.cpu->pc());
-        if (sz > 0) {
+        if (int sz = m_ctx.assem->assembleLine(instr, opcodes, sizeof(opcodes), m_ctx.cpu->pc()); sz > 0) {
             uint32_t scratch = 0x0200;
             for (int i = 0; i < sz; ++i) m_ctx.bus->write8(scratch + i, opcodes[i]);
             uint32_t oldPc = m_ctx.cpu->pc();
@@ -113,8 +112,7 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
     } else if (cmd == "create") {
         std::string id;
         if (ss >> id) {
-            MachineDescriptor* md = MachineRegistry::instance().createMachine(id);
-            if (md) {
+            if (MachineDescriptor* md = MachineRegistry::instance().createMachine(id)) {
                 if (md->cpus.empty() || md->buses.empty()) {
                     m_output("Error: Machine '" + id + "' is incomplete (missing CPU or Bus).\n");
                     delete md;
@@ -220,8 +218,7 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
                     return;
                 }
             }
-            auto* loader = ImageLoaderRegistry::instance().findLoader(path);
-            if (loader) {
+            if (auto* loader = ImageLoaderRegistry::instance().findLoader(path)) {
                 if (loader->load(path, m_ctx.bus, m_ctx.machine, addr)) {
                     m_output("Loaded '" + path + "' using " + loader->name() + "\n");
                     // Extract load address if not provided (for .prg)
@@ -529,8 +526,7 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
         std::string path;
         if (ss >> path) {
-            auto handler = ImageLoaderRegistry::instance().createCartridgeHandler(path);
-            if (handler) {
+            if (auto handler = ImageLoaderRegistry::instance().createCartridgeHandler(path)) {
                 if (handler->attach(m_ctx.bus, m_ctx.machine)) {
                     auto md = handler->metadata();
                     m_output("Attached cartridge: " + md.displayName + " (" + md.type + ")\n");
@@ -550,8 +546,7 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         }
     } else if (cmd == "eject") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
-        auto* cart = ImageLoaderRegistry::instance().getActiveCartridge(m_ctx.bus);
-        if (cart) {
+        if (auto* cart = ImageLoaderRegistry::instance().getActiveCartridge(m_ctx.bus)) {
             cart->eject(m_ctx.bus);
             ImageLoaderRegistry::instance().setActiveCartridge(m_ctx.bus, nullptr);
             m_output("Cartridge ejected.\n");
@@ -606,9 +601,10 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
     } else if (cmd == "m") {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
         std::string expr;
-        uint32_t addr = 0, len = 64;
+        uint32_t addr = 0;
         if (ss >> expr) {
             if (parseAddr(expr, addr)) {
+                uint32_t len = 64;
                 if (ss >> expr) {
                     uint32_t l;
                     if (parseAddr(expr, l)) len = l;
@@ -622,8 +618,9 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         if (!m_ctx.bus) { m_output("No machine created.\n"); return; }
         std::string addrExpr, valExpr, lenExpr;
         if (ss >> addrExpr >> valExpr) {
-            uint32_t addr, val, len = 1;
+            uint32_t addr, val;
             if (parseAddr(addrExpr, addr) && parseAddr(valExpr, val)) {
+                uint32_t len = 1;
                 if (ss >> lenExpr) {
                     uint32_t l;
                     if (parseAddr(lenExpr, l)) len = l;
@@ -835,8 +832,8 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         }
     } else if (cmd == "key") {
         if (!m_ctx.machine || !m_ctx.machine->onKey) { m_output("No machine with keyboard created.\n"); return; }
-        std::string keyName, state;
-        if (ss >> keyName >> state) {
+        std::string keyName;
+        if (std::string state; ss >> keyName >> state) {
             bool down = (state == "down" || state == "1");
             if (!m_ctx.machine->onKey(keyName, down)) {
                 m_output("Unknown key: " + keyName + "\n");

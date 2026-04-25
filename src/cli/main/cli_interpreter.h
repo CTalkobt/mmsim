@@ -2,7 +2,6 @@
 
 #include <string>
 #include <vector>
-#include <sstream>
 #include <iomanip>
 #include <functional>
 #include "libcore/main/machine_desc.h"
