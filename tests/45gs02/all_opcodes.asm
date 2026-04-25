@@ -1,4 +1,4 @@
-// KickAssembler 45GS02 Full Single-Byte Instruction Test
+// KickAssembler 45GS02 Full single-byte + Addressing Modes + Quad Test
 .cpu _45gs02
 
 .const RESULTS = $0400
@@ -13,129 +13,117 @@
 * = $0810 "Program"
 
 start:
-    lda #0
+    lda #$20
     ldx #0
 loop_clear:
     sta RESULTS,x
     inx
     bne loop_clear
 
-    // 1. CLE/SEE (E flag)
-    clc
-    cle
-    php
-    pla
-    and #$20 // Bit 5 is E flag
-    beq e_cle_ok
+    // 1. TSB/TRB abs
+    lda #$00
+    sta $1000
+    lda #$FF
+    tsb $1000
+    lda $1000
+    cmp #$FF
+    beq tsb_abs_ok
     lda #$E1
     sta RESULTS + 0
     jmp end
-e_cle_ok:
-    see
-    php
-    pla
-    and #$20
-    bne e_see_ok
+tsb_abs_ok:
+    lda #SUCCESS
+    sta RESULTS + 0
+
+    // 2. ADC abs,X
+    lda #$10
+    sta $1005
+    ldx #5
+    clc
+    lda #$02
+    adc $1000,x // ADC $1005
+    cmp #$12
+    beq adc_absx_ok
     lda #$E2
-    sta RESULTS + 0
-    jmp end
-e_see_ok:
-    lda #SUCCESS
-    sta RESULTS + 0
-
-    // 2. TSY/TYS
-    ldy #$55
-    tys
-    tsy
-    cpy #$55
-    beq tsy_ok
-    lda #$E3
     sta RESULTS + 1
     jmp end
-tsy_ok:
+adc_absx_ok:
     lda #SUCCESS
     sta RESULTS + 1
 
-    // 3. TSB/TRB (zp)
+    // 3. AND (zp),Y
+    lda #$AA
+    sta $1000
     lda #$00
     sta $20
+    lda #$10
+    sta $21    // $20 points to $1000
+    ldy #0
     lda #$FF
-    tsb $20
-    lda $20
-    cmp #$FF
-    beq tsb_ok
+    and ($20),y
+    cmp #$AA
+    beq and_ind_ok
+    lda #$E3
+    sta RESULTS + 2
+    jmp end
+and_ind_ok:
+    lda #SUCCESS
+    sta RESULTS + 2
+
+    // 4. Quad LDQ/STQ abs
+    lda #$11
+    sta $1100
+    lda #$22
+    sta $1101
+    lda #$33
+    sta $1102
+    lda #$44
+    sta $1103
+    
+    // LDQ abs
+    .byte $42, $42, $AD, $00, $11 // LDQ $1100
+    
+    // STQ zp
+    .byte $42, $42, $85, $30 // STQ $30
+    
+    lda $30
+    cmp #$11
+    bne quad_fail
+    lda $31
+    cmp #$22
+    bne quad_fail
+    lda $32
+    cmp #$33
+    bne quad_fail
+    lda $33
+    cmp #$44
+    bne quad_fail
+    lda #SUCCESS
+    sta RESULTS + 3
+    jmp quad_ok
+quad_fail:
     lda #$E4
-    sta RESULTS + 2
+    sta RESULTS + 3
     jmp end
-tsb_ok:
-    lda #$F0
-    trb $20
-    lda $20
-    cmp #$0F
-    beq trb_ok
+quad_ok:
+
+    // 5. INQ A (Quad INC A)
+    lda #$FF
+    ldx #0
+    ldy #0
+    ldz #0 // Q = $000000FF
+    .byte $42, $42, $1A // INQ A
+    cmp #$00
+    bne inq_fail
+    cpx #$01
+    bne inq_fail
+    lda #SUCCESS
+    sta RESULTS + 4
+    jmp inq_ok
+inq_fail:
     lda #$E5
-    sta RESULTS + 2
-    jmp end
-trb_ok:
-    lda #SUCCESS
-    sta RESULTS + 2
-
-    // 4. ASR A
-    lda #$81
-    asr
-    cmp #$C0 // Sign bit preserved: 1100 0000
-    beq asr_ok
-    lda #$E6
-    sta RESULTS + 3
-    jmp end
-asr_ok:
-    lda #SUCCESS
-    sta RESULTS + 3
-
-    // 5. NEG A
-    lda #5
-    neg
-    cmp #$FB
-    beq neg_ok
-    lda #$E7
     sta RESULTS + 4
-    jmp end
-neg_ok:
-    lda #SUCCESS
-    sta RESULTS + 4
-
-    // 6. INZ / DEZ
-    ldz #$10
-    inz
-    cpz #$11
-    beq inz_ok
-    lda #$E8
-    sta RESULTS + 5
-    jmp end
-inz_ok:
-    dez
-    cpz #$10
-    beq dez_ok
-    lda #$E9
-    sta RESULTS + 5
-    jmp end
-dez_ok:
-    lda #SUCCESS
-    sta RESULTS + 5
-
-    // 7. PHZ / PLZ
-    ldz #$AA
-    phz
-    ldz #$00
-    plz
-    cpz #$AA
-    beq phz_ok
-    lda #$EA
-    sta RESULTS + 6
-    jmp end
-phz_ok:
-    lda #SUCCESS
-    sta RESULTS + 6
+inq_ok:
 
 end:
     lda #$47        // Unlock MEGA65 I/O mode

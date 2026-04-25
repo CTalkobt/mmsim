@@ -13,10 +13,13 @@
 * = $0810 "Program"
 
 start:
-    // Initialize results memory to 0
-    lda #0
-    sta RESULTS_BASE
-    sta RESULTS_BASE + 1
+    // Initialize results memory to $20 (space)
+    lda #$20
+    ldx #0
+loop_clear:
+    sta RESULTS_BASE,x
+    inx
+    bne loop_clear
 
     // Test ADC: 1 + 1 = 2
     clc

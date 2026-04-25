@@ -13,9 +13,12 @@
 * = $0810 "Program"
 
 start:
-    lda #0
-    sta RESULTS_BASE
-    sta RESULTS_BASE+1
+    lda #$20
+    ldx #0
+loop_clear:
+    sta RESULTS_BASE,x
+    inx
+    bne loop_clear
 
     // Test TAZ / TZA
     lda #$55

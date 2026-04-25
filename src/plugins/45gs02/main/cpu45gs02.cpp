@@ -23,7 +23,7 @@ MOS45GS02::MOS45GS02() : m_bus(nullptr) {
 
 void MOS45GS02::reset() {
     m_state.a = 0; m_state.x = 0; m_state.y = 0; m_state.z = 0; m_state.b = 0;
-    m_state.sp = 0x01FF; m_state.p = FLAG_U | FLAG_I; m_state.cycles = 0;
+    m_state.sp = 0x01FF; m_state.p = FLAG_I; m_state.cycles = 0;
     m_state.mapEnabled = false; m_state.haltLine = 0;
     for(int i=0; i<4; i++) m_state.map[i] = i * 0x40; 
     if (m_bus) {
@@ -161,6 +161,22 @@ int MOS45GS02::step() {
     auto getZpX  = [&]() { uint8_t z=read8(m_state.pc++); m_state.cycles++; return (uint16_t)((m_state.b << 8) | (uint8_t)(z + m_state.x)); };
     auto getZpY  = [&]() { uint8_t z=read8(m_state.pc++); m_state.cycles++; return (uint16_t)((m_state.b << 8) | (uint8_t)(z + m_state.y)); };
 
+    auto getIndX = [&]() {
+        uint8_t z = read8(m_state.pc++);
+        uint16_t ptrAddr = (uint16_t)((m_state.b << 8) | (uint8_t)(z + m_state.x));
+        uint16_t ptr = (uint16_t)read8(ptrAddr) | ((uint16_t)read8(ptrAddr + 1) << 8);
+        m_state.cycles += 4;
+        return ptr;
+    };
+
+    auto getIndY = [&]() {
+        uint8_t z = read8(m_state.pc++);
+        uint16_t ptrAddr = (uint16_t)((m_state.b << 8) | z);
+        uint16_t ptr = (uint16_t)read8(ptrAddr) | ((uint16_t)read8(ptrAddr + 1) << 8);
+        m_state.cycles += 3;
+        return ptr + m_state.y;
+    };
+
     auto getStackRelIndY = [&]() {
         uint8_t offset = read8(m_state.pc++);
         uint16_t ptrAddr = m_state.sp + offset;
@@ -257,9 +273,20 @@ int MOS45GS02::step() {
             }
             break;
         }
-        case 0xB5: m_state.a = read8(getZpX()); updateNZ(m_state.a); m_state.cycles++; break;
+        case 0xB5: { // LDA zp,X / LDQ zp,X
+            uint16_t addr = getZpX();
+            if (isQuad) {
+                m_state.a = read8(addr); m_state.x = read8(addr + 1); m_state.y = read8(addr + 2); m_state.z = read8(addr + 3);
+                updateNZ32(regRead(8)); m_state.cycles += 4;
+            } else {
+                m_state.a = read8(addr); updateNZ(m_state.a); m_state.cycles++;
+            }
+            break;
+        }
         case 0xE2: m_state.a = read8(getStackRelIndY()); updateNZ(m_state.a); break; // LDA (d,S),Y
 
+        case 0xA1: m_state.a = read8(getIndX()); updateNZ(m_state.a); break; // LDA (zp,X)
+        case 0xB1: m_state.a = read8(getIndY()); updateNZ(m_state.a); break; // LDA (zp),Y
         case 0xB2: { // LDA (zp),z / LDQ (zp),z
             uint32_t base = getIndPhys();
             uint32_t addr = base + m_state.z;
@@ -307,9 +334,16 @@ int MOS45GS02::step() {
             else { write8(addr, m_state.a); m_state.cycles++; }
             break;
         }
-        case 0x95: write8(getZpX(), m_state.a); m_state.cycles++; break;
+        case 0x95: { // STA zp,X / STQ zp,X
+            uint16_t addr = getZpX();
+            if (isQuad) { write32(addr, regRead(8)); m_state.cycles += 4; }
+            else { write8(addr, m_state.a); m_state.cycles++; }
+            break;
+        }
         case 0x82: write8(getStackRelIndY(), m_state.a); break; // STA (d,S),Y
 
+        case 0x81: write8(getIndX(), m_state.a); break; // STA (zp,X)
+        case 0x91: write8(getIndY(), m_state.a); break; // STA (zp),Y
         case 0x92: { // STA (zp),z / STQ (zp),z
             uint32_t base = getIndPhys();
             uint32_t addr = base + m_state.z;
@@ -351,12 +385,32 @@ int MOS45GS02::step() {
             else { uint8_t v=read8(addr); uint16_t s=(uint16_t)m_state.a+v+(m_state.p&FLAG_C); m_state.p&=~(FLAG_V|FLAG_C); if(~(m_state.a^v)&(m_state.a^s)&0x80) m_state.p|=FLAG_V; if(s>0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)s; updateNZ(m_state.a); m_state.cycles++; }
             break;
         }
+        case 0x7D: { // ADC abs,X / ADCQ abs,X
+            uint16_t addr = getAbsX();
+            if (isQuad) doAdc32(read32(addr));
+            else { uint8_t v=read8(addr); uint16_t s=(uint16_t)m_state.a+v+(m_state.p&FLAG_C); m_state.p&=~(FLAG_V|FLAG_C); if(~(m_state.a^v)&(m_state.a^s)&0x80) m_state.p|=FLAG_V; if(s>0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)s; updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
+        case 0x79: { // ADC abs,Y / ADCQ abs,Y
+            uint16_t addr = getAbsY();
+            if (isQuad) doAdc32(read32(addr));
+            else { uint8_t v=read8(addr); uint16_t s=(uint16_t)m_state.a+v+(m_state.p&FLAG_C); m_state.p&=~(FLAG_V|FLAG_C); if(~(m_state.a^v)&(m_state.a^s)&0x80) m_state.p|=FLAG_V; if(s>0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)s; updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
         case 0x65: { // ADC zp / ADCQ zp
             uint16_t addr = getZp();
             if (isQuad) doAdc32(read32(addr));
             else { uint8_t v=read8(addr); uint16_t s=(uint16_t)m_state.a+v+(m_state.p&FLAG_C); m_state.p&=~(FLAG_V|FLAG_C); if(~(m_state.a^v)&(m_state.a^s)&0x80) m_state.p|=FLAG_V; if(s>0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)s; updateNZ(m_state.a); m_state.cycles++; }
             break;
         }
+        case 0x75: { // ADC zp,X / ADCQ zp,X
+            uint16_t addr = getZpX();
+            if (isQuad) doAdc32(read32(addr));
+            else { uint8_t v=read8(addr); uint16_t s=(uint16_t)m_state.a+v+(m_state.p&FLAG_C); m_state.p&=~(FLAG_V|FLAG_C); if(~(m_state.a^v)&(m_state.a^s)&0x80) m_state.p|=FLAG_V; if(s>0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)s; updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
+        case 0x61: m_state.a = (uint8_t)(regRead(0)); { uint8_t v=read8(getIndX()); uint16_t s=(uint16_t)m_state.a+v+(m_state.p&FLAG_C); m_state.p&=~(FLAG_V|FLAG_C); if(~(m_state.a^v)&(m_state.a^s)&0x80) m_state.p|=FLAG_V; if(s>0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)s; updateNZ(m_state.a); break; }
+        case 0x71: m_state.a = (uint8_t)(regRead(0)); { uint8_t v=read8(getIndY()); uint16_t s=(uint16_t)m_state.a+v+(m_state.p&FLAG_C); m_state.p&=~(FLAG_V|FLAG_C); if(~(m_state.a^v)&(m_state.a^s)&0x80) m_state.p|=FLAG_V; if(s>0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)s; updateNZ(m_state.a); break; }
         case 0x72: { // ADC (zp),z / ADCQ (zp),z
             uint32_t base = getIndPhys(); uint32_t addr = base + m_state.z;
             if (isQuad) doAdc32(is32BitInd ? read32_phys(addr) : read32((uint16_t)addr));
@@ -375,12 +429,32 @@ int MOS45GS02::step() {
             else { uint8_t v=read8(addr); uint16_t d=(uint16_t)m_state.a-v-((m_state.p&FLAG_C)?0:1); m_state.p&=~(FLAG_V|FLAG_C); if((m_state.a^v)&(m_state.a^d)&0x80) m_state.p|=FLAG_V; if(d<=0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)d; updateNZ(m_state.a); m_state.cycles++; }
             break;
         }
+        case 0xFD: { // SBC abs,X / SBCQ abs,X
+            uint16_t addr = getAbsX();
+            if (isQuad) doSbc32(read32(addr));
+            else { uint8_t v=read8(addr); uint16_t d=(uint16_t)m_state.a-v-((m_state.p&FLAG_C)?0:1); m_state.p&=~(FLAG_V|FLAG_C); if((m_state.a^v)&(m_state.a^d)&0x80) m_state.p|=FLAG_V; if(d<=0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)d; updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
+        case 0xF9: { // SBC abs,Y / SBCQ abs,Y
+            uint16_t addr = getAbsY();
+            if (isQuad) doSbc32(read32(addr));
+            else { uint8_t v=read8(addr); uint16_t d=(uint16_t)m_state.a-v-((m_state.p&FLAG_C)?0:1); m_state.p&=~(FLAG_V|FLAG_C); if((m_state.a^v)&(m_state.a^d)&0x80) m_state.p|=FLAG_V; if(d<=0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)d; updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
         case 0xE5: { // SBC zp / SBCQ zp
             uint16_t addr = getZp();
             if (isQuad) doSbc32(read32(addr));
             else { uint8_t v=read8(addr); uint16_t d=(uint16_t)m_state.a-v-((m_state.p&FLAG_C)?0:1); m_state.p&=~(FLAG_V|FLAG_C); if((m_state.a^v)&(m_state.a^d)&0x80) m_state.p|=FLAG_V; if(d<=0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)d; updateNZ(m_state.a); m_state.cycles++; }
             break;
         }
+        case 0xF5: { // SBC zp,X / SBCQ zp,X
+            uint16_t addr = getZpX();
+            if (isQuad) doSbc32(read32(addr));
+            else { uint8_t v=read8(addr); uint16_t d=(uint16_t)m_state.a-v-((m_state.p&FLAG_C)?0:1); m_state.p&=~(FLAG_V|FLAG_C); if((m_state.a^v)&(m_state.a^d)&0x80) m_state.p|=FLAG_V; if(d<=0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)d; updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
+        case 0xE1: m_state.a = (uint8_t)(regRead(0)); { uint8_t v=read8(getIndX()); uint16_t d=(uint16_t)m_state.a-v-((m_state.p&FLAG_C)?0:1); m_state.p&=~(FLAG_V|FLAG_C); if((m_state.a^v)&(m_state.a^d)&0x80) m_state.p|=FLAG_V; if(d<=0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)d; updateNZ(m_state.a); break; }
+        case 0xF1: m_state.a = (uint8_t)(regRead(0)); { uint8_t v=read8(getIndY()); uint16_t d=(uint16_t)m_state.a-v-((m_state.p&FLAG_C)?0:1); m_state.p&=~(FLAG_V|FLAG_C); if((m_state.a^v)&(m_state.a^d)&0x80) m_state.p|=FLAG_V; if(d<=0xFF) m_state.p|=FLAG_C; m_state.a=(uint8_t)d; updateNZ(m_state.a); break; }
         case 0xF2: { // SBC (zp),z / SBCQ (zp),z
             uint32_t base = getIndPhys(); uint32_t addr = base + m_state.z;
             if (isQuad) doSbc32(is32BitInd ? read32_phys(addr) : read32((uint16_t)addr));
@@ -399,12 +473,32 @@ int MOS45GS02::step() {
             else { uint8_t v=read8(addr); uint16_t d=(uint16_t)m_state.a-v; m_state.p &= ~FLAG_C; if(m_state.a>=v) m_state.p|=FLAG_C; updateNZ((uint8_t)d); m_state.cycles++; }
             break;
         }
+        case 0xDD: { // CMP abs,X / CMPQ abs,X
+            uint16_t addr = getAbsX();
+            if (isQuad) doCmp32(read32(addr));
+            else { uint8_t v=read8(addr); uint16_t d=(uint16_t)m_state.a-v; m_state.p &= ~FLAG_C; if(m_state.a>=v) m_state.p|=FLAG_C; updateNZ((uint8_t)d); m_state.cycles++; }
+            break;
+        }
+        case 0xD9: { // CMP abs,Y / CMPQ abs,Y
+            uint16_t addr = getAbsY();
+            if (isQuad) doCmp32(read32(addr));
+            else { uint8_t v=read8(addr); uint16_t d=(uint16_t)m_state.a-v; m_state.p &= ~FLAG_C; if(m_state.a>=v) m_state.p|=FLAG_C; updateNZ((uint8_t)d); m_state.cycles++; }
+            break;
+        }
         case 0xC5: { // CMP zp / CMPQ zp
             uint16_t addr = getZp();
             if (isQuad) doCmp32(read32(addr));
             else { uint8_t v=read8(addr); uint16_t d=(uint16_t)m_state.a-v; m_state.p &= ~FLAG_C; if(m_state.a>=v) m_state.p|=FLAG_C; updateNZ((uint8_t)d); m_state.cycles++; }
             break;
         }
+        case 0xD5: { // CMP zp,X / CMPQ zp,X
+            uint16_t addr = getZpX();
+            if (isQuad) doCmp32(read32(addr));
+            else { uint8_t v=read8(addr); uint16_t d=(uint16_t)m_state.a-v; m_state.p &= ~FLAG_C; if(m_state.a>=v) m_state.p|=FLAG_C; updateNZ((uint8_t)d); m_state.cycles++; }
+            break;
+        }
+        case 0xC1: { uint8_t v=read8(getIndX()); uint16_t d=(uint16_t)m_state.a-v; m_state.p &= ~FLAG_C; if(m_state.a>=v) m_state.p|=FLAG_C; updateNZ((uint8_t)d); break; }
+        case 0xD1: { uint8_t v=read8(getIndY()); uint16_t d=(uint16_t)m_state.a-v; m_state.p &= ~FLAG_C; if(m_state.a>=v) m_state.p|=FLAG_C; updateNZ((uint8_t)d); break; }
         case 0xD2: { // CMP (zp),z / CMPQ (zp),z
             uint32_t base = getIndPhys(); uint32_t addr = base + m_state.z;
             if (isQuad) doCmp32(is32BitInd ? read32_phys(addr) : read32((uint16_t)addr));
@@ -423,12 +517,32 @@ int MOS45GS02::step() {
             else { m_state.a &= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
             break;
         }
+        case 0x3D: { // AND abs,X / ANDQ abs,X
+            uint16_t addr = getAbsX();
+            if (isQuad) doAnd32(read32(addr));
+            else { m_state.a &= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
+        case 0x39: { // AND abs,Y / ANDQ abs,Y
+            uint16_t addr = getAbsY();
+            if (isQuad) doAnd32(read32(addr));
+            else { m_state.a &= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
         case 0x25: { // AND zp / ANDQ zp
             uint16_t addr = getZp();
             if (isQuad) doAnd32(read32(addr));
             else { m_state.a &= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
             break;
         }
+        case 0x35: { // AND zp,X / ANDQ zp,X
+            uint16_t addr = getZpX();
+            if (isQuad) doAnd32(read32(addr));
+            else { m_state.a &= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
+        case 0x21: m_state.a &= read8(getIndX()); updateNZ(m_state.a); break;
+        case 0x31: m_state.a &= read8(getIndY()); updateNZ(m_state.a); break;
         case 0x32: { // AND (zp),z / ANDQ (zp),z
             uint32_t base = getIndPhys(); uint32_t addr = base + m_state.z;
             if (isQuad) doAnd32(is32BitInd ? read32_phys(addr) : read32((uint16_t)addr));
@@ -447,12 +561,32 @@ int MOS45GS02::step() {
             else { m_state.a |= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
             break;
         }
+        case 0x1D: { // ORA abs,X / ORAQ abs,X
+            uint16_t addr = getAbsX();
+            if (isQuad) doOra32(read32(addr));
+            else { m_state.a |= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
+        case 0x19: { // ORA abs,Y / ORAQ abs,Y
+            uint16_t addr = getAbsY();
+            if (isQuad) doOra32(read32(addr));
+            else { m_state.a |= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
         case 0x05: { // ORA zp / ORAQ zp
             uint16_t addr = getZp();
             if (isQuad) doOra32(read32(addr));
             else { m_state.a |= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
             break;
         }
+        case 0x15: { // ORA zp,X / ORAQ zp,X
+            uint16_t addr = getZpX();
+            if (isQuad) doOra32(read32(addr));
+            else { m_state.a |= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
+        case 0x01: m_state.a |= read8(getIndX()); updateNZ(m_state.a); break;
+        case 0x11: m_state.a |= read8(getIndY()); updateNZ(m_state.a); break;
         case 0x12: { // ORA (zp),z / ORAQ (zp),z
             uint32_t base = getIndPhys(); uint32_t addr = base + m_state.z;
             if (isQuad) doOra32(is32BitInd ? read32_phys(addr) : read32((uint16_t)addr));
@@ -471,12 +605,32 @@ int MOS45GS02::step() {
             else { m_state.a ^= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
             break;
         }
+        case 0x5D: { // EOR abs,X / EORQ abs,X
+            uint16_t addr = getAbsX();
+            if (isQuad) doEor32(read32(addr));
+            else { m_state.a ^= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
+        case 0x59: { // EOR abs,Y / EORQ abs,Y
+            uint16_t addr = getAbsY();
+            if (isQuad) doEor32(read32(addr));
+            else { m_state.a ^= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
         case 0x45: { // EOR zp / EORQ zp
             uint16_t addr = getZp();
             if (isQuad) doEor32(read32(addr));
             else { m_state.a ^= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
             break;
         }
+        case 0x55: { // EOR zp,X / EORQ zp,X
+            uint16_t addr = getZpX();
+            if (isQuad) doEor32(read32(addr));
+            else { m_state.a ^= read8(addr); updateNZ(m_state.a); m_state.cycles++; }
+            break;
+        }
+        case 0x41: m_state.a ^= read8(getIndX()); updateNZ(m_state.a); break;
+        case 0x51: m_state.a ^= read8(getIndY()); updateNZ(m_state.a); break;
         case 0x52: { // EOR (zp),z / EORQ (zp),z
             uint32_t base = getIndPhys(); uint32_t addr = base + m_state.z;
             if (isQuad) doEor32(is32BitInd ? read32_phys(addr) : read32((uint16_t)addr));
@@ -489,22 +643,38 @@ int MOS45GS02::step() {
         case 0x14: { uint16_t a=getZp(); uint8_t v=read8(a); if(!(m_state.a&v)) m_state.p|=FLAG_Z; else m_state.p&=~FLAG_Z; write8(a,v&~m_state.a); m_state.cycles++; break; } // TRB zp
         case 0x1C: { uint16_t a=getAbs(); uint8_t v=read8(a); if(!(m_state.a&v)) m_state.p|=FLAG_Z; else m_state.p&=~FLAG_Z; write8(a,v&~m_state.a); m_state.cycles++; break; } // TRB abs
 
-        case 0x43: { // ASR A
-            m_state.p = (m_state.p & ~FLAG_C) | (m_state.a & 1);
-            m_state.a = (m_state.a & 0x80) | (m_state.a >> 1);
-            updateNZ(m_state.a); break;
+        case 0x43: { // ASR A / ASRQ A
+            if (isQuad) {
+                uint32_t q = regRead(8); m_state.p = (m_state.p & ~FLAG_C) | (q & 1);
+                q = (q & 0x80000000) | (q >> 1); regWrite(8, q); updateNZ32(q);
+            } else {
+                m_state.p = (m_state.p & ~FLAG_C) | (m_state.a & 1);
+                m_state.a = (m_state.a & 0x80) | (m_state.a >> 1);
+                updateNZ(m_state.a);
+            }
+            break;
         }
-        case 0x44: { // ASR zp
-            uint16_t a=getZp(); uint8_t v=read8(a);
-            m_state.p = (m_state.p & ~FLAG_C) | (v & 1);
-            v = (v & 0x80) | (v >> 1);
-            write8(a, v); updateNZ(v); break;
+        case 0x44: { // ASR zp / ASRQ zp
+            uint16_t a=getZp();
+            if (isQuad) {
+                uint32_t q = read32(a); m_state.p = (m_state.p & ~FLAG_C) | (q & 1);
+                q = (q & 0x80000000) | (q >> 1); write32(a, q); updateNZ32(q);
+            } else {
+                uint8_t v=read8(a); m_state.p = (m_state.p & ~FLAG_C) | (v & 1);
+                v = (v & 0x80) | (v >> 1); write8(a, v); updateNZ(v);
+            }
+            break;
         }
-        case 0x54: { // ASR zp,X
-            uint16_t a=getZpX(); uint8_t v=read8(a);
-            m_state.p = (m_state.p & ~FLAG_C) | (v & 1);
-            v = (v & 0x80) | (v >> 1);
-            write8(a, v); updateNZ(v); break;
+        case 0x54: { // ASR zp,X / ASRQ zp,X
+            uint16_t a=getZpX();
+            if (isQuad) {
+                uint32_t q = read32(a); m_state.p = (m_state.p & ~FLAG_C) | (q & 1);
+                q = (q & 0x80000000) | (q >> 1); write32(a, q); updateNZ32(q);
+            } else {
+                uint8_t v=read8(a); m_state.p = (m_state.p & ~FLAG_C) | (v & 1);
+                v = (v & 0x80) | (v >> 1); write8(a, v); updateNZ(v);
+            }
+            break;
         }
 
         // --- 3. Increments / Decrements ---
@@ -514,12 +684,64 @@ int MOS45GS02::step() {
         case 0x88: m_state.y--; updateNZ(m_state.y); break;
         case 0x1B: m_state.z++; updateNZ(m_state.z); break; // INZ
         case 0x3B: m_state.z--; updateNZ(m_state.z); break; // DEZ
-        case 0x1A: m_state.a++; updateNZ(m_state.a); break;
-        case 0x3A: m_state.a--; updateNZ(m_state.a); break;
-        case 0xEE: { uint16_t a=getAbs(); uint8_t v=read8(a)+1; write8(a,v); updateNZ(v); m_state.cycles++; break; }
-        case 0xE6: { uint16_t a=getZp(); uint8_t v=read8(a)+1; write8(a,v); updateNZ(v); m_state.cycles++; break; }
-        case 0xCE: { uint16_t a=getAbs(); uint8_t v=read8(a)-1; write8(a,v); updateNZ(v); m_state.cycles++; break; }
-        case 0xC6: { uint16_t a=getZp(); uint8_t v=read8(a)-1; write8(a,v); updateNZ(v); m_state.cycles++; break; }
+        case 0x1A: { // INC A / INQ A
+            if (isQuad) { uint32_t q = regRead(8) + 1; regWrite(8, q); updateNZ32(q); }
+            else { m_state.a++; updateNZ(m_state.a); }
+            break;
+        }
+        case 0x3A: { // DEC A / DEQ A
+            if (isQuad) { uint32_t q = regRead(8) - 1; regWrite(8, q); updateNZ32(q); }
+            else { m_state.a--; updateNZ(m_state.a); }
+            break;
+        }
+        case 0xEE: { // INC abs / INQ abs
+            uint16_t a=getAbs();
+            if (isQuad) { uint32_t q = read32(a) + 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a)+1; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0xFE: { // INC abs,X / INQ abs,X
+            uint16_t a=getAbsX();
+            if (isQuad) { uint32_t q = read32(a) + 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a)+1; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0xE6: { // INC zp / INQ zp
+            uint16_t a=getZp();
+            if (isQuad) { uint32_t q = read32(a) + 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a)+1; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0xF6: { // INC zp,X / INQ zp,X
+            uint16_t a=getZpX();
+            if (isQuad) { uint32_t q = read32(a) + 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a)+1; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0xCE: { // DEC abs / DEQ abs
+            uint16_t a=getAbs();
+            if (isQuad) { uint32_t q = read32(a) - 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a)-1; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0xDE: { // DEC abs,X / DEQ abs,X
+            uint16_t a=getAbsX();
+            if (isQuad) { uint32_t q = read32(a) - 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a)-1; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0xC6: { // DEC zp / DEQ zp
+            uint16_t a=getZp();
+            if (isQuad) { uint32_t q = read32(a) - 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a)-1; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0xD6: { // DEC zp,X / DEQ zp,X
+            uint16_t a=getZpX();
+            if (isQuad) { uint32_t q = read32(a) - 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a)-1; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
 
         // --- 4. Transfers ---
         case 0xAA: m_state.x = m_state.a; updateNZ(m_state.x); break;
@@ -546,7 +768,7 @@ int MOS45GS02::step() {
         case 0x48: push8(m_state.a); break;
         case 0x68: m_state.a = pull8(); updateNZ(m_state.a); break;
         case 0x08: push8(m_state.p); break;
-        case 0x28: m_state.p = pull8() | FLAG_U; break;
+        case 0x28: { uint8_t pulled = pull8(); m_state.p = (pulled & ~(FLAG_B|FLAG_E)) | (m_state.p & (FLAG_B|FLAG_E)); break; } // PLP
         case 0xDA: push8(m_state.x); break;
         case 0xFA: m_state.x = pull8(); updateNZ(m_state.x); break;
         case 0x5A: push8(m_state.y); break;
@@ -565,7 +787,7 @@ int MOS45GS02::step() {
         case 0x6C: { uint16_t a=getAbs(); m_state.pc = read8(a)|(read8(a+1)<<8); m_state.cycles += 2; break; }
         case 0x20: { uint16_t t=getAbs(); uint16_t r=m_state.pc-1; push16(r); m_state.pc=t; m_state.cycles++; break; } // JSR
         case 0x60: { m_state.pc = pull16() + 1; m_state.cycles += 3; break; } // RTS
-        case 0x40: { m_state.p = pull8() | FLAG_U; m_state.pc = pull16(); m_state.cycles += 3; break; } // RTI
+        case 0x40: { uint8_t pulled = pull8(); m_state.p = (pulled & ~(FLAG_B|FLAG_E)) | (m_state.p & (FLAG_B|FLAG_E)); m_state.pc = pull16(); m_state.cycles += 3; break; } // RTI
         case 0x80: { int8_t r=(int8_t)read8(m_state.pc++); m_state.pc+=r; m_state.cycles++; break; } // BRA
         case 0x63: { int16_t r=(int16_t)read8(m_state.pc)|((int16_t)read8(m_state.pc+1)<<8); m_state.pc+=2; uint16_t ret=m_state.pc-1; push16(ret); m_state.pc+=r; m_state.cycles+=4; break; } // BSR (16-bit)
         case 0x62: { uint16_t ret = pull16(); uint8_t imm = read8(m_state.pc++); m_state.pc = ret + 1; m_state.sp += imm; m_state.cycles += 4; break; } // RTN (RTS imm)
@@ -602,8 +824,20 @@ int MOS45GS02::step() {
         case 0xDC: { uint8_t v=read8(getAbs()); uint16_t d=(uint16_t)m_state.z-v; m_state.p &= ~FLAG_C; if(m_state.z>=v) m_state.p|=FLAG_C; updateNZ((uint8_t)(d&0xFF)); m_state.cycles++; break; } // CPZ abs (45GS02)
 
         // --- 8. Bit Manipulation ---
-        case 0x24: { uint8_t v=read8(getZp()); m_state.p &= ~(FLAG_Z|FLAG_N|FLAG_V); if(!(m_state.a&v)) m_state.p|=FLAG_Z; if(v&0x80) m_state.p|=FLAG_N; if(v&0x40) m_state.p|=FLAG_V; break; }
-        case 0x2C: { uint8_t v=read8(getAbs()); m_state.p &= ~(FLAG_Z|FLAG_N|FLAG_V); if(!(m_state.a&v)) m_state.p|=FLAG_Z; if(v&0x80) m_state.p|=FLAG_N; if(v&0x40) m_state.p|=FLAG_V; break; }
+        case 0x24: { // BIT zp / BITQ zp
+            uint16_t addr = getZp();
+            if (isQuad) { uint32_t v=read32(addr); m_state.p &= ~(FLAG_Z|FLAG_N|FLAG_V); if(!(regRead(8)&v)) m_state.p|=FLAG_Z; if(v&0x80000000) m_state.p|=FLAG_N; if(v&0x40000000) m_state.p|=FLAG_V; }
+            else { uint8_t v=read8(addr); m_state.p &= ~(FLAG_Z|FLAG_N|FLAG_V); if(!(m_state.a&v)) m_state.p|=FLAG_Z; if(v&0x80) m_state.p|=FLAG_N; if(v&0x40) m_state.p|=FLAG_V; }
+            break;
+        }
+        case 0x2C: { // BIT abs / BITQ abs
+            uint16_t addr = getAbs();
+            if (isQuad) { uint32_t v=read32(addr); m_state.p &= ~(FLAG_Z|FLAG_N|FLAG_V); if(!(regRead(8)&v)) m_state.p|=FLAG_Z; if(v&0x80000000) m_state.p|=FLAG_N; if(v&0x40000000) m_state.p|=FLAG_V; }
+            else { uint8_t v=read8(addr); m_state.p &= ~(FLAG_Z|FLAG_N|FLAG_V); if(!(m_state.a&v)) m_state.p|=FLAG_Z; if(v&0x80) m_state.p|=FLAG_N; if(v&0x40) m_state.p|=FLAG_V; }
+            break;
+        }
+        case 0x34: { uint8_t v=read8(getZpX()); m_state.p &= ~(FLAG_Z|FLAG_N|FLAG_V); if(!(m_state.a&v)) m_state.p|=FLAG_Z; if(v&0x80) m_state.p|=FLAG_N; if(v&0x40) m_state.p|=FLAG_V; break; }
+        case 0x3C: { uint8_t v=read8(getAbsX()); m_state.p &= ~(FLAG_Z|FLAG_N|FLAG_V); if(!(m_state.a&v)) m_state.p|=FLAG_Z; if(v&0x80) m_state.p|=FLAG_N; if(v&0x40) m_state.p|=FLAG_V; break; }
         case 0x89: { uint8_t v=read8(m_state.pc++); m_state.cycles++; updateNZ(m_state.a&v); break; }
         
         // RMBx / SMBx (Rockwell/W65C02/45GS02)
@@ -639,6 +873,31 @@ int MOS45GS02::step() {
             }
             break;
         }
+        case 0x0E: { // ASL abs / ASLQ abs
+            uint16_t a=getAbs();
+            if (isQuad) { uint32_t q = read32(a); m_state.p = (m_state.p & ~FLAG_C) | (q >> 31); q <<= 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=v>>7; v<<=1; m_state.p=(m_state.p&~FLAG_C)|c; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0x1E: { // ASL abs,X / ASLQ abs,X
+            uint16_t a=getAbsX();
+            if (isQuad) { uint32_t q = read32(a); m_state.p = (m_state.p & ~FLAG_C) | (q >> 31); q <<= 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=v>>7; v<<=1; m_state.p=(m_state.p&~FLAG_C)|c; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0x06: { // ASL zp / ASLQ zp
+            uint16_t a=getZp();
+            if (isQuad) { uint32_t q = read32(a); m_state.p = (m_state.p & ~FLAG_C) | (q >> 31); q <<= 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=v>>7; v<<=1; m_state.p=(m_state.p&~FLAG_C)|c; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0x16: { // ASL zp,X / ASLQ zp,X
+            uint16_t a=getZpX();
+            if (isQuad) { uint32_t q = read32(a); m_state.p = (m_state.p & ~FLAG_C) | (q >> 31); q <<= 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=v>>7; v<<=1; m_state.p=(m_state.p&~FLAG_C)|c; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+
         case 0x4A: { // LSR A / LSRQ
             if (isQuad) {
                 uint32_t q = regRead(8); m_state.p = (m_state.p & ~FLAG_C) | (q & 1);
@@ -648,29 +907,107 @@ int MOS45GS02::step() {
             }
             break;
         }
+        case 0x4E: { // LSR abs / LSRQ abs
+            uint16_t a=getAbs();
+            if (isQuad) { uint32_t q = read32(a); m_state.p = (m_state.p & ~FLAG_C) | (q & 1); q >>= 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=v&1; v>>=1; m_state.p=(m_state.p&~FLAG_C)|c; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0x5E: { // LSR abs,X / LSRQ abs,X
+            uint16_t a=getAbsX();
+            if (isQuad) { uint32_t q = read32(a); m_state.p = (m_state.p & ~FLAG_C) | (q & 1); q >>= 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=v&1; v>>=1; m_state.p=(m_state.p&~FLAG_C)|c; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0x46: { // LSR zp / LSRQ zp
+            uint16_t a=getZp();
+            if (isQuad) { uint32_t q = read32(a); m_state.p = (m_state.p & ~FLAG_C) | (q & 1); q >>= 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=v&1; v>>=1; m_state.p=(m_state.p&~FLAG_C)|c; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0x56: { // LSR zp,X / LSRQ zp,X
+            uint16_t a=getZpX();
+            if (isQuad) { uint32_t q = read32(a); m_state.p = (m_state.p & ~FLAG_C) | (q & 1); q >>= 1; write32(a, q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=v&1; v>>=1; m_state.p=(m_state.p&~FLAG_C)|c; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+
         case 0x2A: { // ROL A / ROLQ
             if (isQuad) {
                 uint32_t q = regRead(8); uint32_t c = (m_state.p & FLAG_C) ? 1 : 0;
                 m_state.p = (m_state.p & ~FLAG_C) | (q >> 31);
                 q = (q << 1) | c; regWrite(8, q); updateNZ32(q); m_state.cycles++;
             } else {
-                uint8_t c=(m_state.p&FLAG_C)?1:0; m_state.p=(m_state.p&~FLAG_C)|(m_state.a>>7); m_state.a=(m_state.a<<1)|c; updateNZ(m_state.a);
+                uint8_t c=(m_state.p&FLAG_C)?1:0; uint8_t oldC = m_state.a>>7; m_state.a=(m_state.a<<1)|c; m_state.p=(m_state.p&~FLAG_C)|oldC; updateNZ(m_state.a);
             }
             break;
         }
+        case 0x2E: { // ROL abs / ROLQ abs
+            uint16_t a=getAbs();
+            if (isQuad) { uint32_t q = read32(a); uint32_t c = (m_state.p & FLAG_C)?1:0; m_state.p=(m_state.p&~FLAG_C)|(q>>31); q=(q<<1)|c; write32(a,q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=(m_state.p&FLAG_C)?1:0; uint8_t oldC=v>>7; v=(v<<1)|c; m_state.p=(m_state.p&~FLAG_C)|oldC; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0x3E: { // ROL abs,X / ROLQ abs,X
+            uint16_t a=getAbsX();
+            if (isQuad) { uint32_t q = read32(a); uint32_t c = (m_state.p & FLAG_C)?1:0; m_state.p=(m_state.p&~FLAG_C)|(q>>31); q=(q<<1)|c; write32(a,q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=(m_state.p&FLAG_C)?1:0; uint8_t oldC=v>>7; v=(v<<1)|c; m_state.p=(m_state.p&~FLAG_C)|oldC; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0x26: { // ROL zp / ROLQ zp
+            uint16_t a=getZp();
+            if (isQuad) { uint32_t q = read32(a); uint32_t c = (m_state.p & FLAG_C)?1:0; m_state.p=(m_state.p&~FLAG_C)|(q>>31); q=(q<<1)|c; write32(a,q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=(m_state.p&FLAG_C)?1:0; uint8_t oldC=v>>7; v=(v<<1)|c; m_state.p=(m_state.p&~FLAG_C)|oldC; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0x36: { // ROL zp,X / ROLQ zp,X
+            uint16_t a=getZpX();
+            if (isQuad) { uint32_t q = read32(a); uint32_t c = (m_state.p & FLAG_C)?1:0; m_state.p=(m_state.p&~FLAG_C)|(q>>31); q=(q<<1)|c; write32(a,q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=(m_state.p&FLAG_C)?1:0; uint8_t oldC=v>>7; v=(v<<1)|c; m_state.p=(m_state.p&~FLAG_C)|oldC; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+
         case 0x6A: { // ROR A / RORQ
             if (isQuad) {
                 uint32_t q = regRead(8); uint32_t c = (m_state.p & FLAG_C) ? 0x80000000 : 0;
                 m_state.p = (m_state.p & ~FLAG_C) | (q & 1);
                 q = (q >> 1) | c; regWrite(8, q); updateNZ32(q); m_state.cycles++;
             } else {
-                uint8_t c=(m_state.p&FLAG_C)?0x80:0; m_state.p=(m_state.p&~FLAG_C)|(m_state.a&1); m_state.a=(m_state.a>>1)|c; updateNZ(m_state.a);
+                uint8_t c=(m_state.p&FLAG_C)?0x80:0; uint8_t oldC=m_state.a&1; m_state.a=(m_state.a>>1)|c; m_state.p=(m_state.p&~FLAG_C)|oldC; updateNZ(m_state.a);
             }
             break;
         }
+        case 0x6E: { // ROR abs / RORQ abs
+            uint16_t a=getAbs();
+            if (isQuad) { uint32_t q = read32(a); uint32_t c=(m_state.p&FLAG_C)?0x80000000:0; m_state.p=(m_state.p&~FLAG_C)|(q&1); q=(q>>1)|c; write32(a,q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=(m_state.p&FLAG_C)?0x80:0; uint8_t oldC=v&1; v=(v>>1)|c; m_state.p=(m_state.p&~FLAG_C)|oldC; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0x7E: { // ROR abs,X / RORQ abs,X
+            uint16_t a=getAbsX();
+            if (isQuad) { uint32_t q = read32(a); uint32_t c=(m_state.p&FLAG_C)?0x80000000:0; m_state.p=(m_state.p&~FLAG_C)|(q&1); q=(q>>1)|c; write32(a,q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=(m_state.p&FLAG_C)?0x80:0; uint8_t oldC=v&1; v=(v>>1)|c; m_state.p=(m_state.p&~FLAG_C)|oldC; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0x66: { // ROR zp / RORQ zp
+            uint16_t a=getZp();
+            if (isQuad) { uint32_t q = read32(a); uint32_t c=(m_state.p&FLAG_C)?0x80000000:0; m_state.p=(m_state.p&~FLAG_C)|(q&1); q=(q>>1)|c; write32(a,q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=(m_state.p&FLAG_C)?0x80:0; uint8_t oldC=v&1; v=(v>>1)|c; m_state.p=(m_state.p&~FLAG_C)|oldC; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
+        case 0x76: { // ROR zp,X / RORQ zp,X
+            uint16_t a=getZpX();
+            if (isQuad) { uint32_t q = read32(a); uint32_t c=(m_state.p&FLAG_C)?0x80000000:0; m_state.p=(m_state.p&~FLAG_C)|(q&1); q=(q>>1)|c; write32(a,q); updateNZ32(q); }
+            else { uint8_t v=read8(a); uint8_t c=(m_state.p&FLAG_C)?0x80:0; uint8_t oldC=v&1; v=(v>>1)|c; m_state.p=(m_state.p&~FLAG_C)|oldC; write8(a,v); updateNZ(v); }
+            m_state.cycles++; break;
+        }
 
         // --- 10. 45GS02 Extensions ---
-        case 0x42: { m_state.a = -(int8_t)m_state.a; updateNZ(m_state.a); m_state.cycles++; break; } // NEG
+        case 0x42: { // NEG A / NEGQ A
+            if (isQuad) { uint32_t q = -(int32_t)regRead(8); regWrite(8, q); updateNZ32(q); }
+            else { m_state.a = -(int8_t)m_state.a; updateNZ(m_state.a); }
+            m_state.cycles++; break;
+        }
         case 0x5C: { m_state.mapEnabled = true; break; } // MAP
         case 0x7C: { m_state.mapEnabled = false; break; } // EOM
 
@@ -725,6 +1062,11 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
     const char* lsr_pfx = isQuad ? "LSRQ" : "LSR";
     const char* rol_pfx = isQuad ? "ROLQ" : "ROL";
     const char* ror_pfx = isQuad ? "RORQ" : "ROR";
+    const char* bit_pfx = isQuad ? "BITQ" : "BIT";
+    const char* inc_pfx = isQuad ? "INQ" : "INC";
+    const char* dec_pfx = isQuad ? "DEQ" : "DEC";
+    const char* asr_pfx = isQuad ? "ASRQ" : "ASR";
+    const char* neg_pfx = isQuad ? "NEGQ" : "NEG";
 
     switch (op) {
         case 0x00: snprintf(buf, bufsz, "BRK"); return (int)(currentAddr - addr);
@@ -739,8 +1081,10 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0xBD: snprintf(buf, bufsz, "LDA $%04X,X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0xB9: snprintf(buf, bufsz, "LDA $%04X,Y", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0xA5: snprintf(buf, bufsz, "%s $%02X", prefix, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
-        case 0xB5: snprintf(buf, bufsz, "LDA $%02X,X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xB5: snprintf(buf, bufsz, "%s $%02X,X", prefix, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0xE2: snprintf(buf, bufsz, "LDA ($%02X,SP),Y", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xA1: snprintf(buf, bufsz, "LDA ($%02X,X)", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xB1: snprintf(buf, bufsz, "LDA ($%02X),Y", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0xB2: 
             if (is32BitInd) snprintf(buf, bufsz, "%s [$%02X],Z", prefix, bus->peek8(currentAddr));
             else snprintf(buf, bufsz, "%s ($%02X),Z", prefix, bus->peek8(currentAddr));
@@ -750,8 +1094,10 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0x9D: snprintf(buf, bufsz, "STA $%04X,X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0x99: snprintf(buf, bufsz, "STA $%04X,Y", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0x85: snprintf(buf, bufsz, "%s $%02X", s_prefix, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
-        case 0x95: snprintf(buf, bufsz, "STA $%02X,X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x95: snprintf(buf, bufsz, "%s $%02X,X", s_prefix, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x82: snprintf(buf, bufsz, "STA ($%02X,SP),Y", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x81: snprintf(buf, bufsz, "STA ($%02X,X)", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x91: snprintf(buf, bufsz, "STA ($%02X),Y", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x92:
             if (is32BitInd) snprintf(buf, bufsz, "%s [$%02X],Z", s_prefix, bus->peek8(currentAddr));
             else snprintf(buf, bufsz, "%s ($%02X),Z", s_prefix, bus->peek8(currentAddr));
@@ -759,7 +1105,12 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
 
         case 0x69: snprintf(buf, bufsz, "ADC #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x6D: snprintf(buf, bufsz, "%s $%04X", adc_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x7D: snprintf(buf, bufsz, "%s $%04X,X", adc_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x79: snprintf(buf, bufsz, "%s $%04X,Y", adc_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0x65: snprintf(buf, bufsz, "%s $%02X", adc_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x75: snprintf(buf, bufsz, "%s $%02X,X", adc_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x61: snprintf(buf, bufsz, "ADC ($%02X,X)", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x71: snprintf(buf, bufsz, "ADC ($%02X),Y", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x72: 
             if (is32BitInd) snprintf(buf, bufsz, "%s [$%02X],Z", adc_pfx, bus->peek8(currentAddr));
             else snprintf(buf, bufsz, "%s ($%02X),Z", adc_pfx, bus->peek8(currentAddr));
@@ -767,7 +1118,12 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
 
         case 0xE9: snprintf(buf, bufsz, "SBC #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0xED: snprintf(buf, bufsz, "%s $%04X", sbc_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0xFD: snprintf(buf, bufsz, "%s $%04X,X", sbc_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0xF9: snprintf(buf, bufsz, "%s $%04X,Y", sbc_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0xE5: snprintf(buf, bufsz, "%s $%02X", sbc_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xF5: snprintf(buf, bufsz, "%s $%02X,X", sbc_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xE1: snprintf(buf, bufsz, "SBC ($%02X,X)", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xF1: snprintf(buf, bufsz, "SBC ($%02X),Y", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0xF2:
             if (is32BitInd) snprintf(buf, bufsz, "%s [$%02X],Z", sbc_pfx, bus->peek8(currentAddr));
             else snprintf(buf, bufsz, "%s ($%02X),Z", sbc_pfx, bus->peek8(currentAddr));
@@ -775,45 +1131,87 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
 
         case 0xC9: snprintf(buf, bufsz, "CMP #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0xCD: snprintf(buf, bufsz, "%s $%04X", cmp_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0xDD: snprintf(buf, bufsz, "%s $%04X,X", cmp_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0xD9: snprintf(buf, bufsz, "%s $%04X,Y", cmp_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0xC5: snprintf(buf, bufsz, "%s $%02X", cmp_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xD5: snprintf(buf, bufsz, "%s $%02X,X", cmp_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xC1: snprintf(buf, bufsz, "CMP ($%02X,X)", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xD1: snprintf(buf, bufsz, "CMP ($%02X),Y", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0xD2:
             if (is32BitInd) snprintf(buf, bufsz, "%s [$%02X],Z", cmp_pfx, bus->peek8(currentAddr));
             else snprintf(buf, bufsz, "%s ($%02X),Z", cmp_pfx, bus->peek8(currentAddr));
             return (int)(currentAddr + 1 - addr);
 
+        case 0x29: snprintf(buf, bufsz, "AND #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x2D: snprintf(buf, bufsz, "%s $%04X", and_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x3D: snprintf(buf, bufsz, "%s $%04X,X", and_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x39: snprintf(buf, bufsz, "%s $%04X,Y", and_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0x25: snprintf(buf, bufsz, "%s $%02X", and_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x35: snprintf(buf, bufsz, "%s $%02X,X", and_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x21: snprintf(buf, bufsz, "AND ($%02X,X)", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x31: snprintf(buf, bufsz, "AND ($%02X),Y", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x32:
             if (is32BitInd) snprintf(buf, bufsz, "%s [$%02X],Z", and_pfx, bus->peek8(currentAddr));
             else snprintf(buf, bufsz, "%s ($%02X),Z", and_pfx, bus->peek8(currentAddr));
             return (int)(currentAddr + 1 - addr);
 
+        case 0x09: snprintf(buf, bufsz, "ORA #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x0D: snprintf(buf, bufsz, "%s $%04X", ora_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x1D: snprintf(buf, bufsz, "%s $%04X,X", ora_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x19: snprintf(buf, bufsz, "%s $%04X,Y", ora_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0x05: snprintf(buf, bufsz, "%s $%02X", ora_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x15: snprintf(buf, bufsz, "%s $%02X,X", ora_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x01: snprintf(buf, bufsz, "ORA ($%02X,X)", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x11: snprintf(buf, bufsz, "ORA ($%02X),Y", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x12:
             if (is32BitInd) snprintf(buf, bufsz, "%s [$%02X],Z", ora_pfx, bus->peek8(currentAddr));
             else snprintf(buf, bufsz, "%s ($%02X),Z", ora_pfx, bus->peek8(currentAddr));
             return (int)(currentAddr + 1 - addr);
 
+        case 0x49: snprintf(buf, bufsz, "EOR #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x4D: snprintf(buf, bufsz, "%s $%04X", eor_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x5D: snprintf(buf, bufsz, "%s $%04X,X", eor_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x59: snprintf(buf, bufsz, "%s $%04X,Y", eor_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0x45: snprintf(buf, bufsz, "%s $%02X", eor_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x55: snprintf(buf, bufsz, "%s $%02X,X", eor_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x41: snprintf(buf, bufsz, "EOR ($%02X,X)", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x51: snprintf(buf, bufsz, "EOR ($%02X),Y", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x52:
             if (is32BitInd) snprintf(buf, bufsz, "%s [$%02X],Z", eor_pfx, bus->peek8(currentAddr));
             else snprintf(buf, bufsz, "%s ($%02X),Z", eor_pfx, bus->peek8(currentAddr));
             return (int)(currentAddr + 1 - addr);
 
         case 0x0A: snprintf(buf, bufsz, "%s A", asl_pfx); return (int)(currentAddr - addr);
+        case 0x0E: snprintf(buf, bufsz, "%s $%04X", asl_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x1E: snprintf(buf, bufsz, "%s $%04X,X", asl_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x06: snprintf(buf, bufsz, "%s $%02X", asl_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x16: snprintf(buf, bufsz, "%s $%02X,X", asl_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+
         case 0x4A: snprintf(buf, bufsz, "%s A", lsr_pfx); return (int)(currentAddr - addr);
+        case 0x4E: snprintf(buf, bufsz, "%s $%04X", lsr_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x5E: snprintf(buf, bufsz, "%s $%04X,X", lsr_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x46: snprintf(buf, bufsz, "%s $%02X", lsr_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x56: snprintf(buf, bufsz, "%s $%02X,X", lsr_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+
         case 0x2A: snprintf(buf, bufsz, "%s A", rol_pfx); return (int)(currentAddr - addr);
+        case 0x2E: snprintf(buf, bufsz, "%s $%04X", rol_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x3E: snprintf(buf, bufsz, "%s $%04X,X", rol_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x26: snprintf(buf, bufsz, "%s $%02X", rol_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x36: snprintf(buf, bufsz, "%s $%02X,X", rol_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+
         case 0x6A: snprintf(buf, bufsz, "%s A", ror_pfx); return (int)(currentAddr - addr);
+        case 0x6E: snprintf(buf, bufsz, "%s $%04X", ror_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x7E: snprintf(buf, bufsz, "%s $%04X,X", ror_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x66: snprintf(buf, bufsz, "%s $%02X", ror_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x76: snprintf(buf, bufsz, "%s $%02X,X", ror_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
 
         case 0x04: snprintf(buf, bufsz, "TSB $%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x0C: snprintf(buf, bufsz, "TSB $%04X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0x14: snprintf(buf, bufsz, "TRB $%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x1C: snprintf(buf, bufsz, "TRB $%04X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
-        case 0x43: snprintf(buf, bufsz, "ASR A"); return (int)(currentAddr - addr);
-        case 0x44: snprintf(buf, bufsz, "ASR $%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
-        case 0x54: snprintf(buf, bufsz, "ASR $%02X,X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x43: snprintf(buf, bufsz, "%s A", asr_pfx); return (int)(currentAddr - addr);
+        case 0x44: snprintf(buf, bufsz, "%s $%02X", asr_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x54: snprintf(buf, bufsz, "%s $%02X,X", asr_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
 
         // LDX
         case 0xA2: snprintf(buf, bufsz, "LDX #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
@@ -857,8 +1255,20 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0xD4: snprintf(buf, bufsz, "CPZ $%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0xDC: snprintf(buf, bufsz, "CPZ $%04X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
 
+        case 0xEE: snprintf(buf, bufsz, "%s $%04X", inc_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0xFE: snprintf(buf, bufsz, "%s $%04X,X", inc_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0xE6: snprintf(buf, bufsz, "%s $%02X", inc_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xF6: snprintf(buf, bufsz, "%s $%02X,X", inc_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xCE: snprintf(buf, bufsz, "%s $%04X", dec_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0xDE: snprintf(buf, bufsz, "%s $%04X,X", dec_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0xC6: snprintf(buf, bufsz, "%s $%02X", dec_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xD6: snprintf(buf, bufsz, "%s $%02X,X", dec_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+
         case 0x1B: snprintf(buf, bufsz, "INZ"); return (int)(currentAddr - addr);
         case 0x3B: snprintf(buf, bufsz, "DEZ"); return (int)(currentAddr - addr);
+
+        case 0x1A: snprintf(buf, bufsz, "%s A", inc_pfx); return (int)(currentAddr - addr);
+        case 0x3A: snprintf(buf, bufsz, "%s A", dec_pfx); return (int)(currentAddr - addr);
 
         case 0x22: snprintf(buf, bufsz, "JSR ($%04X)", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0x23: snprintf(buf, bufsz, "JSR ($%04X,X)", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
@@ -866,9 +1276,12 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0x63: { int16_t r=(int16_t)bus->peek8(currentAddr)|((int16_t)bus->peek8(currentAddr+1)<<8); snprintf(buf, bufsz, "BSR $%04X", (uint16_t)(currentAddr + 2 + r)); return (int)(currentAddr + 2 - addr); }
         case 0x62: snprintf(buf, bufsz, "RTN #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
 
-        case 0x42: snprintf(buf, bufsz, "NEG"); return (int)(currentAddr - addr);
+        case 0x42: snprintf(buf, bufsz, "%s", neg_pfx); return (int)(currentAddr - addr);
         case 0x5C: snprintf(buf, bufsz, "MAP"); return (int)(currentAddr - addr);
         case 0x7C: snprintf(buf, bufsz, "EOM"); return (int)(currentAddr - addr);
+
+        case 0x24: snprintf(buf, bufsz, "%s $%02X", bit_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x2C: snprintf(buf, bufsz, "%s $%04X", bit_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
 
         case 0x83: { int16_t r=(int16_t)bus->peek8(currentAddr)|((int16_t)bus->peek8(currentAddr+1)<<8); snprintf(buf, bufsz, "LBRA $%04X", (uint16_t)(currentAddr + 2 + r)); return (int)(currentAddr + 2 - addr); }
         case 0xD3: { int16_t r=(int16_t)bus->peek8(currentAddr)|((int16_t)bus->peek8(currentAddr+1)<<8); snprintf(buf, bufsz, "LBNE $%04X", (uint16_t)(currentAddr + 2 + r)); return (int)(currentAddr + 2 - addr); }

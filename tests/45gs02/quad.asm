@@ -12,14 +12,12 @@
 * = $0810 "Program"
 
 start:
-    lda #0
+    lda #$20
     ldx #0
-    ldy #0
-    ldz #0
-    sta RESULTS_BASE
-    sta RESULTS_BASE+1
-    sta RESULTS_BASE+2
-    sta RESULTS_BASE+3
+loop_clear:
+    sta RESULTS_BASE,x
+    inx
+    bne loop_clear
 
     // 1. Test LDQ / STQ Zero Page
     lda #$11
