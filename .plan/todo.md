@@ -1129,7 +1129,7 @@ registers, and Hypervisor mode. See `ref/CBM/Mega65/mega65-book.txt` Appendix K.
       after the KERNAL sets DDR=$2F ($00101111) the banking lines present
       LORAM=HIRAM=CHAREN=1 (KERNAL+BASIC ROM visible, I/O active).
     - [ ] Snapshot: `m_ioDdr` and `m_ioData` are included in the POD blob.
-- [ ] **Quad (Q) pseudo-register**: Q = {Z[7:0], Y[7:0], X[7:0], A[7:0]} as a
+- [x] **Quad (Q) pseudo-register**: Q = {Z[7:0], Y[7:0], X[7:0], A[7:0]} as a
       virtual 32-bit register. Not stored separately — assembled on demand from
       the four 8-bit registers.
 - [x] **MAP state**: internal struct `MapState` (in `CPU45GS02State`) holding the eight 8KB offset
@@ -1137,12 +1137,12 @@ registers, and Hypervisor mode. See `ref/CBM/Mega65/mega65-book.txt` Appendix K.
       by the internal `translate()` to translate virtual→physical.
 - [x] **MAP instruction** (`$5C`): enables MAP translation.
 - [x] **EOM instruction** (`$7C`): disables MAP translation.
-- [ ] **Quad load/store**: `LDQ zp`, `LDQ abs`, `LDQ (zp),z`, `STQ zp`,
+- [x] **Quad load/store**: `LDQ zp`, `LDQ abs`, `LDQ (zp),z`, `STQ zp`,
       `STQ abs`, `STQ (zp),z` — moves 4 bytes between Q and memory in
       little-endian order.
-- [ ] **Quad arithmetic**: `ADCQ`, `SBCQ`, `ANDQ`, `ORQ`, `EORQ`, `CMPQ` —
+- [x] **Quad arithmetic**: `ADCQ`, `SBCQ`, `ANDQ`, `ORQ`, `EORQ`, `CMPQ` —
       operate on the full Q register (32-bit A+X+Y+Z combined).
-- [ ] **Quad shifts**: `ASLQ`, `LSRQ`, `ROLQ`, `RORQ` — 32-bit shift/rotate.
+- [x] **Quad shifts**: `ASLQ`, `LSRQ`, `ROLQ`, `RORQ` — 32-bit shift/rotate.
 - [ ] **32-bit flat indirect**: `NOP` prefix ($EA) before `LDA (zp),z` or
       `STA (zp),z` activates 32-bit indirect mode: the base-page pointer is
       read as 4 bytes (28-bit physical address), Z is added as a byte offset,

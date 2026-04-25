@@ -9,6 +9,11 @@ All notable changes to this project will be documented in this file.
     - Initial implementation of the MEGA65 45GS02 CPU core in `src/plugins/45gs02/`.
     - Support for 65CE02 extensions: `TAZ`, `TZA`, `TAB`, `TBA`, `PHZ`, `PLZ`, `INW`, `DEW`, `ASW`, `ROW`, `PHW`, `BSR`, `RTN`.
     - Support for MEGA65 specifics: `NEG`, `MAP`, `EOM`.
+    - Implemented **Quad (Q) pseudo-register** (A+X+Y+Z) and associated 32-bit operations:
+        - `LDQ`, `STQ` (Zero Page, Absolute, and 32-bit Indirect addressing).
+        - `ADCQ`, `SBCQ`, `CMPQ`, `ANDQ`, `ORQ`, `EORQ`.
+        - `ASLQ`, `LSRQ`, `ROLQ`, `RORQ`.
+    - Enhanced disassembler with support for all Quad instructions.
     - Integrated `translate()` logic for memory mapping (4-slot MMU).
     - Support for the `B` (Base Page) register in zero-page addressing modes.
     - Hypervisor exit trap support (triggered at `$D6CF`).

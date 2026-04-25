@@ -1,5 +1,6 @@
 #include "mmemu_plugin_api.h"
 #include "cpu45gs02.h"
+#include "disassembler_45gs02.h"
 #include "libcore/main/machine_desc.h"
 #include "libmem/main/memory_bus.h"
 #include "libdevices/main/io_handler.h"
@@ -10,6 +11,10 @@ static const SimPluginHostAPI* g_host = nullptr;
 
 static ICore* createCore45GS02() {
     return new MOS45GS02();
+}
+
+static IDisassembler* createDisassembler45GS02() {
+    return new Disassembler45GS02();
 }
 
 static MachineDescriptor* createMachineRawMega65() {
@@ -48,7 +53,11 @@ static MachineDescriptor* createMachineRawMega65() {
 }
 
 static CorePluginInfo s_cores[] = {
-    {"45gs02", "MEGA65", "open", createCore45GS02}
+    {"45GS02", "MEGA65", "open", createCore45GS02}
+};
+
+static ToolchainPluginInfo s_toolchains[] = {
+    {"45GS02", createDisassembler45GS02, nullptr}
 };
 
 static MachinePluginInfo s_machines[] = {
@@ -62,7 +71,7 @@ static SimPluginManifest s_manifest = {
     "0.1.0",
     nullptr, nullptr,
     1, s_cores,
-    0, nullptr,
+    1, s_toolchains,
     0, nullptr,
     1, s_machines,
     0, nullptr,

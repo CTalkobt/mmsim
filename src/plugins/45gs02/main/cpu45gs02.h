@@ -52,7 +52,7 @@ public:
     uint32_t    isaCaps()     const override { return 0; }
 
     // Register descriptor table
-    int                  regCount()             const override;
+    int                  regCount()             const override { return 9; }
     const RegDescriptor* regDescriptor(int idx) const override;
     uint32_t             regRead (int idx)      const override;
     void                 regWrite(int idx, uint32_t val) override;
@@ -108,10 +108,17 @@ private:
 
     // Helper for address translation (MAP)
     uint32_t translate(uint16_t addr);
+    uint32_t read32(uint16_t addr);
+    void     write32(uint16_t addr, uint32_t val);
+    uint32_t read32_phys(uint32_t physAddr);
+    void     write32_phys(uint32_t physAddr, uint32_t val);
     uint8_t  read8(uint16_t addr);
     void     write8(uint16_t addr, uint8_t val);
+    uint8_t  read8_phys(uint32_t physAddr);
+    void     write8_phys(uint32_t physAddr, uint8_t val);
     void     updateNZ(uint8_t val);
     void     updateNZ16(uint16_t val);
+    void     updateNZ32(uint32_t val);
     void     push8(uint8_t v);
     uint8_t  pull8();
     void     push16(uint16_t v);

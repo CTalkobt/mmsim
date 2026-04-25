@@ -36,6 +36,7 @@ def run_xmega65(prg_path):
         "-gui", "none",
         "-prg", prg_path,
         "-autoload",
+        "-prgexit",
         "-dumpmem", dump_path,
         "-config", "tests/45gs02/xmega65_test.cfg"
     ]

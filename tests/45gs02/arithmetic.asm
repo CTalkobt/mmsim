@@ -3,6 +3,7 @@
 
 .const SERIAL_DATA = $d6c1
 .const EXIT_TRIGGER = $d6cf
+.const MEGA65_KEY   = $d02f  // VIC-IV I/O mode key: $47,$53 unlocks MEGA65 I/O space
 .const RESULTS_BASE = $0400
 
 // BASIC header: 10 SYS 2064 ($0810)
@@ -47,7 +48,10 @@ sbc1_ok:
 end:
     lda #10 // Newline for serial log still (optional)
     sta SERIAL_DATA
+    lda #$47        // Unlock MEGA65 I/O mode so $D6CF reaches MEGA65 I/O space
+    sta MEGA65_KEY
+    lda #$53
+    sta MEGA65_KEY
     lda #$42
     sta EXIT_TRIGGER
-loop:
-    jmp loop
+    rts
