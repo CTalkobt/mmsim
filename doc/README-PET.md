@@ -46,7 +46,7 @@ The PET machine plugin integrates the 6502 CPU, legacy discrete logic or CRTC vi
 ### 3.1 MOS 6545 CRTC
 - Manages video timing and memory address generation for character fetching.
 - Supports dynamic reconfiguration of screen geometry (columns/rows).
-- Documentation: [README-6545.md](README-6545.md) (Planned).
+- Documentation: [README-6545.md](README-6545.md)
 
 ### 3.2 IEEE-488 Bus (`SimpleIEEE488Bus`)
 - Implements the active-low logic of the parallel peripheral bus.

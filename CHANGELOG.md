@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0-dev] - 2026-04-25
+
+### Added
+- **45GS02 CPU Implementation** (Phase 18):
+    - Initial implementation of the MEGA65 45GS02 CPU core in `src/plugins/45gs02/`.
+    - Support for 65CE02 extensions: `TAZ`, `TZA`, `TAB`, `TBA`, `PHZ`, `PLZ`, `INW`, `DEW`, `ASW`, `ROW`, `PHW`, `BSR`, `RTN`.
+    - Support for MEGA65 specifics: `NEG`, `MAP`, `EOM`.
+    - Integrated `translate()` logic for memory mapping (4-slot MMU).
+    - Support for the `B` (Base Page) register in zero-page addressing modes.
+    - Hypervisor exit trap support (triggered at `$D6CF`).
+- **45GS02 Validation Suite**:
+    - Automated cross-validation of the `mmsim` 45GS02 core against the reference `xemu-xmega65` emulator.
+    - Test cases for arithmetic, transfers, and advanced CPU features.
+    - **Note**: Running these tests may trigger a GUI dialog from `xemu-xmega65` even in headless mode on some systems.
+- **IEC Bus Enhancements**:
+    - Added comprehensive tests for IEC serial bus communication and `.d64` disk image handling.
+- **`rawMega65` Machine Preset**:
+    - A minimal machine target for testing the 45GS02 CPU without full MEGA65 chipset complexity.
+
+### Changed
+- **Pathing**: Updated `xmega65` path configuration in validation scripts to be less user-specific, improving portability.
+
+### Fixed
+- **CLI Cleanup**: Minor code cleanups in `cli_interpreter.cpp` to use modern C++17 `if` with initializer and removed redundant code.
+
 ## [0.6.0-dev] - 2026-04-11
 
 ### Added

@@ -12,6 +12,7 @@ Plugins that implement the `ICore` interface.
 | Plugin File | Description | Documentation |
 |-------------|-------------|---------------|
 | `lib/mmemu-plugin-6502.so` | MOS 6502 (NMOS) with illegal opcode support; also provides MOS 6510. | [README-6502.md](README-6502.md) · [README-6510.md](README-6510.md) |
+| `lib/mmemu-plugin-45gs02.so` | MEGA65 45GS02 CPU: 65CE02 extensions, 28-bit mapping (MAP), 32-bit Quad operations. | [README-45GS02.md](README-45GS02.md) |
 
 ### 1.2 Device Plugins (I/O & Video)
 Plugins that implement the `IOHandler` interface for memory-mapped hardware.
@@ -31,8 +32,10 @@ Plugins that implement the `IOHandler` interface for memory-mapped hardware.
 | `lib/mmemu-plugin-antic.so` | Atari ANTIC DMA engine and display controller. | [README-ANTIC.md](README-ANTIC.md) |
 | `lib/mmemu-plugin-gtia.so` | Atari GTIA color and PMG chip. | [README-GTIA.md](README-GTIA.md) |
 | `lib/mmemu-plugin-pokey.so` | Atari POKEY audio, timers, and keyboard/SIO. | [README-POKEY.md](README-POKEY.md) |
-
-| `lib/mmemu-plugin-virtual-iec.so` | Commodore IEC Serial Bus (Level 2 virtual device) — ATN/CLK/DATA state machine, attaches to CIA #2 / VIA #2. | [README-IEC.md](README-IEC.md) |
+| `lib/mmemu-plugin-virtual-iec.so` | Commodore IEC Serial Bus (Level 2 virtual device) with .d64 support. | [README-IEC.md](README-IEC.md) |
+| `lib/mmemu-plugin-hyper-serial.so` | HyperSerial debugging logger for MEGA65 / 45GS02 tests. | [README-HYPER-SERIAL.md](README-HYPER-SERIAL.md) |
+| `lib/mmemu-plugin-exit-trap.so` | Minimal exit signaling device for automated test validation. | [README-EXIT-TRAP.md](README-EXIT-TRAP.md) |
+| `lib/mmemu-plugin-cbm-hle.so` | Commodore KERNAL High-Level Emulation traps (Level 1). | [README-CBM-HLE.md](README-CBM-HLE.md) |
 
 ### 1.2.1 Integrated Devices (no separate .so)
 These devices are compiled into the machine plugins but are documented separately:
@@ -50,13 +53,15 @@ Plugins that implement `MachineDescriptor` factories.
 | `lib/mmemu-plugin-c64.so` | Commodore 64 — full chip set and banking. | [README-C64.md](README-C64.md) |
 | `lib/mmemu-plugin-pet.so` | Commodore PET Series (2001, 4032, 8032). | [README-PET.md](README-PET.md) |
 
+| Note | The `rawMega65` machine is defined via JSON in `machines/rawMega65.json` and uses the `45gs02` core and `hyper_serial` / `exit_trap` devices. | [README-RAW-MEGA65.md](README-RAW-MEGA65.md) |
+
 ### 1.4 Utility & Loader Plugins
 Plugins providing support services like ROM importing or file format parsing.
 
 | Plugin File | Description |
 |-------------|-------------|
 | `lib/mmemu-plugin-vice-importer.so` | Discovers and imports ROMs from a local VICE installation. |
-| `lib/mmemu-plugin-cbm-loader.so` | Implements `.prg` program loading and `.crt` cartridge support. |
+| `lib/mmemu-plugin-cbm-loader.so` | Implements `.prg` program loading, `.crt` cartridge, and disk image parsing. |
 
 ---
 
@@ -94,3 +99,4 @@ The `lib/` directory contains the dynamic plugins (`.so` files). Standard distri
 - **VIC-20 Support**: `6502`, `via6522`, `vic6560`, `kbd-vic20`, `vic20`, `cbm-loader`, `vice-importer`. (Datasette built-in.)
 - **C64 Support**: `6502`, `c64-pla`, `cia6526`, `vic2`, `sid6581`, `c64`, `cbm-loader`, `vice-importer`, `virtual-iec` (optional). (Datasette built-in.)
 - **PET Support**: `6502`, `pia6520`, `via6522`, `crtc6545`, `pet-video`, `pet`, `cbm-loader`, `vice-importer`. (Datasette built-in.)
+- **MEGA65 Support (Dev)**: `45gs02`, `hyper-serial`, `exit-trap`, `cbm-loader`. (Machine defined via `rawMega65.json`.)

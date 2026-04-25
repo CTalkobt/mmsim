@@ -111,12 +111,9 @@ void ejectDisk(int unit);
 
 ```
 src/plugins/devices/virtual_iec/test/test_virtual_iec.cpp
-  virtual_iec_handshake — verifies IDLE→ATTENTION→ADDRESSING cycle:
-    1. Pull ATN (bit 3 of writePort).
-    2. tick(3000) — exceeds 2000-cycle ATN response threshold.
-    3. Assert DATA IN (bit 7 of readPort) is set.
-    4. Clock in 8 bits of LISTEN 8 ($28) via CLK/DATA toggles.
-    5. Assert DATA IN still set (ACKNOWLEDGE phase).
+  virtual_iec_handshake — verifies IDLE→ATTENTION→ADDRESSING cycle.
+src/plugins/devices/virtual_iec/test/test_iec_d64.cpp
+  iec_d64_mount — verifies .d64 image mounting and sector reading via IEC state machine.
 ```
 
 Run with `make test`.
@@ -132,16 +129,17 @@ src/plugins/devices/virtual_iec/
 │   ├── virtual_iec.cpp        — state machine, bit transfer, command dispatch
 │   └── plugin_init.cpp        — mmemuPluginInit() entry point
 └── test/
-    └── test_virtual_iec.cpp   — handshake unit test
+    ├── test_virtual_iec.cpp   — handshake unit test
+    └── test_iec_d64.cpp       — D64 disk image unit test
 ```
 
 The plugin is built as `lib/mmemu-plugin-virtual-iec.so` and loaded automatically by the plugin loader.
 
 ---
 
-## 8. Limitations (Phase 15.2)
+## 8. Limitations
 
-- Bit streaming from disk images is not yet implemented (Phase 15.3).
-- EOI (End-Or-Identify) signalling is not handled.
-- Only one virtual device (unit 8) per bus is supported.
-- Fast-loaders that bit-bang the bus without using standard KERNAL timing will not work.
+- EOI (End-Or-Identify) signalling is currently simplified.
+- Only one virtual device (unit 8) per bus is supported by default.
+- Fast-loaders that bit-bang the bus without using standard KERNAL timing may require further refinement.
+- **Note**: Recent updates have added support for bit-streaming from `.d64` disk images (Phase 15.3 partially integrated).
