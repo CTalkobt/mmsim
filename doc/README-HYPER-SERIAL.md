@@ -6,13 +6,13 @@
 
 ## 1. Register Interface
 
-The device is typically mapped at `$D6C0` in the MEGA65 memory map.
+The device is typically mapped at `\$D6C0` in the MEGA65 memory map.
 
 | Address | Mode | Description |
 |---------|------|-------------|
-| **$D6C0** | Read | **Status**: Returns `$03` (Tx and Rx Ready). |
-| **$D6C1** | Write | **Data**: Writing a byte here appends it to `hyper_serial.log`. |
-| **$D6CF** | Write | **Exit Trigger**: Writing `$42` signals a halt to the simulator. |
+| **\$D6C0** | Read | **Status**: Returns `\$03` (Tx and Rx Ready). |
+| **\$D6C1** | Write | **Data**: Writing a byte here appends it to `hyper_serial.log`. |
+| **\$D6CF** | Write | **Exit Trigger**: Writing `\$42` signals a halt to the simulator. |
 
 ---
 

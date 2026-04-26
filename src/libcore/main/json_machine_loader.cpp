@@ -1,4 +1,5 @@
 #include "json_machine_loader.h"
+#include "util/path_util.h"
 #include "libcore/main/machine_desc.h"
 #include "libcore/main/machines/machine_registry.h"
 #include "libcore/main/core_registry.h"
@@ -91,7 +92,8 @@ static uint32_t hexStrToU32(const std::string& s) {
 // ---------------------------------------------------------------------------
 
 int JsonMachineLoader::loadFile(const std::string& path) {
-    std::ifstream f(path);
+    std::string actualPath = PathUtil::findResource(path);
+    std::ifstream f(actualPath);
     if (!f.is_open()) return 0;
     std::ostringstream ss;
     ss << f.rdbuf();
@@ -216,7 +218,7 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
             if (!label.empty()) romByLabel[label] = {ptr, (uint32_t)size};
 
             if (!path.empty())
-                romLoad(path.c_str(), ptr, (size_t)size);
+                romLoad(PathUtil::findResource(path).c_str(), ptr, (size_t)size);
 
             if (bus && romSpec.contains("overlayAddr") &&
                 !romSpec["overlayAddr"].is_null()) {
@@ -232,7 +234,7 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
     // -----------------------------------------------------------------------
     if (spec.contains("symbolFiles") && spec["symbolFiles"].is_array()) {
         for (const auto& symPath : spec["symbolFiles"]) {
-            desc->symbolFiles.push_back(symPath.get<std::string>());
+            desc->symbolFiles.push_back(PathUtil::findResource(symPath.get<std::string>()));
         }
     }
 

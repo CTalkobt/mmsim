@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    PluginLoader::instance().loadFromDir("./lib");
+    PluginLoader::instance().loadFromStandardLocations();
 
     CliContext ctx;
     CliInterpreter interpreter(ctx, [](const std::string& out) {

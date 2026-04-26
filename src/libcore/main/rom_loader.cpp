@@ -1,10 +1,12 @@
 #include "rom_loader.h"
+#include "util/path_util.h"
 #include <cstdio>
 
 bool romLoad(const char *path, uint8_t *buf, size_t expectedSize) {
-    FILE *f = fopen(path, "rb");
+    std::string actualPath = PathUtil::findResource(path);
+    FILE *f = fopen(actualPath.c_str(), "rb");
     if (!f) {
-        fprintf(stderr, "Error: Could not open ROM file: %s\n", path);
+        fprintf(stderr, "Error: Could not open ROM file: %s (tried %s)\n", path, actualPath.c_str());
         return false;
     }
 

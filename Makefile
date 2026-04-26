@@ -1,6 +1,6 @@
 # mmemu — Multi Machine Emulator
 # Top-level Makefile
-.PHONY: all cli gui mcp libs test plugins clean
+.PHONY: all cli gui mcp libs test plugins clean man
 
 all: cli gui mcp plugins
 
@@ -26,6 +26,7 @@ INCLUDES  = -Isrc -Isrc/include -Isrc/cli/main -Isrc/gui/main -Isrc/libcore/main
 BINDIR   = bin
 LIBDIR   = lib
 ILIBDIR  = lib/internal
+MANDIR   = man
 
 # wxWidgets configuration
 WXCXXFLAGS = $(shell wx-config --cxxflags)
@@ -39,7 +40,8 @@ PLUGIN_LIBS =
 LIBMEM_SRCS       = src/libmem/main/ibus.cpp src/libmem/main/memory_bus.cpp src/libmem/main/libmem.cpp
 LIBCORE_SRCS      = src/libcore/main/icore.cpp src/libcore/main/rom_loader.cpp src/libcore/main/core_registry.cpp \
 	src/libcore/main/machines/machine_registry.cpp src/libcore/main/libcore.cpp \
-	src/libcore/main/image_loader.cpp src/libcore/main/json_machine_loader.cpp
+	src/libcore/main/image_loader.cpp src/libcore/main/json_machine_loader.cpp \
+	src/libcore/main/path_util.cpp
 LIBDEVICES_SRCS   = src/libdevices/main/libdevices.cpp src/libdevices/main/io_registry.cpp \
                     src/libdevices/main/ivideo_output.cpp \
                     src/libdevices/main/device_registry.cpp src/libdevices/main/joystick.cpp \
@@ -512,8 +514,18 @@ test-mega65: $(CLI_BIN) plugins
 	./tests/45gs02/validate.py tests/45gs02/advanced.asm
 	./tests/45gs02/validate.py tests/45gs02/quad.asm
 
+man:
+	mkdir -p $(MANDIR)
+	@echo "Generating man pages from documentation..."
+	@for f in doc/README-*.md; do \
+		base=$$(basename $$f .md | sed 's/README-//' | tr '[:upper:]' '[:lower:]'); \
+		pandoc -s -t man $$f -o $(MANDIR)/mmemu-$$base.7; \
+	done
+	@pandoc -s -t man doc/iec.md -o $(MANDIR)/mmemu-iec.7
+	@pandoc -s -t man README.md -o $(MANDIR)/mmemu.1
+
 clean:
-	rm -rf $(BINDIR) $(LIBDIR) $(ILIBDIR)
+	rm -rf $(BINDIR) $(LIBDIR) $(ILIBDIR) $(MANDIR)
 	find src -name "*.o" -delete
 	find src -name "*.d" -delete
 

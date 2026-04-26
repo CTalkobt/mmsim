@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 ## [0.7.0-dev] - 2026-04-25
 
 ### Added
+- **Installation Infrastructure**:
+    - New `install-local.sh` and `install-system.sh` scripts in `tools/` for easy deployment to `~/.local` or `/usr/local`.
+    - **Man Page Generation**: Added a `make man` target using `pandoc` to convert Markdown documentation into system man pages (installed to Section 1 for binaries and Section 7 for plugins/concepts).
+- **Resource Discovery System (`PathUtil`)**:
+    - Centralized path resolution for plugins, machine configurations, and ROM images.
+    - Automatic search in standard locations: `./`, `~/.local/share/mmsim/`, and `/usr/local/share/mmsim/`.
+    - Plugins are now automatically discovered in `~/.local/lib/mmsim/plugins` and `/usr/local/lib/mmsim/plugins`.
 - **45GS02 CPU Implementation** (Phase 18):
     - Initial implementation of the MEGA65 45GS02 CPU core in `src/plugins/45gs02/`.
     - Support for 65CE02 extensions: `TAZ`, `TZA`, `TAB`, `TBA`, `PHZ`, `PLZ`, `INW`, `DEW`, `ASW`, `ROW`, `PHW`, `BSR`, `RTN`.

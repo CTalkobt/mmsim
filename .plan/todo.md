@@ -193,7 +193,7 @@ snapshots. Drives all debug panes described in arch.md §13.*
    - [x] Interactive REPL with input parsing.
    - [x] `step`, `run`, `pause`, `stop` commands mapped to `ICore`.
    - [x] `regs` command: displays all registers from `ICore::regDescriptor()`.
-   - [x] `m` (memory) and `f` (fill) commands using `IBus::read8/write8`.
+   - [x] `m` (memory) and `f` (fill) using `IBus::read8/write8`.
    - [x] `disasm` command using `IDisassembler` interface.
    - [x] `load` command to load binary files into memory.
    - [x] **Direct Instruction Execution**: Support `.<instr>` prefix for instant assembly and execution.
@@ -329,278 +329,13 @@ devices. No concrete chips yet — those come in Phases 10 and 11.*
 *Goal: A fully bootable VIC-20 simulation. This is the first machine where all
 five libraries are exercised together.*
 
-### Phase 10.1 MOS 6522 VIA (`src/plugins/devices/via6522/`)
-
-The VIC-20 has two VIA chips. One implementation services both.
-
-- [x] Register file: ORA, DDRA, ORB, DDRB, T1CL/CH (latch+counter), T2CL/CH, SR, ACR, PCR, IFR, IER, IORA.
-- [x] Timer 1: continuous / one-shot mode; underflow sets IFR bit 6; triggers IRQ via `ISignalLine`.
-- [x] Timer 2: one-shot pulse count; underflow sets IFR bit 5.
-- [x] Port A / Port B: reads consult an injected `IPortDevice*`; DDR masks applied correctly. Unconnected pins read as 1.
-- [x] CB2 / CA2 handshake lines via `ISignalLine`.
-- [x] `tick(cycles)` updates timer counters and fires interrupts.
-- [x] `reset()` clears all registers to power-on state.
-- [x] `IOHandler` interface: responds to 16-byte window, mirrored across the VIA's aliased address range.
-
-### Phase 10.2 MOS 6560/6561 VIC (`src/plugins/devices/vic6560/`)
-
-*The VIC-I chip used in the VIC-20 (6560 NTSC, 6561 PAL).*
-
-- [x] Register file (16 registers, $9000–$900F): interlace, screen origin X/Y, columns, rows, double-size, raster compare, memory pointers, light pen X/Y, paddle X/Y, sound, volume/colour, auxiliary colour, border colour, background colour.
-- [x] Video geometry: screen columns and rows read from registers; default 22×23 visible characters.
-- [x] Character fetch: reads character codes from screen RAM, then glyph data from character ROM, using memory pointers in VIC registers. Uses `IBus::peek8()` to avoid side effects.
-- [x] Colour RAM: separate 4-bit colour array at $9600–$97FF (400 bytes for 22×23). Stored as a plain array owned by the VIC-20 machine descriptor; VIC receives a pointer.
-- [x] Raster counter: increments each line; comparison register triggers IRQ.
-- [x] Sound: three square-wave tone generators (high/low nibble frequency + on/off bits) and one noise channel. Volume register. Amplitude model only — no waveform synthesis at this stage (can be upgraded later).
-- [x] `IVideoOutput` interface: `renderFrame()` fills an RGBA pixel buffer with the current frame using current register state and bus data.
-- [x] `tick(cycles)` drives the raster counter; fires raster IRQ via `ISignalLine` when the counter matches.
-
-### Phase 10.3 VIC-20 Memory Map (`src/libcore/machines/machine_vic20.cpp`)
-
-```
-Address       Size    Description
-$0000–$03FF    1 KB   Zero page, stack, system vectors
-$0400–$0FFF    3 KB   Unexpanded: unmapped (open bus); 3K expansion fills this
-$1000–$1DFF    3.5KB  Main user RAM
-$1E00–$1FFF    0.5KB  Default screen RAM (22×23 char codes = 506 bytes)
-$2000–$7FFF   24 KB   BLK1–BLK3 cartridge/expansion slots (unmapped by default)
-$8000–$8FFF    4 KB   Character ROM (VIC-20 char set)
-$9000–$900F   16 B    VIC-I registers (mirrored to $93FF)
-$9110–$911F   16 B    VIA #1 (mirrored to $93FF)
-$9120–$912F   16 B    VIA #2 (mirrored to $93FF)
-$9400–$95FF  512 B    Colour RAM nybbles (low 4 bits used; mirrored)
-$9600–$97FF  512 B    Colour RAM alias (actual accessible window)
-$A000–$BFFF    8 KB   BLK5 cartridge slot (unmapped by default)
-$C000–$DFFF    8 KB   BASIC ROM
-$E000–$FFFF    8 KB   KERNAL ROM
-```
-
-- [x] `FlatMemoryBus(16)` for the 64 KB address space.
-- [x] Load character ROM at $8000 via `romLoad()`.
-- [x] Load BASIC ROM at $C000 via `romLoad()` with `writable=false` overlay.
-- [x] Load KERNAL ROM at $E000 via `romLoad()` with `writable=false` overlay.
-- [x] IORegistry entries: VIC ($9000), VIA #1 ($9110), VIA #2 ($9120).
-- [x] Colour RAM as a plain 512-byte array at $9400–$97FF; `FlatMemoryBus` overlay for read/write (4-bit mask on write).
-- [x] `MachineDescriptor` id `"vic20"`, single CPU slot (`MOS6502`), single bus slot (`"system"`).
-- [x] `onReset`: loads ROMs (if not already loaded), resets CPU and all devices.
-- [x] Register factory with `MachineRegistry::registerMachine("vic20", ...)` — all five variants registered via `s_machines[]` in `plugin_init.cpp`; `PluginLoader::registerPluginItems` handles this automatically at plugin load time.
-
-### Phase 10.4 VIC-20 Peripheral Wiring
-
-- [x] **Keyboard matrix** (`src/plugins/devices/keyboard/main/keyboard_matrix.h/cpp`)
-   - [x] 8×8 matrix (64 keys), wired to VIA #1 port A (column output) and VIA #2 port B (row input).
-   - [x] `keyDown(row, col)` / `keyUp(row, col)` API for the GUI/CLI to inject keystrokes.
-   - [x] Implements `IPortDevice` on both ports; VIA reads return appropriate row bits.
-
-- [x] **Joystick** (`src/libdevices/joystick.h/cpp`)
-   - [x] 5-bit active-low directional + fire, injected into VIA #1 port B.
-   - [x] `setState(uint8_t bits)` API.
-
-### Phase 10.5 Plugin Extension Host API
-
-*Goal: Define the interfaces and host-side registration infrastructure that let
-dynamically loaded plugins contribute GUI panes, CLI commands, and MCP tools
-without any static linkage to the host binaries. All three frontends consume the
-same registration layer; individual plugins opt in to whichever surfaces they
-need.*
-
-**Extend `SimPluginHostAPI`** (`src/include/mmemu_plugin_api.h`)
-
-- [x] Add function pointers to `SimPluginHostAPI` for each extension point:
-    - `registerPane(const PluginPaneInfo*)` — GUI pane registration (no-op in CLI/MCP hosts).
-    - `registerCommand(const PluginCommandInfo*)` — CLI command registration (no-op in GUI/MCP hosts).
-    - `registerMcpTool(const PluginMcpToolInfo*)` — MCP tool registration (no-op in CLI/GUI hosts).
-- [x] Each function pointer is set to a real implementation in the host that
-      supports it, and to a safe no-op stub in hosts that do not, so plugins call
-      unconditionally without host-capability checks.
-
-**GUI pane extension** (`src/include/mmemu_plugin_api.h`, `src/gui/plugin_pane_manager.h/cpp`)
-
-- [x] `struct PluginPaneInfo` — all window handles are `void*`; no wxWidgets
-      types appear anywhere in this struct or in `mmemu_plugin_api.h`:
-    - `const char* paneId` — unique identifier (e.g. `"vice-importer.main"`).
-    - `const char* displayName` — tab/title label shown in notebook and menu.
-    - `const char* menuSection` — top-level menu name under which a show/hide
-      item is placed (e.g. `"Tools"` or `"View"`); `nullptr` to suppress menu entry.
-    - `const char* const* machineIds` — null-terminated list of machine IDs for
-      which the pane is relevant; `nullptr` means show for all machines.
-    - `void* (*createPane)(void* parentHandle, void* ctx)` — factory called on
-      the GUI thread; `parentHandle` is the opaque parent window; returns an
-      opaque pane handle. `ctx` is the plugin-supplied context pointer.
-    - `void  (*destroyPane)(void* paneHandle, void* ctx)` — called before the
-      pane is removed (machine switch or shutdown); plugin frees its resources.
-    - `void  (*refreshPane)(void* paneHandle, uint64_t cycles, void* ctx)` —
-      called by the host's cycle timer (or on any registered event) so the plugin
-      can update displayed data; must return quickly (no blocking I/O).
-    - `void* ctx` — plugin-supplied opaque context passed to all callbacks.
-- [x] `PluginPaneManager` (`src/gui/plugin_pane_manager.h/cpp`) — the only site
-      that casts `void*` handles to `wxWindow*`:
-    - Maintains the registered `PluginPaneInfo` list and a parallel list of live
-      pane handles (one per registered pane, null until first shown).
-    - **Menu integration**: for each registered pane with a non-null `menuSection`,
-      appends a checkable menu item under that section; toggling it
-      shows/hides the pane and keeps the check state in sync.
-    - **Machine switch**: hides and destroys panes whose `machineIds` do not
-      include the new machine ID; lazily creates and shows panes that match.
-      The corresponding menu items are enabled/disabled to match visibility.
-    - **Notebook integration**: panes appear as additional tabs in the main
-      frame's `wxAuiNotebook`; users can drag, float, or close them like any
-      built-in pane.
-    - **Periodic refresh**: the host's existing cycle/render timer calls
-      `PluginPaneManager::tickAll(uint64_t cycles)`, which iterates live panes
-      and invokes `refreshPane` on each. No wxWidgets types cross the boundary —
-      the opaque `void* paneHandle` is passed straight through.
-    - `destroyPane` is called on tab close or machine unload before the
-      `wxWindow*` is deleted.
-
-**CLI command extension** (`src/include/mmemu_plugin_api.h`, `src/cli/plugin_command_registry.h/cpp`)
-
-- [x] `struct PluginCommandInfo`:
-    - `const char* name` — command token (e.g. `"importroms"`).
-    - `const char* usage` — one-line usage string printed by `help`.
-    - `int (*execute)(int argc, const char* const* argv, void* ctx)` — called on
-      the CLI thread; returns 0 on success, non-zero on error.
-    - `void* ctx` — plugin-supplied opaque context.
-- [x] `PluginCommandRegistry` (`src/cli/plugin_command_registry.h/cpp`):
-    - `registerCommand(const PluginCommandInfo*)` — stores entry; rejects
-      duplicates (logs a warning, does not overwrite built-in commands).
-    - `dispatch(const std::vector<std::string>& tokens)` — called by the CLI REPL
-      after built-in command lookup fails; returns false if no plugin handles it.
-    - `listCommands(std::vector<std::string>&)` — appended to `help` output.
-
-**MCP tool extension** (`src/include/mmemu_plugin_api.h`, `src/mcp/plugin_tool_registry.h/cpp`)
-
-- [x] `struct PluginMcpToolInfo`:
-    - `const char* toolName` — JSON-RPC method name (e.g. `"importroms"`).
-    - `const char* schemaJson` — JSON Schema string for the `params` object.
-    - `void (*handle)(const char* paramsJson, char** resultJson, void* ctx)` —
-      called on the MCP thread; writes a heap-allocated JSON string to
-      `*resultJson`; the host frees it with the companion `freeString` pointer.
-    - `void (*freeString)(char*)` — plugin-provided free function (avoids
-      cross-module `free` mismatch).
-    - `void* ctx` — plugin-supplied opaque context.
-- [x] `PluginToolRegistry` (`src/mcp/plugin_tool_registry.h/cpp`):
-    - `registerTool(const PluginMcpToolInfo*)` — stores entry; rejects name
-      collisions with built-in tools.
-    - `dispatch(const std::string& method, const std::string& paramsJson, std::string& resultJson)` — returns false if no plugin handles the method.
-    - `listTools(std::vector<std::string>&)` — appended to `tools/list` response.
-
-**Dynamic loading contract**
-
-- [x] `PluginLoader::load()` (Phase 6) is extended to call `registerPane`,
-      `registerCommand`, and `registerMcpTool` via the already-populated
-      `SimPluginHostAPI` pointer passed into `mmemuPluginInit`. No additional
-      loader changes are required beyond ensuring the function pointers are set
-      before the plugin entry point is called.
-- [x] Plugins that do not need a given surface simply do not call the
-      corresponding registration function; no stub implementation is required in
-      the plugin.
-
-**Unit tests** (`tests/test_plugin_extension.cpp`)
-
-- [x] `PluginCommandRegistry`: register two commands; verify dispatch routes to
-      the correct handler; verify unknown token returns false.
-- [x] `PluginCommandRegistry`: registration of a name that collides with a
-      built-in command is rejected and returns false.
-- [x] `PluginToolRegistry`: register a tool; `dispatch` calls its handler and
-      returns the JSON result; unknown method returns false.
-- [x] `PluginPaneInfo` struct is fully expressible in plain C (no wxWidgets
-      headers required); verified by compiling a test TU with no wx include paths.
-- [x] `PluginPaneManager` (tested via a wx-free mock that substitutes `void*`
-      stubs for real windows): registration stores entry; `machineIds` filter
-      suppresses `createPane` for non-matching machine IDs and invokes it for
-      matching ones; `tickAll` calls `refreshPane` on all live panes.
-
-### Phase 10.6 VIC-20 Integration Test
-
-- [x] Assemble a minimal test program (LDA #$41 / STA $1E00 / JMP *) directly as machine code bytes.
-- [x] Load into bus, reset, run until `isProgramEnd()`.
-- [x] Verify the correct byte appeared in screen RAM at $1E00.
-- [x] Run for enough cycles to advance at least two VIC-I raster lines; verify via `IORegistry::dispatchRead` at $9004.
-- [x] **VIA timer validation**: program VIA1 T1, tick past underflow, verify IFR bit 6 via `IORegistry::dispatchRead` at $911D.
-- [x] **Extension Host Verification**:
-    - [x] Verify the VIC-20 machine correctly identifies itself (`machineId == "vic20"`) for pane filtering.
-    - [x] Verify that the `"importroms"` CLI command is registered when the vice-importer `.so` is loaded via `PluginLoader`.
-
-### Phase 10.7 VICE ROM Importer Plugin (`src/plugins/viceImporter/`)
-
-*Goal: Provide an end-user-triggered utility that discovers an existing VICE
-installation on the host system and copies the VIC-20 ROM images into the
-emulator's `roms/` directory. The utility is never invoked automatically — the
-user must explicitly request it via a CLI command or GUI menu item.*
-
-**Plugin identity and wiring**
-
-- [x] Plugin entry point `mmemuPluginInit` in `src/plugins/viceImporter/main/plugin_main.cpp`; plugin manifest declares:
-    - `pluginId = "vice-importer"`, `displayName = "VICE ROM Importer"`.
-    - Dependency on `"vic20"` machine plugin (listed in `SimPluginManifest::deps[]`).
-    - `supportedMachineIds[]` = `{ "vic20" }` — the importer only activates for
-      machine IDs it knows about; adding future machines (C64, etc.) requires
-      explicit additions here.
-- [x] Receives the `SimPluginHostAPI` pointer and stores it for subsequent registration calls.
-- [x] `Makefile` target builds `lib/mmemu-plugin-vice-importer.so`; link order
-      ensures the vic20 machine plugin is loaded first.
-
-**Discovery engine** (`src/plugins/viceImporter/main/rom_discovery.h/cpp`)
-
-- [x] `struct RomSource { std::string label; std::string basePath; }` — describes
-      a candidate VICE installation.
-- [x] `std::vector<RomSource> discoverSources(const std::string& machineId)`
-    - Searches a hardcoded list of well-known VICE install paths (platform-specific:
-      `~/.local/share/vice`, `/usr/share/vice`, `/usr/share/games/vice`,
-      `/opt/vice`, `~/Applications/VICE.app`, `C:\Program Files\VICE`).
-    - For each candidate path, verifies that the expected VIC-20 ROM files are
-      present before including it in the result (no partial matches).
-    - Returns an empty vector if nothing is found; never throws.
-    - Internal `discoverSourcesInPaths(machineId, paths)` helper exposed for testing.
-- [x] `struct RomFileSpec { std::string srcRelPath; std::string destName; size_t expectedSize; }` — maps one source ROM file to its canonical destination name and expected byte size.
-- [x] `std::vector<RomFileSpec> romFilesFor(const std::string& machineId)` — returns the spec list for `"vic20"`: `basic.bin` (8 KB), `kernal.bin` (8 KB), `char.bin` (4 KB) sourced from VICE's `VIC20/` subdirectory.
-
-**Import operation** (`src/plugins/viceImporter/main/rom_importer.h/cpp`)
-
-- [x] `ImportResult importRoms(const RomSource& src, const std::string& machineId, const std::string& destDir)`
-    - Copies each file listed by `romFilesFor()` from `src.basePath` to `destDir/`.
-    - Validates byte size of each file after copy; rolls back (deletes copied files)
-      on any mismatch or IO error, and returns a descriptive error string.
-    - Never overwrites an existing file unless the caller sets `overwrite = true`
-      (prevents silent ROM replacement).
-    - Returns `{ success, std::vector<std::string> copiedFiles, std::string errorMessage }`.
-
-**CLI integration** (via Phase 10.5 `PluginCommandRegistry`)
-
-- [x] Registers a `PluginCommandInfo` for `"importroms"` during `mmemuPluginInit`.
-- [x] Command syntax: `importroms <machineId> [--list] [--source <n>] [--dest <path>] [--overwrite]`:
-    - `--list`: prints discovered sources and exits (dry-run, no files copied).
-    - `--source <n>`: selects source by index from the discovered list; if omitted
-      and exactly one source exists it is used automatically; if multiple exist the
-      command prints the list and asks the user to re-run with `--source`.
-    - `--dest`: overrides the default destination (`roms/`).
-    - `--overwrite`: permits replacing existing ROM files.
-    - Prints a per-file copy summary and a final success/failure line.
-
-**GUI integration** (via Phase 10.5 `PluginPaneManager`)
-
-- [x] Registers a `PluginPaneInfo` with `machineIds = { "vic20", nullptr }` during `mmemuPluginInit`.
-- [x] `createPane` returns a `RomImportPane` (`wxPanel` subclass):
-    - Dropdown of discovered sources populated by `discoverSources()`.
-    - Read-only display of files that will be copied and their destination.
-    - "Import" button disabled when no source is selected; enabled otherwise.
-    - Status feedback inline within the pane; error shown on failure.
-    - On success, displays a prompt suggesting the user reset/reload the machine.
-- [x] Pane is automatically hidden by `PluginPaneManager` when a non-VIC-20 machine is active.
-
-**MCP integration** (via Phase 10.5 `PluginToolRegistry`)
-
-- [x] Registers a `PluginMcpToolInfo` for `"import_roms"` during `mmemuPluginInit`.
-- [x] Schema defines `machineId` (string, required), `sourceIndex` (integer, optional), and `overwrite` (boolean, optional).
-- [x] Handler invokes `importRoms()` and returns a JSON response with success status and list of copied files.
-
-**Unit tests** (`tests/test_vice_importer.cpp`)
-
-- [x] `discoverSourcesInPaths("vic20", paths)` with a temp-dir mock filesystem returns expected sources; missing/wrong-size files are excluded.
-- [x] `importRoms()` copies files to a temp directory; validates sizes match specs.
-- [x] `importRoms()` with a deliberate size mismatch rolls back all copied files and returns a non-empty error string.
-- [x] `importRoms()` does not overwrite an existing file unless `overwrite=true`.
+### Phase 10.1 MOS 6522 VIA (`src/plugins/devices/via6522/`) [COMPLETED]
+### Phase 10.2 MOS 6560/6561 VIC (`src/plugins/devices/vic6560/`) [COMPLETED]
+### Phase 10.3 VIC-20 Memory Map [COMPLETED]
+### Phase 10.4 VIC-20 Peripheral Wiring [COMPLETED]
+### Phase 10.5 Plugin Extension Host API [COMPLETED]
+### Phase 10.6 VIC-20 Integration Test [COMPLETED]
+### Phase 10.7 VICE ROM Importer Plugin [COMPLETED]
 
 ---
 
@@ -609,577 +344,79 @@ user must explicitly request it via a CLI command or GUI menu item.*
 *Goal: A bootable C64 simulation. Reuses `FlatMemoryBus`, `MOS6502` (via
 `MOS6510` subclass), VIA→CIA upgrade, and adds VIC-II and SID.*
 
-### Phase 11.1 MOS 6510 CPU (`src/plugins/6502/main/cpu6510.h/cpp`) [COMPLETED]
-
-The 6510 is a 6502 with a built-in 6-bit I/O port at addresses $00 (DDR) and $01 (DATA). The port controls the PLA banking lines.
-
-- [x] Subclass `MOS6502`; installs a proxy bus (PortBus) that intercepts $00/$01 before passing all other accesses through to the real bus (necessary because MOS6502::read/write are private).
-- [x] Port bits: bit 0 = LORAM, bit 1 = HIRAM, bit 2 = CHAREN, bits 3–5 = cassette/serial (not used for banking).
-- [x] Exposes `ISignalLine` for each port output (`signalLoram()`, `signalHiram()`, `signalCharen()`) so the PLA handler can observe changes.
-- [x] Registered as `"6510"` core in the 6502 plugin manifest; `"raw6510"` machine factory added.
-
-### Phase 11.2 C64 PLA Banking (`src/plugins/devices/c64_pla/main/c64_pla.h/cpp`) [COMPLETED]
-
-The PLA maps the 6510 port bits to ROM/IO visibility in the upper address space.
-
-- [x] `C64PLA` registered as `IOHandler` at baseAddr=$A000 so it sorts before $D000 devices in IORegistry.
-- [x] `ioRead` implements the full banking matrix:
-    - $E000–$FFFF: KERNAL ROM when HIRAM=1; flat RAM otherwise.
-    - $A000–$BFFF: BASIC ROM when HIRAM=1 && LORAM=1; flat RAM otherwise.
-    - $D000–$DFFF: Char ROM when HIRAM=1 && CHAREN=0; returns false (I/O devices respond) when CHAREN=1; flat RAM when HIRAM=0.
-- [x] All writes return false: ROM areas accept writes to underlying flat RAM; I/O writes reach device handlers in the dispatch chain.
-- [x] ROM data pointers set via `setBasicRom/setKernalRom/setCharRom`; signal lines via `setSignals(loram, hiram, charen)`.
-
-### Phase 11.3 MOS 6526 CIA (`src/plugins/devices/cia6526/main/cia6526.h/cpp`) [COMPLETED]
-
-- [x] Register file: PRA, PRB, DDRA, DDRB, TA lo/hi (latch + counter), TB lo/hi, TOD 10ths/sec/min/hr, SDR, ICR, CRA, CRB.
-- [x] Timer A / Timer B: continuous and one-shot modes; underflow sets ICR bits 0/1; TB can count TA underflows (CRB bits 5–6).
-- [x] TOD (Time of Day): BCD clock; tenths-to-hours cascade with AM/PM; alarm IRQ; latch frozen on TODHR read, released on TODTEN read; writing TODHR halts clock until TODTEN written.
-- [x] ICR: write bit 7=1 sets mask bits, bit 7=0 clears; read returns pending|IRQ_ANY then clears all.
-- [x] `keyDown` / `keyUp` injected into PRA/PRB via `IPortDevice*` (same interface as VIA6522).
-- [x] `reset()` clears all registers; IRQ line de-asserted; port devices notified of DDR=0.
-
-### Phase 11.4 MOS 6567/6569 VIC-II (`src/plugins/devices/vic2/main/vic2.h/cpp`) [COMPLETED]
-
-- [x] Register file ($D000–$D02E, 47 registers): Sprites X/Y (×8), MSB X, control 1/2, raster compare, light pen X/Y, sprite enable/expand/priority/multicolor/collision, IRQ status/enable, border/background/sprite colours. Reads beyond $D02E return $FF; colour registers return $F0 in high nibble.
-- [x] Sprite engine: 8 sprites, 24×21 pixels; sprite data pointer read from screen_base+1016+sp; X/Y expansion (doubles pixels/rows); monochrome and multicolor ($D025/$D026 shared colors); priority (behind/in-front of background); sprite-sprite bounding-box collision detection ($D01E); sprite-background pixel collision detection ($D01F). Collision IRQs fire via $D019/$D01A.
-- [x] Video modes: Standard text, Multicolor text, Standard bitmap, Multicolor bitmap, Extended background color (ECB). Mode selected by $D011 ECM/BMM and $D016 MCM bits.
-- [x] VIC-II banking: `setDmaBus(IBus*)` + `setBankBase(uint32_t)` for 16 KB bank selected by CIA #2 port A. Character ROM accessible at bank offsets $1000–$1FFF and $9000–$9FFF via `setCharRom()`.
-- [x] `renderFrame()`: frame-based renderer (384×272 total, 320×200 display area, 32px left/right border, 36px top/bottom). Renders background then composites sprites with priority and collision.
-- [x] `tick(cycles)`: cycle-accumulating raster counter (65 cycles/line × 263 lines NTSC); fires raster IRQ via `ISignalLine` when raster matches $D011 bit-8 + $D012 compare value.
-
-### Phase 11.5 MOS 6581 SID (`src/plugins/devices/sid6581/main/sid6581.h/cpp`) [COMPLETED]
-
-- [x] Three voices (offsets +0 to +6 per voice × 3): FREQ lo/hi, PW lo/hi (12-bit), Control (Gate/Sync/Ring/Test/Tri/Saw/Pulse/Noise), Attack/Decay, Sustain/Release.
-- [x] Waveform generators: Triangle (folded from 24-bit phase accumulator), Sawtooth (upper 12 bits), Pulse (threshold on upper 12 bits vs. pulse-width register), Noise (23-bit Galois LFSR, taps 22 and 17, clocked on phase bit-19 rising edge; output mapped from 8 LFSR bit positions to 12-bit value). Multiple active waveforms are ANDed (real SID behaviour for combined waveforms).
-- [x] Hard sync: voice phase reset when sync-source oscillator wraps. Ring modulation: triangle MSB XOR'd with sync-source phase MSB.
-- [x] Test bit: freezes phase accumulator at 0, loads LFSR with 0x7FFFFF.
-- [x] ADSR envelope: 8-bit level (0–255); attack linear 0→255 using standard SID rate table (9–31250 cycles/step at 1 MHz); decay/release at 3× the attack rate, linear 255→sustain→0; gate 0→1 triggers attack, 1→0 triggers release.
-- [x] Filter: Chamberlin state-variable filter (LP/BP/HP simultaneously available). 11-bit cutoff mapped logarithmically 30–12 kHz; resonance from $D417 upper nibble (Q range ~0.2–2.0). Per-voice filter routing via $D417 bits 0–2; output mode (LP/BP/HP) from $D418 bits 4–6.
-- [x] Volume: 4-bit master volume ($D418 bits 0–3); voice-3 disconnect from audio output ($D418 bit 7, for LFO/OSC3 read use).
-- [x] Read-only: OSC3 (phase accumulator bits 23–16), ENV3 (envelope level). Paddle X/Y return 0xFF.
-- [x] IAudioOutput: ring buffer (8192 samples); `tick()` synthesises samples at configured rate; `pullSamples()` drains the buffer. Clock rate configurable via `setClockHz()` (default 985248 PAL; 1022727 NTSC).
-- [x] Plugin: `mmemu-plugin-sid6581.so`, device registered as `"6581"`.
-
+### Phase 11.1 MOS 6510 CPU [COMPLETED]
+### Phase 11.2 C64 PLA Banking [COMPLETED]
+### Phase 11.3 MOS 6526 CIA [COMPLETED]
+### Phase 11.4 MOS 6567/6569 VIC-II [COMPLETED]
+### Phase 11.5 MOS 6581 SID [COMPLETED]
 ### Phase 11.6 C64 Memory Map and Wiring [COMPLETED]
-
-- [x] `MachineDescriptor` id `"c64"` — `src/plugins/machines/c64/main/machine_c64.cpp`.
-- [x] `onInit`: creates and registers C64PLA ($A000), VIC2 ($D000), SID ($D400), ColorRAM ($D800), CIA1 ($DC00), CIA2 ($DD00) in IORegistry; sets bus IO hooks.
-- [x] `onReset`: resets all devices via `ioRegistry->resetAll()`, then resets CPU.
-- [x] 6510 banking signals wired from `MOS6510::signalLoram/Hiram/Charen()` into `C64PLA::setSignals()`.
-- [x] VIC-II DMA bus = system bus; CIA2 Port A write callback updates `VIC2::setBankBase()` on bits 0–1 change.
-- [x] IRQ: VIC-II raster + CIA1 → `CpuIrqLine`; NMI: CIA2 → `CpuNmiLine`.
-- [x] ROM images loaded from `roms/c64/{basic,kernal,char}.bin`; PLA and VIC-II receive ROM pointers.
-- [x] CIA6526 gained `setPortAWriteCallback()` for VIC bank switching.
-- [x] Plugin: `mmemu-plugin-c64.so`; machine registered as `"c64"`.
-- [x] GUI screen pane registered (reuses `VicDisplayPane` from VIC-20 plugin).
-- [x] Integration test: 9 test cases (setup, CPU variant, RAM write, 6510 I/O port, CIA timer, PLA banking, VIC-II raster, boot screen content, and color updates). 100% tests pass.
 
 ---
 
-
 ## Phase 12: Commodore PET/CBM Machine [COMPLETED]
 
-*Goal: Implement the Commodore PET series (2001, 3000, 4000, 8000), including 
-the 6520 PIA, 6545 CRTC, and the unique PET memory maps.*
-
-### Phase 12.1: MOS 6520 PIA (`src/plugins/devices/pia6520/`) [COMPLETED]
-
-- [x] Implement `PIA6520 : public IOHandler`.
-- [x] Dual 8-bit ports (Port A and Port B) with data direction registers.
-- [x] Control registers (CRA, CRB) for interrupt control and DDR/Port selection.
-- [x] CA1/CA2 and CB1/CB2 line handling for handshaking (used by IEEE-488).
-- [x] `reset()` clears all registers and de-asserts interrupt lines.
-- [x] Snapshot support for registers and line states.
-
-### Phase 12.2: MOS 6545/6845 CRTC (`src/plugins/devices/crtc6545/`) [COMPLETED]
-
-- [x] Implement `CRTC6545 : public IOHandler`.
-- [x] Register-based interface: Address Register ($E880) and Data Register ($E881).
-- [x] 18 internal registers for screen timing (H-sync, V-sync, Interlace, etc.).
-- [x] Address generation for character memory and row/column counting.
-- [x] Support for both 40-column and 80-column PET models via register configuration.
-- [x] `tick(cycles)`: internal counters for horizontal and vertical sync pulses.
-
-### Phase 12.3: PET Video Subsystem (`src/plugins/devices/pet_video/`) [COMPLETED]
-
-- [x] Implement `PetVideo` inheriting from `IVideoOutput`.
-- [x] **Discrete logic model (2001)**: Simulate basic timing logic used before the CRTC was introduced.
-- [x] **CRTC model (4000/8000)**: Interface with `CRTC6545` for address generation.
-- [x] Character ROM mapping: Support for Graphics (lower/upper) and Business 
-      (lower/upper) character sets.
-- [x] **Video RAM Overlay**: Map $8000–$87FF (2 KB) using `FlatMemoryBus::addOverlay`.
-- [x] `renderFrame()`: produces RGBA buffer from PET character memory and 
-      attributes. Supports "Green" or "Amber" phosphor simulation.
-
-### Phase 12.4: IEEE-488 Bus Implementation (`src/libdevices/ieee488.h/cpp`) [COMPLETED]
-
-- [x] Implement `IEEE488Bus` interface for communication with disk drives 
-      and printers.
-- [x] Wire PIA signals (ATN, DAV, NRFD, NDAC, EOI, SRQ, IFC, REN) to the bus.
-- [x] **HLE Disk Drive (Unit 8)**: Trap IEEE-488 sequences to provide fast host-file access.
-- [x] Support for PET "disk commands" (e.g., `LOAD "$",8`).
-
+### Phase 12.1: MOS 6520 PIA [COMPLETED]
+### Phase 12.2: MOS 6545/6845 CRTC [COMPLETED]
+### Phase 12.3: PET Video Subsystem [COMPLETED]
+### Phase 12.4: IEEE-488 Bus Implementation [COMPLETED]
 ### Phase 12.5: PET Machine Factory and Memory Map [COMPLETED]
-
-- [x] `MachineDescriptor` for `"pet2001"`, `"pet4032"`, and `"pet8032"`.
-- [x] **Banking Logic**: Support for BASIC 1.0/2.0/4.0, Editor, KERNAL, and Character ROM.
-- [x] **I/O Window**: PET I/O window at $E800–$EFFF containing PIAs, VIAs, and CRTC.
-- [x] **Keyboard Matrix**: Implement both Graphics (2001/4000) and Business (8000) 
-      keyboard matrices wired to PIA #1.
-- [x] `onReset`: Load appropriate ROMs for the selected model and reset all chips.
-
 ### Phase 12.6: PET Integration Tests [COMPLETED]
-
-- [x] **PIA Loopback**: Verify Port A to Port B communication via external 
-      wiring model.
-- [x] **Video Buffer**: Write to $8000 (video RAM) and verify `renderFrame` 
-      detects the change.
-- [x] **CRTC Configuration**: Change registers in 6545 and verify screen 
-      geometry (columns/rows) updates.
-- [x] **IEEE-488 Smoke Test**: Perform a mock `LISTEN/DATA/UNLISTEN` sequence 
-      and verify PIA flags.
 
 ---
 
 ## Phase 13: Runtime Image and Cartridge Loading [PARTIALLY COMPLETED]
 
-*Goal: Enable dynamic loading of .prg (RAM injection), .bin (raw memory), and
-cartridge images (.crt or raw) into a running machine via CLI, GUI, and MCP.
-Format-specific parsers live in machine-family plugins; `libcore` provides only
-the registration mechanism and the format-agnostic BIN loader.*
+---
 
-### Phase 13.1: Core Loader Infrastructure (`src/libcore/main/image_loader.h/cpp`) [COMPLETED]
-
-- [x] Define `IImageLoader` interface: `canLoad(path)`, `load(path, IBus*, machine)`.
-- [x] Define `ICartridgeHandler` interface: `attach(IBus*)`, `eject(IBus*)`,
-      `metadata()` (returns type string, bank count, address range).
-- [x] Implement `ImageLoaderRegistry` — singleton, same pattern as `DeviceRegistry`.
-- [x] **BIN Loader**: Implement `BinLoader : public IImageLoader` for raw binary
-      data loading at a user-specified physical address. Register in the host binary.
-- [x] CLI/GUI/MCP delegate `load`, `cart`, and `eject` commands through the
-      registry without knowing any specific file format.
-
-### Phase 13.2: CBM Loader Plugin (`src/plugins/cbm-loader/`) [COMPLETED]
-
-*Handles all Commodore-family program and cartridge image formats. Shared by
-VIC-20, C64, PET, and C128.*
-
-- [x] Implement `PrgLoader : public IImageLoader` for Commodore `.prg` files
-      (2-byte little-endian load address header, data follows); inject into the
-      active machine's `IBus`.
-- [x] Implement `CrtParser` for the OpenC64Cart `.crt` format: file/CHIP packet
-      headers, cartridge type, hardware ID, bank count.
-- [x] Implement `CbmCartridgeHandler : public ICartridgeHandler` for basic 8 KB /
-      16 KB ROM mapping via `IBus` overlay; drive EXROM/GAME signal lines for C64.
-- [x] Register `PrgLoader` and `CbmCartridgeHandler` via `mmemuPluginInit` into
-      `ImageLoaderRegistry`.
-- [x] **Snapshot Integration**: Include active cartridge image path and bank state
-      in machine snapshots.
-
-### Phase 13.3: Atari Loader Plugin (`src/plugins/atari-loader/`)
-
-*Handles Atari 8-bit program and cartridge image formats. Shared across all
-Atari machine targets.*
-
-- [ ] Implement `XexLoader : public IImageLoader` for Atari `.xex` files
-      (optional $FFFF leader, segment start/end address pairs); inject each
-      segment and patch RUNAD ($02E0) / INITAD ($02E2) vectors.
-- [ ] Implement `CarParser` for the Atari `.car` format (16-byte header, cartridge
-      type ID, banking metadata).
-- [ ] Implement `AtariCartridgeHandler : public ICartridgeHandler` for `.car`
-      ROM mapping at the correct Atari address window.
-- [ ] Register via `mmemuPluginInit` into `ImageLoaderRegistry`.
-
-### Phase 13.4: CLI Interface Extensions [COMPLETED]
-
-- [x] `load <filename> [address]`: Delegates to `ImageLoaderRegistry`; uses header
-      for `.prg` / `.xex`, requires address for `.bin`.
-- [x] `cart <filename>`: Attaches a cartridge image via `ICartridgeHandler` and
-      triggers a machine reset if necessary.
-- [x] `run`: Sets the PC to the start address of the last loaded image and
-      resumes execution.
-- [x] `eject`: Calls `ICartridgeHandler::eject()` and restores the machine's
-      default memory mapping.
-
-### Phase 13.5: GUI Image Management [COMPLETED]
-
-- [x] **Load Image Dialog**: File picker with optional load address override and
-      a "Run after load" checkbox.
-- [x] **Cartridge Pane**: Displays currently attached cartridge metadata (type,
-      bank count, address range) sourced from `ICartridgeHandler::metadata()`.
-- [x] **Drag-and-Drop**: Dragging `.prg`/`.xex` or `.crt`/`.car` into the
-      machine display window triggers immediate loading or attachment.
-- [x] **File History**: Recently loaded images list for quick reattachment.
-
-### Phase 13.6: MCP Integration [COMPLETED]
-
-- [x] `load_image` tool: Accepts `path`, `address`, and `autoStart` boolean;
-      returns the final load address and size.
-- [x] `attach_cartridge` tool: Accepts `path` and `reset` boolean; returns
-      cartridge metadata from `ICartridgeHandler::metadata()`.
-- [x] `eject_cartridge` tool: Calls `ICartridgeHandler::eject()`.
-
-### Phase 13.7: Integration Tests [PARTIALLY COMPLETED]
-
-- [x] **Registry Test**: Verify `ImageLoaderRegistry` correctly dispatches to the
-      right `IImageLoader` based on file extension.
-- [x] **BIN Test**: Load a raw binary to a specific address; verify memory content
-      via `IBus::peek8()`.
-- [x] **CBM PRG Test** (cbm-loader plugin): Load a `.prg`; verify data lands at
-      the address given in the 2-byte header.
-- [x] **CBM Cartridge Overlay Test** (cbm-loader plugin): Attach a `.crt`;
-      verify reads at $8000–$9FFF return cartridge data.
-- [ ] **Atari XEX Test** (atari-loader plugin): Load a multi-segment `.xex`;
-      verify each segment is written to its range and RUNAD is patched.
-- [ ] **Atari Cartridge Overlay Test** (atari-loader plugin): Attach a `.car`;
-      verify header parsing and ROM visible at the correct address window.
-- [x] **Eject Test**: Detach a cartridge; verify RAM is visible again at the
-      previous cartridge range.
+## Phase 14: Tape (Datasette) Support [COMPLETED]
 
 ---
 
-## Phase 14: Tape (Datasette) Support
-
-*Goal: Implement the Commodore Datasette (tape) interface, supporting the .tap 
-pulse-encoded format for VIC-20, C64, and PET.*
-
-### Phase 14.1: .tap Archive Parser (`src/plugins/cbm-loader/`)
-
-- [x] Implement `TapArchive` class to parse "C64-TAPE-RAW" headers.
-- [x] Decoder for pulse timings (converting .tap byte values to CPU cycles).
-- [x] Support for both Version 0 and Version 1 .tap files.
-- [x] Co-located with other CBM format parsers in the `cbm-loader` plugin.
-
-### Phase 14.2: Datasette Device (`src/plugins/devices/datasette/`)
-
-- [x] Implement `Datasette : public ISignalLine` (for the tape pulse output).
-- [x] Sense line (connected to CPU port bash1 bit 4 on C64): indicates if a button 
-      is pressed.
-- [x] Motor control: responds to motor signal from CPU port.
-- [x] Write pulse capture (for saving to tape).
-- [x] Internal timer/state machine to "play" the pulses into the CPU's IRQ/FLAG 
-      lines at the correct cycle-exact intervals.
-
-### Phase 14.3: Per-Machine Wiring
-
-- [x] **C64**: Wire Datasette to CPU Port bash1 (Sense/Motor) and CIA #1 FLAG 
-      line (Pulses).
-- [x] **VIC-20**: Wire to VIA #1.
-- [x] **PET**: Wire to PIA #1.
-
-### Phase 14.4: Tape UI and Controls
-
-- [x] **CLI**: `tape mount <file>`, `tape play`, `tape stop`, `tape rewind`.
-- [x] **GUI**: "Tape Control" pane with tape counter, play/stop/rewind buttons, 
-      signal and status LED.
-- [x] **MCP**: `mount_tape`, `control_tape` tools.
+## Phase 15: IEC Serial Bus and Disk Drive Support [COMPLETED]
 
 ---
 
-## Phase 15: IEC Serial Bus and Disk Drive Support
-
-*Goal: Implement the Commodore Serial Bus (IEC) and High-Level Emulation (HLE) 
-for disk access (.d64, .g64, .p00). See .plan/iec.md.*
-
-### Phase 15.1: KERNAL HLE (Level 1) [COMPLETED]
-
-- [x] Implement `KernalTrap` ExecutionObserver to monitor PC for KERNAL entry 
-      points ($FFD5, $FFD8).
-- [x] Support for "Flat Directory" mapping (local host folders as disks).
-- [x] Fast-inject file data into RAM, bypassing bit-banging protocol.
-
-### Phase 15.2: Virtual IEC Device (Level 2) [COMPLETED]
-
-- [x] Implement `VirtualIECBus` state machine (`src/plugins/devices/virtual_iec/`).
-- [x] Handle ATN/CLK/DATA handshaking signals via `IPortDevice` on CIA #2 (iecWiring in JSON loader).
-- [x] Stream bits from host-side .d64 or .prg files.
-
-### Phase 15.3: Disk Image Support (`src/plugins/cbm-loader/`) [COMPLETED]
-
-*CBM-specific disk image formats co-located with other Commodore format parsers
-in the `cbm-loader` plugin.*
-
-- [x] `.d64` parser (sector/track mapping for 1541).
-- [x] `.g64` parser (GCR-encoded pulses for copy-protected images).
-- [x] `.t64` (tape image formatted as disk) support.
-- [x] `DiskImageLoader` for loading images via standard image loader interface.
-
-### Phase 15.4: Disk UI and Controls [COMPLETED]
-
-- [x] **CLI**: `disk mount <unit> <file>`, `disk eject <unit>`.
-- [x] **GUI**: "Drive Status" pane showing active track/sector and activity LED.
-- [x] **MCP**: `mount_disk`, `eject_disk` tools.
-
-## Phase 15.5: Atari SIO and Disk Image Support
-
-*Goal: Implement the Atari Serial I/O (SIO) bus and disk image support (.atr, .xfd).*
-
-### Phase 15.5.1: Atari Disk Image Parsers (`src/plugins/atari-loader/`)
-
-*Atari-specific disk image formats co-located with other Atari format parsers
-in the `atari-loader` plugin.*
-
-- [ ] **ATR Parser**: Implement a parser for Atari `.atr` disk images (16-byte
-      header followed by raw sectors).
-- [ ] **XFD Loader**: Support for headerless raw sector images (`.xfd`).
-- [ ] **Sector Translation**: Map 128-byte (SD) and 256-byte (DD) sectors
-      to Atari-specific track layouts.
-
-### Phase 15.5.2: SIO HLE (Level 1)
-
-- [ ] Implement `SioTrap` ExecutionObserver to monitor OS ROM for SIO entry 
-      points ($E459).
-- [ ] **Fast Disk Access**: Trap sector read/write requests and satisfy them 
-      directly from host-side disk images, bypassing the serial protocol.
-
-### Phase 15.5.3: Virtual SIO Device (Level 2)
-
-- [ ] Implement `VirtualSIOBus` state machine.
-- [ ] Handle DATA, COMMAND, PROCEED, and INTERRUPT lines via POKEY/PIA 
-      emulation.
-- [ ] Stream bits from host-side images into the POKEY serial registers.
-
-## Phase 16: Commodore 128 Machine
-
-*Goal: Implement the dual-CPU Commodore 128, including the 8502 and Z80 CPUs, the 
-complex MMU for 128KB banking, and the 80-column VDC.*
-
-### Phase 16.1: MOS 8502 CPU (`src/plugins/6502/main/cpu8502.h/cpp`)
-
-- [ ] Subclass `MOS6510`.
-- [ ] Implement **Fast Mode (2 MHz)**:
-    - Add `m_isFast` internal state.
-    - When bit 0 of the MMU configuration is set (via `ISignalLine`), double the 
-      internal cycle count logic.
-    - `step()` returns 1x or 2x cycles based on the fast mode state.
-- [ ] **I/O port at $00/$01**:
-    - Same as 6510, but ensure 2 MHz timing compatibility.
-    - Wire `sigLoram`, `sigHiram`, `sigCharen` to the C128 MMU.
-- [ ] Snapshot includes `m_isFast`, `m_ioDdr`, and `m_ioData`.
-
-### Phase 16.2: Z80 CPU Core (`src/libcore/cpu_z80.h/cpp`)
-
-- [ ] Implement `Z80` class inheriting from `ICore`.
-- [ ] **Registers**: A, F, B, C, D, E, H, L, SP, PC, IX, IY, I, R, plus shadow 
-      sets (A', F', etc.).
-- [ ] **Instruction Decoder**: Complete table for official Z80 opcodes and 
-      prefixes (CB, DD, ED, FD).
-- [ ] **Disassembler**: Implement `disassembleOne` and `disassembleEntry` 
-      specifically for Z80 syntax.
-- [ ] `setDataBus`/`setIoBus`: Support Z80's separate IO address space 
-      (though C128 maps IO to the memory bus).
-- [ ] `step()`: Fetch-decode-execute one Z80 instruction.
-
-### Phase 16.3: C128 MMU (8722) (`src/plugins/devices/c128_mmu/main/c128_mmu.h/cpp`)
-
-- [ ] Implement `C128MMU : public IOHandler` at $D500–$D50B.
-- [ ] **Configuration Register (CR)**:
-    - Bank selection (Bank 0 / Bank 1) for CPU accesses.
-    - ROM banking: BASIC, Editor, KERNAL visibility.
-    - I/O window enable ($D000–$DFFF).
-- [ ] **Page 0/1 Relocation**:
-    - 8-bit registers for Page 0 and Page 1 high-byte pointers.
-    - CPU reads/writes to $00xx/$01xx are redirected to the mapped page.
-- [ ] **RAM Configuration (RCR)**:
-    - Shared RAM settings (0, 1, 4, 16 KB at top/bottom).
-- [ ] **Mode Configuration**:
-    - Handle C128/C64 mode switch.
-    - Handle CPU selection: drive Z80/8502 `HALT` lines.
-- [ ] `reset()` defaults to Z80 active, Bank 0, ROMs enabled.
-
-### Phase 16.4: MOS 8563 VDC (80-column) (`src/plugins/devices/vdc8563/main/vdc.h/cpp`)
-
-- [ ] Implement `VDC8563 : public IOHandler` at $D600–$D601.
-- [ ] **Register Interface**: Address Register ($D600) and Data Register ($D601).
-- [ ] **VDC RAM**: Allocate 16 KB or 64 KB of dedicated video memory (not in 
-      CPU bus).
-- [ ] **VDC DMA**: Support for copying blocks between CPU RAM and VDC RAM.
-- [ ] **Text Mode**: 80x25 character rendering with attributes (blink, 
-      underline, reverse, color).
-- [ ] `renderFrame()`: produces an RGBA buffer for the 80-column display.
-
-### Phase 16.5: C128 Machine Factory and Memory Map
-
-- [ ] `MachineDescriptor` for `"c128"`.
-- [ ] **Bus Configuration**: `FlatMemoryBus` with two 64 KB RAM overlays 
-      (Bank 0, Bank 1).
-- [ ] **ROM Loading**:
-    - C128 KERNAL ($E000), Editor ($C000), BASIC ($4000).
-    - Z80 BIOS (mapped to $0000 at reset).
-- [ ] **Peripheral Wiring**:
-    - VIC-II ($D000), SID ($D400), CIA1 ($DC00), CIA2 ($DD00).
-    - C128 Keyboard: Extend C64 matrix with extra keys (Numeric, ESC, TAB, etc.).
-- [ ] `onReset`: Start Z80, load ROMs, set MMU to default.
-
-### Phase 16.6: C128 Integration Tests
-
-- [ ] **CPU Handover**: Write to MMU register to swap from Z80 to 8502; verify 
-      execution continues on 8502.
-- [ ] **RAM Banking**: Write to $2000 in Bank 0, switch to Bank 1, verify $2000 
-      reads different data.
-- [ ] **Page 0 Move**: Relocate Page 0 to $1000; verify `STA $00` hits physical 
-      $1000.
-- [ ] **VDC Block Copy**: Use VDC registers to copy data to VDC RAM and verify 
-      via VDC read-back.
-- [ ] **Fast Mode Timing**: Verify `cycles()` increments twice as fast when 
-      FAST bit is set.
-
-## Phase 17: MOS 65CE02 CPU
-
-*Goal: An intermediate CPU that bridges 6502 (Phase 2) and 45GS02 (Phase 16).
-The 65CE02 introduces the Z index register, the B (base page) register, 16-bit
-stack, new addressing modes, and extended branch instructions.*
-
-### Phase 17.1 MOS 65CE02 Core (`src/libcore/cpu65ce02.h/cpp`)
-
-- [ ] Subclass `MOS6502`; add internal state: `Z` (8-bit index), `B` (base-page
-      high byte, default $00), `SPH` (stack pointer high byte, making SP 16-bit).
-- [ ] **Emulation/Native flag**: add `E` bit to status register. `E=1` means
-      6502-compatible (emulation) mode; `E=0` means native 65CE02 mode. Reset
-      starts in emulation mode (`E=1`).
-- [ ] **Base page**: all zero-page accesses use `(B << 8) | zp_addr` as the
-      effective address; B defaults to $00, making page 0 the default base page.
-- [ ] **Register descriptor table**: extend 6502 table with entries for Z, B,
-      SPH (flagged `REGFLAG_INTERNAL`), and E (status bit pseudo-register).
-- [ ] **New addressing modes** (implement in the decode/execute path):
-    - Base-page indirect Z-indexed: `(zp),z` — dereferences 16-bit pointer in
-      base page, adds Z; used for the standard 65CE02 indirect mode.
-    - Stack-pointer indirect Y-indexed: `(d,sp),y` — pointer at stack-relative
-      offset, then add Y.
-    - Absolute indirect Y-indexed: `(abs),y`.
-- [ ] **New transfer instructions**: `TAZ`/`TZA` (A↔Z), `TAB`/`TBA` (A↔B),
-      `TSY`/`TYS` (SP↔Y), `TYS` copies Y into SP high byte.
-- [ ] **Push/pop word**: `PHW #imm16` (push 16-bit immediate), `PHW abs`
-      (push 16-bit from memory). Stack is 16-bit (SP wraps within $0100–$01FF
-      in emulation mode; full 16-bit in native mode).
-- [ ] **Long branches**: `LBRA rel16`, `LBCC rel16`, `LBCS rel16`, `LBEQ rel16`,
-      `LBNE rel16`, `LBMI rel16`, `LBPL rel16`, `LBVC rel16`, `LBVS rel16` —
-      16-bit signed PC-relative offset.
-- [ ] **16-bit memory operations**: `ASW abs` (arithmetic shift word left),
-      `ROW abs` (rotate word left), `DEW zp` (decrement 16-bit word at base
-      page), `INW zp` (increment 16-bit word at base page).
-- [ ] **Emulation-mode control**: `CLE` (clear E, enter native mode),
-      `SEE` (set E, return to emulation mode).
-- [ ] **`step()`**: dispatch new opcodes; all 6502 opcodes retain original
-      behaviour; new opcodes only active in their respective modes.
-- [ ] **`isCallAt()`**: recognise `JSR abs` ($20) and the new `BSR rel16` ($63)
-      as call sites.
-- [ ] **`isReturnAt()`**: recognise `RTS` ($60), `RTI` ($40), `RTN #imm8`
-      ($62 — return and remove N stack bytes).
-- [ ] Snapshot: `saveState/loadState` includes Z, B, SPH, E in the POD blob.
-
-### Phase 17.2 65CE02 Plugin (`src/plugins/65ce02/`)
-
-- [ ] Create `src/plugins/65ce02/` mirroring the 6502 plugin structure.
-- [ ] Implement `mmemuPluginInit` exposing `MOS65CE02` as a core and an updated
-      `Disassembler65CE02` that covers all new opcodes and addressing modes.
-- [ ] `Makefile` target: `lib/mmemu-plugin-65ce02.so`.
-- [ ] `KickAssemblerBackend` already targets 65CE02 via `.cpu _65ce02`; no
-      assembler changes needed.
-
-### Phase 17.3 Unit Tests (`tests/test_cpu65ce02.cpp`)
-
-- [ ] `TAZ`/`TZA`: verify Z register loaded from / stored to A.
-- [ ] `TAB`: relocate base page to $10 (B=$10); subsequent zero-page read hits
-      physical address $1000+offset.
-- [ ] `PHW #imm16`: push word, verify SP decremented by 2 and bytes in stack.
-- [ ] `LBNE rel16`: branch taken with 16-bit offset; branch not taken.
-- [ ] `INW zp`: verify 16-bit word in base page increments correctly across
-      byte boundary (low byte $FF → $00, carry into high byte).
-- [ ] `(zp),z` addressing: store a 16-bit pointer in base page, set Z, load
-      byte at effective address; verify correct value returned.
-- [ ] `CLE`/`SEE`: verify E flag toggles in status register.
-- [ ] Snapshot round-trip includes Z and B registers.
-
----
-
-## Phase 18: 45GS02 CPU [PARTIALLY COMPLETED]
+## Phase 18: 45GS02 CPU [COMPLETED]
 
 *Goal: The full MEGA65 CPU, extending 65CE02 with 32-bit Quad operations, the
 MAP instruction for 28-bit memory access, variable speed, math acceleration
 registers, and Hypervisor mode. See `ref/CBM/Mega65/mega65-book.txt` Appendix K.*
 
-### Phase 18.1 45GS02 Core (`src/plugins/45gs02/main/cpu45gs02.h/cpp`) [PARTIALLY COMPLETED]
+### Phase 18.1 45GS02 Core (`src/plugins/45gs02/main/cpu45gs02.h/cpp`) [COMPLETED]
 
 - [x] Implement `MOS45GS02` inheriting from `ICore`.
-- [ ] **On-chip I/O port ($00/$01)**: the 45GS02, like the 6510 before it,
-      integrates a 6-bit I/O port directly into the CPU silicon. Reads and
-      writes to addresses $00 and $01 are intercepted inside `read8`/`write8`
-      **before** the address reaches the bus; no bus cycle is generated for them.
-    - [ ] $00 (DDR): data-direction register. Bit=1 → pin is output; bit=0 → pin
-      is input (reads back the external pull-up value, modelled as 1).
-    - [ ] $01 (DATA): port data register.
-      - **Read**: returns `(DDR & m_ioData) | (~DDR & 0x3F)` — output bits
-        return the last written value; input bits float high (all 1s).
-      - **Write**: stores to `m_ioData`; only DDR-configured output bits drive
-        the external pins.
-    - [ ] Pin assignments (identical to the C64/6510 port for software compatibility):
-        - Bit 0 (LORAM): BASIC ROM visibility signal (output).
-        - Bit 1 (HIRAM): KERNAL ROM visibility signal (output).
-        - Bit 2 (CHAREN): I/O vs. CHAR ROM select signal (output).
-        - Bit 3: Cassette motor control (output; not connected in MEGA65 hw).
-        - Bit 4: Cassette button sense (input; floats high when no cassette).
-        - Bit 5: Cassette data output (output; not connected in MEGA65 hw).
-    - [ ] The CPU exposes three `ISignalLine*` outputs — `sigLoram`, `sigHiram`,
-      `sigCharen` — that are driven on every write to $01. The `MapMmu`
-      (Phase 19.2) subscribes to these lines to update ROM/IO overlay state,
-      exactly as the C64 PLA does in Phase 11.2.
-    - [ ] Power-on default: DDR=$00 (all inputs), DATA=$37 ($00111111) so that
-      after the KERNAL sets DDR=$2F ($00101111) the banking lines present
-      LORAM=HIRAM=CHAREN=1 (KERNAL+BASIC ROM visible, I/O active).
-    - [ ] Snapshot: `m_ioDdr` and `m_ioData` are included in the POD blob.
 - [x] **Quad (Q) pseudo-register**: Q = {Z[7:0], Y[7:0], X[7:0], A[7:0]} as a
       virtual 32-bit register. Not stored separately — assembled on demand from
       the four 8-bit registers.
-- [x] **MAP state**: internal struct `MapState` (in `CPU45GS02State`) holding the eight 8KB offset
-      values (four for $0000–$7FFF, four for $8000–$FFFF) and enable bits. Used
-      by the internal `translate()` to translate virtual→physical.
+- [x] **MAP state**: internal struct `MapState` holding the mapping offsets
+      and enable bits.
 - [x] **MAP instruction** (`$5C`): enables MAP translation.
 - [x] **EOM instruction** (`$7C`): disables MAP translation.
 - [x] **Quad load/store**: `LDQ zp`, `LDQ abs`, `LDQ (zp),z`, `STQ zp`,
-      `STQ abs`, `STQ (zp),z` — moves 4 bytes between Q and memory in
-      little-endian order.
+      `STQ abs`, `STQ (zp),z` — moves 4 bytes between Q and memory.
 - [x] **Quad arithmetic**: `ADCQ`, `SBCQ`, `ANDQ`, `ORQ`, `EORQ`, `CMPQ` —
-      operate on the full Q register (32-bit A+X+Y+Z combined).
-- [x] **Quad shifts**: `ASLQ`, `LSRQ`, `ROLQ`, `RORQ` — 32-bit shift/rotate.
-- [x] **32-bit flat indirect**: `NOP` prefix ($EA) before `LDA (zp),z` or
-      `STA (zp),z` activates 32-bit indirect mode: the base-page pointer is
-      read as 4 bytes (28-bit physical address), Z is added as a byte offset,
-      and the access bypasses MAP translation, going directly to the physical
-      28-bit address. KickAssembler syntax: `lda ((zp)),z`. All 8 indirect
-      opcodes ($12,$32,$52,$72,$92,$B2,$D2,$F2) supported; quad 32-bit flat
-      encoding is `42 42 EA XX nn`. Cross-validated via `tests/45gs02/quad.asm`.
-- [ ] **Variable speed register** (`$D031` bit 4 = FAST): when the CPU reads
-      this register via `IORegistry`, it adjusts an internal `m_speed` flag:
-      - FAST=0 → 1 MHz / 3.5 MHz (PAL/NTSC); FAST=1 → 40 MHz (full speed).
-      - In simulation, speed is modelled as a `uint32_t cyclesPerStep` scalar
-        exposed via `regRead`; the host can use it for throttling.
-- [ ] **Math acceleration registers** (stub as an `IOHandler` at $D770–$D77F,
-      Phase 20 provides the full device; stub returns 0 for reads):
-    - $D770–$D771: MULTINA (16-bit multiplicand A, written lo then hi).
-    - $D772–$D773: MULTINB (16-bit multiplicand B).
-    - $D774–$D777: MULTOUT (32-bit product, read-only, available next cycle).
-    - $D778–$D77B: DIVINA (32-bit dividend).
-    - $D77C–$D77D: DIVINB (16-bit divisor).
-    - $D77E–$D77F: DIVOUT quotient (16-bit) and remainder (16-bit).
-- [x] **Hypervisor mode** (stub): entering hypervisor is triggered by a write
-      to $D640–$D67F (monitored by tests via `$D6CF` trigger). 
-- [x] **`disassembleOne()` / `disassembleEntry()`**: extended to cover implemented 45GS02 opcodes.
-- [x] **Register descriptor table**: implemented for A, X, Y, Z, B, SP, PC, P.
-- [x] Snapshot: POD blob includes CPU state.
+      operate on the full Q register.
+- [x] **Quad shifts**: `ASLQ`, `LSRQ`, `ROLQ`, `RORQ`, `ASRQ` — 32-bit shift/rotate.
+- [x] **32-bit flat indirect**: `NOP` prefix ($EA) before `LDA (zp),z` etc.
+      activates 28-bit physical addressing.
+- [x] **New Addressing Modes**: `(d,S),Y` stack-relative indirect indexed.
+- [x] **Long branches**: All relative branches have 16-bit long variants.
+- [x] **16-bit memory operations**: `ASW`, `ROW`, `DEW`, `INW`.
+- [x] **NEG**: Two's complement negation of Accumulator and Quad.
+- [x] **Hypervisor mode**: Traps writing to `$D6CF` immediately halt simulation.
+- [x] **`disassembleOne()` / `disassembleEntry()`**: full coverage for 45GS02.
+- [x] **Register descriptor table**: A, X, Y, Z, B, SP, PC, P, Q.
+- [x] Snapshot: `saveState/loadState` implemented.
 
 ### Phase 18.2 45GS02 Plugin (`src/plugins/45gs02/`) [COMPLETED]
 
 - [x] Create `src/plugins/45gs02/` plugin; `mmemuPluginInit` exposes
       `CPU45GS02` core and `Disassembler45GS02`.
 - [x] `Makefile` target: `lib/mmemu-plugin-45gs02.so`.
-- [x] `KickAssemblerBackend` already targets 45GS02 via `.cpu _45gs02`.
 
 ### Phase 18.3 Unit Tests (`tests/test_cpu45gs02.cpp`) [COMPLETED]
 
-- [x] **Baseline tests**: Arithmetic, transfers, logic.
-- [x] **45GS02 validation suite**: Automated cross-validation against `xemu-xmega65` via `tests/45gs02/validate.py`.
+- [x] **45GS02 validation suite**: Automated cross-validation against `xemu-xmega65`.
 - [x] **Advanced tests**: `INW`, `DEW`, `ASW`, `ROW`, `NEG`, `MAP`, `EOM`, `B` register.
 
 ---
@@ -1401,7 +638,7 @@ operations: copy, fill, swap, and mix.*
 
 ---
 
-## Phase 21: MEGA65 Memory Map and Machine Factory
+## Phase 21: MEGA65 Memory Map and Machine Factory [PARTIALLY COMPLETED]
 
 *Goal: A bootable MEGA65 simulation with the full 28-bit address space wired,
 all devices registered, and I/O personality switching functional.*
@@ -1444,48 +681,13 @@ $DE00–$DFFF   Cartridge I/O (stub)
 $E000–$FFFF   KERNAL ROM (from MEGA65.ROM; overlay in Banks 2–3)
 ```
 
-### Phase 21.2 Machine Factory (`src/libcore/machines/machine_mega65.cpp`)
+### Phase 21.2 Machine Factory (`src/plugins/machines/rawMega65/`) [PARTIALLY COMPLETED]
 
-- [ ] `SparseMemoryBus(28)` as the single system bus (`"system"`, 28-bit).
-- [ ] `MapMmu` wired between `CPU45GS02` and `SparseMemoryBus`; CPU's `IBus*`
-      slot set to `MapMmu`; `MapMmu` holds downstream `SparseMemoryBus*`.
-- [ ] Load `MEGA65.ROM` (nominally 768 KB) via `romLoad()` at $20000 in the
-      `SparseMemoryBus`; `addRegion(0x20000, romSize, data, writable=false)`.
-- [ ] KERNAL (last 8 KB of ROM) also mirrored at $E000–$FFFF via a second
-      `addRegion` call for the legacy 16-bit CPU view (MapMmu handles the
-      translation transparently).
-- [ ] `IORegistry` populated in MEGA65 personality order:
-    - VIC-IV ($D000, masks to $D3FF).
-    - SID pair ($D400, masks to $D43F).
-    - UART/SD stub ($D600, 256 bytes — stub returning $FF for reads).
-    - DMA F018B ($D700, masks to $D70F).
-    - Math accelerator ($D770, masks to $D77F).
-    - Colour RAM mirror ($D800, 1 KB, backed by $FF80000 region).
-    - CIA1 ($DC00, 256 bytes).
-    - CIA2 ($DD00, 256 bytes).
-    - Cartridge I/O stub ($DE00, 512 bytes).
-- [ ] `MachineDescriptor` id `"mega65"`:
-    - Single CPU slot: `CPU45GS02`.
-    - Single bus slot: `SparseMemoryBus(28)` named `"system"`.
-    - `onInit`: `romLoad()` for MEGA65.ROM; populate `IORegistry`; wire CIA1
-      port A/B to keyboard matrix; wire CIA2 port A bits 0–1 for VIC-IV bank
-      select; connect DMA active flag to CPU stall signal.
-    - `onReset`: reset MAP state (all offsets clear, C64 bank = $37); reset
-      CPU; reset all IOHandler devices; reset KEY register to C64 personality.
-- [ ] Register factory: `MachineRegistry::registerMachine("mega65", ...)`.
-
-### Phase 21.3 I/O Personality Switching
-
-- [ ] `MapMmu` tracks the current personality: `C64`, `C65`, or `MEGA65`.
-- [ ] On personality change, `MapMmu` reconfigures which `IOHandler` entries
-      are active in the $D000–$DFFF window:
-    - C64: VIC-II registers only ($D000–$D02E); SID at $D400; CIA1/CIA2.
-    - C65: adds VIC-III $D030/$D031 visibility; hides math/DMA.
-    - MEGA65: full register map as above.
-- [ ] Personality change does not affect RAM or ROM overlays — only which
-      device handlers dispatch in the I/O window.
-- [ ] `$D02F` write sequence (G=$47, S=$53) advances personality; any other
-      write resets to C64 personality.
+- [x] `rawMega65` machine preset for bare-metal testing.
+- [x] JSON-based machine configuration (`machines/rawMega65.json`).
+- [x] Initial wiring of 45GS02 to system bus.
+- [ ] Full 28-bit bus integration with `SparseMemoryBus`.
+- [ ] All I/O devices registered in `IORegistry`.
 
 ---
 
@@ -1673,7 +875,7 @@ MEGA65 SD card image. Follows the structure of the Phase 10.7 VICE importer.*
 *Goal: Cycle-accurate emulation of the ANTIC, GTIA, and POKEY trio.*
 
 - [x] **ROM Collection**: System ROMs (OS-A, OS-B, XL, BASIC, CHAR) collected in `roms/atari/`.
-- [x] **ANTIC DMA Engine** (`src/plugins/devices/antic/`)
+- [x] **ANTIC DMA Engine** (`src/plugins/devices/antic/`) [PARTIALLY COMPLETED]
 - [x] **Display List Interpreter**:
     - [x] Fetch-decode-execute display list instructions.
     - [x] Support for basic modes (mapped in code).
@@ -2103,40 +1305,6 @@ register state, I/O line levels, and visual assets like sprites or tile maps.*
 
 ### Phase 33.1: Device Info API and Infrastructure [COMPLETED]
 
-- [x] Define , , and  structures in .
-- [x] Add  to .
-- [x] Implement base reporting (name, address) in  default.
-
-### Phase 33.2: Per-Chip Breakdown Implementation [COMPLETED]
-
-- [x] **VIC-II**: Full register dump, raster/cycle status, and individual sprite 
-      extraction (8 bitmaps).
-- [x] **SID 6581**: All 29 registers, filter settings, and per-voice envelope phases.
-- [x] **CIA 6526 / VIA 6522**: Port latches, DDRs, timer counters, and IRQ status.
-- [x] **Virtual IEC**: Bus state machine phase and ATN/CLK/DATA line levels.
-- [x] **Datasette**: Tape position, motor/sense status, and I/O pulse lines.
-
-### Phase 33.3: Multi-Frontend Inspection [COMPLETED]
-
-- [x] **CLI**:  command with fuzzy name matching.
-- [x] **MCP**:  and  tools returning JSON breakdowns.
-- [x] **GUI**:  featuring:
-    - Device selector dropdown.
-    - Hierarchical tree view for registers and state.
-    - **Visual Inspector**: Scrolled window rendering zoomed-in bitmaps (e.g. sprites) 
-      on a grid layout.
-- [x] **Layout Optimization**: Move Register window beneath Memory; CLI at 
-      bottom-right; expand Tool Notebook for maximum visibility.
-
----
-
-## Phase 33: Device Info Breakdown & Visual Inspection [COMPLETED]
-
-*Goal: Provide deep introspection into every emulated device, including internal 
-register state, I/O line levels, and visual assets like sprites or tile maps.*
-
-### Phase 33.1: Device Info API and Infrastructure [COMPLETED]
-
 - [x] Define `DeviceInfo`, `DeviceRegister`, and `DeviceBitmap` structures in `libdevices`.
 - [x] Add `virtual void getDeviceInfo(DeviceInfo& out) const` to `IOHandler`.
 - [x] Implement base reporting (name, address) in `IOHandler` default.
@@ -2166,4 +1334,3 @@ register state, I/O line levels, and visual assets like sprites or tile maps.*
 
 - [ ] ***GUI**: On the DeviceInfoPane hierarchical view, allow 
       a) adding, b) editing and c) removign a device. 
-

@@ -1,5 +1,6 @@
 #include "plugin_loader.h"
 #include "include/util/logging.h"
+#include "util/path_util.h"
 #include <dlfcn.h>
 #include <iostream>
 #include <filesystem>
@@ -159,6 +160,12 @@ void PluginLoader::loadFromDir(const std::string& dir) {
                 failed.push_back(path);
         }
         pending = std::move(failed);
+    }
+}
+
+void PluginLoader::loadFromStandardLocations() {
+    for (const auto& path : PathUtil::getPluginSearchPaths()) {
+        loadFromDir(path);
     }
 }
 

@@ -231,20 +231,59 @@ For a complete list of supported hardware, see **[doc/README-PLUGINS.md](doc/REA
 
 ---
 
-## 9. Getting Started
+## 9. Installation
+
+**mmsim** provides installation scripts to deploy the binaries, plugins, and resources to standard system or user directories.
+
+### 9.1 Installation Scripts
+The following scripts are located in the `tools/` directory:
+
+- **Local User Install**: `./tools/install-local.sh`
+    - Installs to `$HOME/.local/bin`, `$HOME/.local/lib/mmsim`, and `$HOME/.local/share/mmsim`.
+    - Recommended for development and single-user use.
+- **System Install**: `sudo ./tools/install-system.sh`
+    - Installs to `/usr/local/bin`, `/usr/local/lib/mmsim`, and `/usr/local/share/mmsim`.
+    - Requires root privileges.
+
+Both scripts will automatically generate and install **man pages** (via `make man`) if `pandoc` is available on your system.
+
+### 9.2 Search Paths & Resource Discovery
+The emulator uses a centralized discovery system to find its components at runtime. It searches the following locations in order:
+
+#### Plugins (`.so` modules)
+1. `./lib/` (Local development)
+2. `$HOME/.local/lib/mmsim/plugins/`
+3. `/usr/local/lib/mmsim/plugins/`
+4. `/usr/lib/mmsim/plugins/`
+
+#### Data (ROMs, Machine JSONs)
+1. `./` (Local development)
+2. `$HOME/.local/share/mmsim/`
+3. `/usr/local/share/mmsim/`
+4. `/usr/share/mmsim/`
+
+#### Man Pages
+1. `$HOME/.local/share/man/`
+2. `/usr/local/share/man/`
+
+---
+
+## 10. Getting Started
 
 ### Prerequisites
 - **C++17 Compiler** (GCC 9+, Clang 10+).
 - **Libraries**: `spdlog`, `fmt`, `wxWidgets` (3.0+), `ALSA` (`libasound`), `nlohmann/json`.
+- **Documentation**: `pandoc` (optional, required for `make man`).
 
 ### Building
 ```bash
 make all      # Build everything
+make man      # Generate man pages
 make test     # Build and run the test suite (161+ tests)
 ```
 
 ---
 
-## 10. Development Standards
+## 11. Development Standards
 - Adhere to [STYLEGUIDE.md](STYLEGUIDE.md).
 - Track updates in [CHANGELOG.md](CHANGELOG.md).

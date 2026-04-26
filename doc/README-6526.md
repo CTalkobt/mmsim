@@ -1,6 +1,6 @@
 # mmemu-plugin-cia6526: MOS 6526 CIA Implementation
 
-The MOS 6526 Complex Interface Adapter (CIA) is a versatile I/O chip used in the Commodore 64 as CIA #1 ($DC00) and CIA #2 ($DD00). It is implemented as an `IOHandler` plugin within `mmemu-plugin-cia6526.so`.
+The MOS 6526 Complex Interface Adapter (CIA) is a versatile I/O chip used in the Commodore 64 as CIA #1 (\$DC00) and CIA #2 (\$DD00). It is implemented as an `IOHandler` plugin within `mmemu-plugin-cia6526.so`.
 
 ---
 

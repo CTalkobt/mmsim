@@ -12,49 +12,49 @@ The C64 machine plugin composes the full Commodore 64 hardware stack — 6510 CP
 ## 2. Functionality
 
 ### 2.1 Hardware Composition
-- **CPU**: MOS 6510 (extends 6502 with built-in 6-bit I/O port at $00/$01).
+- **CPU**: MOS 6510 (extends 6502 with built-in 6-bit I/O port at \$00/\$01).
 - **Video**: MOS 6567 VIC-II generating a 384×272 pixel RGBA frame (including border).
 - **Sound**: MOS 6581 SID — three voices with envelope generators and a state-variable filter.
 - **I/O**: Two MOS 6526 CIA chips for timers, TOD clock, serial bus, and keyboard scanning.
 - **Banking**: C64 PLA interprets LORAM/HIRAM/CHAREN signals from the 6510 port to overlay ROM/I/O regions on top of flat RAM.
-- **Color RAM**: 1 KB × 4-bit dedicated color memory at $D800–$DBFF; upper nibble always reads as `$F`.
+- **Color RAM**: 1 KB × 4-bit dedicated color memory at \$D800–\$DBFF; upper nibble always reads as `\$F`.
 - **Keyboard**: 8×8 matrix wired to CIA1 Port A (column select, output) and Port B (row sense, input).
 
 ### 2.2 Memory Map
 | Range | Size | Description |
 |-------|------|-------------|
-| $0000–$00FF | 256 B | Zero Page (CPU port at $00/$01) |
-| $0100–$01FF | 256 B | Stack |
-| $0200–$9FFF | ~39 KB | Main RAM |
-| $A000–$BFFF | 8 KB | BASIC ROM (banked out when LORAM=0) |
-| $C000–$CFFF | 4 KB | RAM |
-| $D000–$D3FF | 1 KB | VIC-II registers (CHAREN=1) / Char ROM (CHAREN=0) |
-| $D400–$D7FF | 1 KB | SID registers (CHAREN=1) / Char ROM (CHAREN=0) |
-| $D800–$DBFF | 1 KB | Color RAM (always I/O, 4-bit cells) |
-| $DC00–$DCFF | 256 B | CIA1 registers (CHAREN=1) / Char ROM (CHAREN=0) |
-| $DD00–$DDFF | 256 B | CIA2 registers (CHAREN=1) / Char ROM (CHAREN=0) |
-| $E000–$FFFF | 8 KB | KERNAL ROM (banked out when HIRAM=0) |
+| \$0000–\$00FF | 256 B | Zero Page (CPU port at \$00/\$01) |
+| \$0100–\$01FF | 256 B | Stack |
+| \$0200–\$9FFF | ~39 KB | Main RAM |
+| \$A000–\$BFFF | 8 KB | BASIC ROM (banked out when LORAM=0) |
+| \$C000–\$CFFF | 4 KB | RAM |
+| \$D000–\$D3FF | 1 KB | VIC-II registers (CHAREN=1) / Char ROM (CHAREN=0) |
+| \$D400–\$D7FF | 1 KB | SID registers (CHAREN=1) / Char ROM (CHAREN=0) |
+| \$D800–\$DBFF | 1 KB | Color RAM (always I/O, 4-bit cells) |
+| \$DC00–\$DCFF | 256 B | CIA1 registers (CHAREN=1) / Char ROM (CHAREN=0) |
+| \$DD00–\$DDFF | 256 B | CIA2 registers (CHAREN=1) / Char ROM (CHAREN=0) |
+| \$E000–\$FFFF | 8 KB | KERNAL ROM (banked out when HIRAM=0) |
 
 ### 2.3 PLA Banking Model
-The 6510 I/O port (DDR at $00, DATA at $01) drives three banking signals into the PLA:
+The 6510 I/O port (DDR at \$00, DATA at \$01) drives three banking signals into the PLA:
 
 | Bit | Signal | Effect when low |
 |-----|--------|-----------------|
-| 0 | LORAM | BASIC ROM at $A000–$BFFF replaced by RAM |
-| 1 | HIRAM | KERNAL ROM at $E000–$FFFF replaced by RAM |
-| 2 | CHAREN | Char ROM visible at $D000–$DFFF (I/O hidden) |
+| 0 | LORAM | BASIC ROM at \$A000–\$BFFF replaced by RAM |
+| 1 | HIRAM | KERNAL ROM at \$E000–\$FFFF replaced by RAM |
+| 2 | CHAREN | Char ROM visible at \$D000–\$DFFF (I/O hidden) |
 
-Power-on state: DDR=$00 (all inputs), DATA=$3F → effective port $3F → LORAM=1, HIRAM=1, CHAREN=1 (BASIC + KERNAL + I/O visible).
+Power-on state: DDR=\$00 (all inputs), DATA=\$3F → effective port \$3F → LORAM=1, HIRAM=1, CHAREN=1 (BASIC + KERNAL + I/O visible).
 
 ### 2.4 VIC-II Bank Selection
 CIA2 Port A bits 1–0 (inverted) select which 16 KB window the VIC-II DMA engine sees:
 
 | CIA2 PA bits 1–0 | VIC bank base |
 |------------------|---------------|
-| 11 (default) | $0000 |
-| 10 | $4000 |
-| 01 | $8000 |
-| 00 | $C000 |
+| 11 (default) | \$0000 |
+| 10 | \$4000 |
+| 01 | \$8000 |
+| 00 | \$C000 |
 
 The machine factory installs a CIA2 Port A write callback that updates `VIC2::setBankBase()` on every write.
 
@@ -63,7 +63,7 @@ The machine factory installs a CIA2 Port A write callback that updates `VIC2::se
 - **NMI**: CIA2 fires CPU NMI (used for the Restore key on real hardware).
 
 ### 2.6 Keyboard Matrix
-CIA1 Port A drives columns (output, active-low); CIA1 Port B reads rows (input, active-low). The KERNAL scans by writing `$FE`, `$FD`, … to Port A and reading Port B.
+CIA1 Port A drives columns (output, active-low); CIA1 Port B reads rows (input, active-low). The KERNAL scans by writing `\$FE`, `\$FD`, … to Port A and reading Port B.
 
 Key name strings passed to `MachineDescriptor::onKey`:
 
@@ -86,8 +86,8 @@ Required in `roms/c64/` (not distributed; see `.gitignore`):
 
 | File | Size | Contents |
 |------|------|----------|
-| `basic.bin` | 8 KB | BASIC V2 ROM ($A000–$BFFF) |
-| `kernal.bin` | 8 KB | KERNAL ROM ($E000–$FFFF) |
+| `basic.bin` | 8 KB | BASIC V2 ROM (\$A000–\$BFFF) |
+| `kernal.bin` | 8 KB | KERNAL ROM (\$E000–\$FFFF) |
 | `char.bin` | 4 KB | Character ROM |
 
 If any ROM file is absent the machine still initialises; the affected region reads as zeroes.
@@ -99,7 +99,7 @@ The C64 machine includes a Datasette device wired to the 6510 I/O port and CIA1:
 |--------|--------------------|-------------|
 | Motor | 6510 port bit 5 (active-low) | Enables tape transport when CPU drives bit 5 low. |
 | Write | 6510 port bit 3 | Cassette write line from CPU to tape head. |
-| Read pulse | CIA1 FLAG (`$DC0D` bit 4) | Each incoming pulse sets the CIA1 FLAG interrupt. |
+| Read pulse | CIA1 FLAG (`\$DC0D` bit 4) | Each incoming pulse sets the CIA1 FLAG interrupt. |
 | Sense | 6510 port bit 4 (input) | Asserted by Datasette when a button is pressed/tape mounted. |
 
 See [doc/README-DATASETTE.md](README-DATASETTE.md) for the full Datasette API.
@@ -112,7 +112,7 @@ One `schedulerStep` call executes one CPU instruction (via `ICore::step()`), the
 ## 3. Dependencies
 - [mmemu-plugin-6502](README-6502.md): Provides the MOS 6510 execution core (registered as `"6510"`).
 - [mmemu-plugin-c64-pla](README-C64PLA.md): PLA banking controller.
-- [mmemu-plugin-cia6526](README-6526.md): CIA1 ($DC00) and CIA2 ($DD00) — timers, TOD, I/O ports.
+- [mmemu-plugin-cia6526](README-6526.md): CIA1 (\$DC00) and CIA2 (\$DD00) — timers, TOD, I/O ports.
 - [mmemu-plugin-vic2](README-VIC2.md): VIC-II video and raster IRQ.
 - [mmemu-plugin-sid6581](README-SID.md): SID audio synthesis.
 

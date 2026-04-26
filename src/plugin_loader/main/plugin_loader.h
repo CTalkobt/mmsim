@@ -10,7 +10,7 @@ public:
 
     bool load(const std::string& path);
     void loadFromDir(const std::string& dir);
-    
+    void loadFromStandardLocations();
     void unloadAll();
 
     // Host-provided extension registration stubs

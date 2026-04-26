@@ -4,7 +4,20 @@ This document provides a categorized index of all dynamically loadable plugins a
 
 ---
 
-## 1. Plugin Index
+## 1. Plugin Discovery
+
+At startup, all **mmsim** binaries scan for plugins in the following standard locations (in order):
+
+1. **Local Development**: `./lib/` (relative to current working directory).
+2. **User Local**: `~/.local/lib/mmsim/plugins/`
+3. **System Local**: `/usr/local/lib/mmsim/plugins/`
+4. **System Standard**: `/usr/lib/mmsim/plugins/`
+
+Plugins are shared library files (usually with a `.so` extension on Linux) that follow the naming convention `mmemu-plugin-*.so`.
+
+---
+
+## 2. Plugin Index
 
 ### 1.1 Processor Plugins (CPU)
 Plugins that implement the `ICore` interface.

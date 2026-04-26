@@ -414,7 +414,7 @@ public:
         PluginPaneManager::instance().registerPane(&s_builtInScreenPane);
         PluginPaneManager::instance().registerPane(&s_builtInTapePane);
         PluginPaneManager::instance().registerPane(&s_builtInDrivePane);
-        PluginLoader::instance().loadFromDir("./lib");
+        PluginLoader::instance().loadFromStandardLocations();
         auto *frame = new MmemuFrame();
         frame->Show(true);
 
