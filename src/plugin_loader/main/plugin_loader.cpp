@@ -192,7 +192,8 @@ void PluginLoader::registerPluginItems(SimPluginManifest* manifest) {
     // Machines
     for (int i = 0; i < manifest->machineCount; ++i) {
         auto& m = manifest->machines[i];
-        MachineRegistry::instance().registerMachine(m.machineId, m.create);
+        std::string desc = m.description ? m.description : "";
+        MachineRegistry::instance().registerMachine(m.machineId, m.create, desc);
     }
 
     // Devices

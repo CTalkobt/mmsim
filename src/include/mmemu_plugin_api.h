@@ -142,6 +142,7 @@ struct DevicePluginInfo {
 struct MachinePluginInfo {
     const char* machineId;
     MachineDescriptor* (*create)(void);
+    const char* description;  // Human-readable description (optional, may be nullptr)
 };
 
 /**

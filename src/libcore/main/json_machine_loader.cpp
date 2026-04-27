@@ -136,10 +136,13 @@ int JsonMachineLoader::registerAll(const nlohmann::json& doc) {
         std::string id = spec["id"].get<std::string>();
 
         nlohmann::json specCopy = spec;
+        std::string displayName;
+        if (spec.contains("displayName") && spec["displayName"].is_string())
+            displayName = spec["displayName"].get<std::string>();
         MachineRegistry::instance().registerMachine(id,
             [specCopy]() -> MachineDescriptor* {
                 return JsonMachineLoader::buildFromSpec(specCopy);
-            });
+            }, displayName);
         ++count;
     }
     return count;

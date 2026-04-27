@@ -125,13 +125,13 @@ Json handleDescribe() {
     };
 
     // Common property schemas
-    Json midProp(Json::OBJ); midProp.oVal["type"] = Json("string");
+    Json midProp(Json::OBJ); midProp.oVal["type"] = Json("string"); midProp.oVal["description"] = Json("Machine type from list_machines (e.g. rawMega65, c64)");
     Json addrProp(Json::OBJ); addrProp.oVal["type"] = Json("string"); addrProp.oVal["description"] = Json("Address expression (e.g. $1000, start+5, %1010, decimal)");
-    Json cntProp(Json::OBJ); cntProp.oVal["type"] = Json("integer");
+    Json cntProp(Json::OBJ); cntProp.oVal["type"] = Json("integer"); cntProp.oVal["description"] = Json("Number of items (instructions, bytes, stack entries, etc.)");
     Json sizeProp(Json::OBJ); sizeProp.oVal["type"] = Json("string"); sizeProp.oVal["description"] = Json("Size expression (hex or decimal)");
-    Json pattProp(Json::OBJ); pattProp.oVal["type"] = Json("string");
-    Json ishProp(Json::OBJ); ishProp.oVal["type"] = Json("boolean");
-    Json textProp(Json::OBJ); textProp.oVal["type"] = Json("string");
+    Json pattProp(Json::OBJ); pattProp.oVal["type"] = Json("string"); pattProp.oVal["description"] = Json("Search pattern — ASCII text or hex bytes if is_hex is true");
+    Json ishProp(Json::OBJ); ishProp.oVal["type"] = Json("boolean"); ishProp.oVal["description"] = Json("If true, interpret the value as hexadecimal");
+    Json textProp(Json::OBJ); textProp.oVal["type"] = Json("string"); textProp.oVal["description"] = Json("Text string to type or process");
 
     Json typeSchema(Json::OBJ);
     typeSchema.oVal["type"] = Json("object");
@@ -141,7 +141,7 @@ Json handleDescribe() {
     typeSchema.oVal["properties"] = typeProps;
     Json typeReq(Json::ARR); typeReq.push_back(Json("machine_id")); typeReq.push_back(Json("text"));
     typeSchema.oVal["required"] = typeReq;
-    addTool("type_string", "Type text into the machine virtual keyboard", typeSchema);
+    addTool("type_string", "Type text into the machine's virtual keyboard, simulating sequential key presses", typeSchema);
 
     Json stepSchema(Json::OBJ);
     stepSchema.oVal["type"] = Json("object");
@@ -151,7 +151,7 @@ Json handleDescribe() {
     stepSchema.oVal["properties"] = stepProps;
     Json stepReq(Json::ARR); stepReq.push_back(Json("machine_id"));
     stepSchema.oVal["required"] = stepReq;
-    addTool("step_cpu", "Step the CPU by a number of instructions", stepSchema);
+    addTool("step_cpu", "Step the CPU by count instructions (default 1). Returns registers after stepping.", stepSchema);
 
     Json spcSchema(Json::OBJ);
     spcSchema.oVal["type"] = Json("object");
@@ -161,7 +161,7 @@ Json handleDescribe() {
     spcSchema.oVal["properties"] = spcProps;
     Json spcReq(Json::ARR); spcReq.push_back(Json("machine_id")); spcReq.push_back(Json("addr"));
     spcSchema.oVal["required"] = spcReq;
-    addTool("set_pc", "Set CPU program counter", spcSchema);
+    addTool("set_pc", "Set the CPU program counter to an address expression", spcSchema);
 
     Json rmSchema(Json::OBJ);
     rmSchema.oVal["type"] = Json("object");
@@ -172,23 +172,23 @@ Json handleDescribe() {
     rmSchema.oVal["properties"] = rmProps;
     Json rmReq(Json::ARR); rmReq.push_back(Json("machine_id")); rmReq.push_back(Json("addr")); rmReq.push_back(Json("size"));
     rmSchema.oVal["required"] = rmReq;
-    addTool("read_memory", "Read a range of memory", rmSchema);
+    addTool("read_memory", "Read a range of memory bytes. Returns hex dump output.", rmSchema);
 
     Json wmSchema(Json::OBJ);
     wmSchema.oVal["type"] = Json("object");
     Json wmProps(Json::OBJ);
     wmProps.oVal["machine_id"] = midProp;
     wmProps.oVal["addr"] = addrProp;
-    Json bytesProp(Json::OBJ); bytesProp.oVal["type"] = Json("array");
+    Json bytesProp(Json::OBJ); bytesProp.oVal["type"] = Json("array"); bytesProp.oVal["description"] = Json("Array of byte values (0-255) to write sequentially starting at addr");
     Json itemsProp(Json::OBJ); itemsProp.oVal["type"] = Json("integer");
     bytesProp.oVal["items"] = itemsProp;
     wmProps.oVal["bytes"] = bytesProp;
     wmSchema.oVal["properties"] = wmProps;
     Json wmReq(Json::ARR); wmReq.push_back(Json("machine_id")); wmReq.push_back(Json("addr")); wmReq.push_back(Json("bytes"));
     wmSchema.oVal["required"] = wmReq;
-    addTool("write_memory", "Write bytes to memory", wmSchema);
+    addTool("write_memory", "Write an array of bytes to memory starting at addr", wmSchema);
 
-    addTool("read_registers", "Read current CPU registers", spcSchema); // reuse machine_id + addr (addr ignored)
+    addTool("read_registers", "Read all current CPU registers (A, X, Y, SP, PC, flags). Only machine_id is required.", spcSchema); // reuse machine_id + addr (addr ignored)
 
     Json smSchema(Json::OBJ);
     smSchema.oVal["type"] = Json("object");
@@ -200,30 +200,30 @@ Json handleDescribe() {
     smSchema.oVal["properties"] = smProps;
     Json smReq(Json::ARR); smReq.push_back(Json("machine_id")); smReq.push_back(Json("pattern"));
     smSchema.oVal["required"] = smReq;
-    addTool("search_memory", "Search for pattern in memory", smSchema);
+    addTool("search_memory", "Search for a byte pattern in memory. Use is_hex=true for hex patterns (e.g. \"A9 00\"), otherwise ASCII text. Optional start_addr limits search range.", smSchema);
 
     Json mtSchema(Json::OBJ);
     mtSchema.oVal["type"] = Json("object");
     Json mtProps(Json::OBJ);
     mtProps.oVal["machine_id"] = midProp;
-    Json pathProp(Json::OBJ); pathProp.oVal["type"] = Json("string");
+    Json pathProp(Json::OBJ); pathProp.oVal["type"] = Json("string"); pathProp.oVal["description"] = Json("Filesystem path to the file");
     mtProps.oVal["path"] = pathProp;
     mtSchema.oVal["properties"] = mtProps;
     Json mtReq(Json::ARR); mtReq.push_back(Json("machine_id")); mtReq.push_back(Json("path"));
     mtSchema.oVal["required"] = mtReq;
-    addTool("mount_tape", "Mount a .tap image into the datasette", mtSchema);
+    addTool("mount_tape", "Mount a .tap tape image file into the machine's datasette drive", mtSchema);
 
     Json mdSchema(Json::OBJ);
     mdSchema.oVal["type"] = Json("object");
     Json mdProps(Json::OBJ);
     mdProps.oVal["machine_id"] = midProp;
-    Json unitProp(Json::OBJ); unitProp.oVal["type"] = Json("integer");
+    Json unitProp(Json::OBJ); unitProp.oVal["type"] = Json("integer"); unitProp.oVal["description"] = Json("Drive unit number (e.g. 8, 9, 10, 11)");
     mdProps.oVal["unit"] = unitProp;
     mdProps.oVal["path"] = pathProp;
     mdSchema.oVal["properties"] = mdProps;
     Json mdReq(Json::ARR); mdReq.push_back(Json("machine_id")); mdReq.push_back(Json("unit")); mdReq.push_back(Json("path"));
     mdSchema.oVal["required"] = mdReq;
-    addTool("mount_disk", "Mount a disk image into a drive unit", mdSchema);
+    addTool("mount_disk", "Mount a .d64/.g64/.d81 disk image into a drive unit", mdSchema);
 
     Json edSchema(Json::OBJ);
     edSchema.oVal["type"] = Json("object");
@@ -233,7 +233,7 @@ Json handleDescribe() {
     edSchema.oVal["properties"] = edProps;
     Json edReq(Json::ARR); edReq.push_back(Json("machine_id")); edReq.push_back(Json("unit"));
     edSchema.oVal["required"] = edReq;
-    addTool("eject_disk", "Eject a disk image from a drive unit", edSchema);
+    addTool("eject_disk", "Eject the disk image from a drive unit", edSchema);
 
     Json ctSchema(Json::OBJ);
     ctSchema.oVal["type"] = Json("object");
@@ -241,11 +241,12 @@ Json handleDescribe() {
     ctProps.oVal["machine_id"] = midProp;
     Json opProp(Json::OBJ);
     opProp.oVal["type"] = Json("string");
+    opProp.oVal["description"] = Json("Tape operation: \"play\", \"stop\", \"rewind\", \"record\", or \"stoprecord\"");
     ctProps.oVal["operation"] = opProp;
     ctSchema.oVal["properties"] = ctProps;
     Json ctReq(Json::ARR); ctReq.push_back(Json("machine_id")); ctReq.push_back(Json("operation"));
     ctSchema.oVal["required"] = ctReq;
-    addTool("control_tape", "Control tape: \"play\", \"stop\", \"rewind\", \"record\", \"stoprecord\"", ctSchema);
+    addTool("control_tape", "Control the datasette tape transport (play, stop, rewind, record, stoprecord)", ctSchema);
 
     Json rtSchema(Json::OBJ);
     rtSchema.oVal["type"] = Json("object");
@@ -254,13 +255,13 @@ Json handleDescribe() {
     rtSchema.oVal["properties"] = rtProps;
     Json rtReq(Json::ARR); rtReq.push_back(Json("machine_id"));
     rtSchema.oVal["required"] = rtReq;
-    addTool("record_tape", "Start recording to the datasette (arms write-line capture)", rtSchema);
+    addTool("record_tape", "Arm the datasette for recording (captures CPU write-line data)", rtSchema);
 
     Json strSchema(Json::OBJ);
     strSchema.oVal["type"] = Json("object");
     Json strProps(Json::OBJ);
     strProps.oVal["machine_id"] = midProp;
-    Json strPathProp(Json::OBJ); strPathProp.oVal["type"] = Json("string");
+    Json strPathProp(Json::OBJ); strPathProp.oVal["type"] = Json("string"); strPathProp.oVal["description"] = Json("Output .tap file path to save the recording");
     strProps.oVal["path"] = strPathProp;
     strSchema.oVal["properties"] = strProps;
     Json strReq(Json::ARR); strReq.push_back(Json("machine_id")); strReq.push_back(Json("path"));
@@ -271,14 +272,14 @@ Json handleDescribe() {
     kSchema.oVal["type"] = Json("object");
     Json kProps(Json::OBJ);
     kProps.oVal["machine_id"] = midProp;
-    Json keyProp(Json::OBJ); keyProp.oVal["type"] = Json("string");
+    Json keyProp(Json::OBJ); keyProp.oVal["type"] = Json("string"); keyProp.oVal["description"] = Json("Key name (e.g. \"a\", \"return\", \"space\", \"f1\", \"shift\")");
     kProps.oVal["key"] = keyProp;
-    Json ksProp(Json::OBJ); ksProp.oVal["type"] = Json("boolean");
+    Json ksProp(Json::OBJ); ksProp.oVal["type"] = Json("boolean"); ksProp.oVal["description"] = Json("true for key-down (press), false for key-up (release)");
     kProps.oVal["down"] = ksProp;
     kSchema.oVal["properties"] = kProps;
     Json kReq(Json::ARR); kReq.push_back(Json("machine_id")); kReq.push_back(Json("key")); kReq.push_back(Json("down"));
     kSchema.oVal["required"] = kReq;
-    addTool("press_key", "Inject a keystroke", kSchema);
+    addTool("press_key", "Press or release a single key on the machine's virtual keyboard", kSchema);
 
     Json liSchema(Json::OBJ);
     liSchema.oVal["type"] = Json("object");
@@ -286,23 +287,24 @@ Json handleDescribe() {
     liProps.oVal["machine_id"] = midProp;
     liProps.oVal["path"] = pathProp;
     liProps.oVal["addr"] = addrProp;
-    Json autoProp(Json::OBJ); autoProp.oVal["type"] = Json("boolean");
+    Json autoProp(Json::OBJ); autoProp.oVal["type"] = Json("boolean"); autoProp.oVal["description"] = Json("If true, set PC to load address after loading (auto-run)");
     liProps.oVal["auto_start"] = autoProp;
     liSchema.oVal["properties"] = liProps;
     Json liReq(Json::ARR); liReq.push_back(Json("machine_id")); liReq.push_back(Json("path"));
     liSchema.oVal["required"] = liReq;
-    addTool("load_image", "Load a PRG or BIN image", liSchema);
+    addTool("load_image", "Load a .prg or .bin image into memory. Optional addr overrides the PRG load address; auto_start sets PC to the entry point.", liSchema);
 
     Json acSchema(Json::OBJ);
     acSchema.oVal["type"] = Json("object");
     Json acProps(Json::OBJ);
     acProps.oVal["machine_id"] = midProp;
     acProps.oVal["path"] = pathProp;
-    acProps.oVal["reset"] = ishProp;
+    Json resetProp(Json::OBJ); resetProp.oVal["type"] = Json("boolean"); resetProp.oVal["description"] = Json("If true, reset the machine after attaching the cartridge");
+    acProps.oVal["reset"] = resetProp;
     acSchema.oVal["properties"] = acProps;
     Json acReq(Json::ARR); acReq.push_back(Json("machine_id")); acReq.push_back(Json("path"));
     acSchema.oVal["required"] = acReq;
-    addTool("attach_cartridge", "Attach a cartridge image", acSchema);
+    addTool("attach_cartridge", "Attach a cartridge ROM image (.crt/.bin) to the machine", acSchema);
 
     Json ecSchema(Json::OBJ);
     ecSchema.oVal["type"] = Json("object");
@@ -311,7 +313,7 @@ Json handleDescribe() {
     ecSchema.oVal["properties"] = ecProps;
     Json ecReq(Json::ARR); ecReq.push_back(Json("machine_id"));
     ecSchema.oVal["required"] = ecReq;
-    addTool("eject_cartridge", "Eject currently attached cartridge", ecSchema);
+    addTool("eject_cartridge", "Eject the currently attached cartridge from the machine", ecSchema);
 
     Json rstSchema(Json::OBJ);
     rstSchema.oVal["type"] = Json("object");
@@ -320,26 +322,26 @@ Json handleDescribe() {
     rstSchema.oVal["properties"] = rstProps;
     Json rstReq(Json::ARR); rstReq.push_back(Json("machine_id"));
     rstSchema.oVal["required"] = rstReq;
-    addTool("reset_machine", "Reset a machine to its power-on state", rstSchema);
+    addTool("reset_machine", "Reset a machine to its power-on state (cold reset)", rstSchema);
 
     Json emptySchema(Json::OBJ);
     emptySchema.oVal["type"] = Json("object");
-    addTool("list_loggers", "List all registered loggers and their levels", emptySchema);
+    addTool("list_loggers", "List all registered loggers and their current log levels", emptySchema);
 
     Json sllSchema(Json::OBJ);
     sllSchema.oVal["type"] = Json("object");
     Json sllProps(Json::OBJ);
-    Json sllTarget(Json::OBJ); sllTarget.oVal["type"] = Json("string");
-    Json sllLevel(Json::OBJ); sllLevel.oVal["type"] = Json("string");
+    Json sllTarget(Json::OBJ); sllTarget.oVal["type"] = Json("string"); sllTarget.oVal["description"] = Json("Logger name from list_loggers, or \"all\" to set all loggers");
+    Json sllLevel(Json::OBJ); sllLevel.oVal["type"] = Json("string"); sllLevel.oVal["description"] = Json("Log level: \"trace\", \"debug\", \"info\", \"warn\", \"error\", \"critical\", or \"off\"");
     sllProps.oVal["target"] = sllTarget;
     sllProps.oVal["level"] = sllLevel;
     sllSchema.oVal["properties"] = sllProps;
     Json sllReq(Json::ARR); sllReq.push_back(Json("target")); sllReq.push_back(Json("level"));
     sllSchema.oVal["required"] = sllReq;
-    addTool("set_log_level", "Set log level for a logger or 'all'", sllSchema);
+    addTool("set_log_level", "Set the log level for a specific logger or \"all\" loggers", sllSchema);
 
     // list_machines
-    addTool("list_machines", "List all available machine types", emptySchema);
+    addTool("list_machines", "List all available machine types with their descriptions. Use these IDs with create_machine.", emptySchema);
 
     // create_machine
     Json cmSchema(Json::OBJ); cmSchema.oVal["type"] = Json("object");
@@ -347,7 +349,7 @@ Json handleDescribe() {
     cmSchema.oVal["properties"] = cmProps;
     Json cmReq(Json::ARR); cmReq.push_back(Json("machine_id"));
     cmSchema.oVal["required"] = cmReq;
-    addTool("create_machine", "Create (or re-create) a machine by ID", cmSchema);
+    addTool("create_machine", "Create (or re-create) a machine instance. Use list_machines to see valid IDs.", cmSchema);
 
     // list_symbols
     Json lsSchema(Json::OBJ); lsSchema.oVal["type"] = Json("object");
@@ -355,17 +357,17 @@ Json handleDescribe() {
     lsSchema.oVal["properties"] = lsProps;
     Json lsReq(Json::ARR); lsReq.push_back(Json("machine_id"));
     lsSchema.oVal["required"] = lsReq;
-    addTool("list_symbols", "List all defined symbols", lsSchema);
+    addTool("list_symbols", "List all defined symbols in the machine's symbol table (address → label)", lsSchema);
 
     // add_symbol
     Json asSchema(Json::OBJ); asSchema.oVal["type"] = Json("object");
     Json asProps(Json::OBJ); asProps.oVal["machine_id"] = midProp;
-    Json lblProp(Json::OBJ); lblProp.oVal["type"] = Json("string");
+    Json lblProp(Json::OBJ); lblProp.oVal["type"] = Json("string"); lblProp.oVal["description"] = Json("Symbol label name (e.g. \"start\", \"irq_handler\")");
     asProps.oVal["label"] = lblProp; asProps.oVal["addr"] = addrProp;
     asSchema.oVal["properties"] = asProps;
     Json asReq(Json::ARR); asReq.push_back(Json("machine_id")); asReq.push_back(Json("label")); asReq.push_back(Json("addr"));
     asSchema.oVal["required"] = asReq;
-    addTool("add_symbol", "Add a symbol to the symbol table", asSchema);
+    addTool("add_symbol", "Add a named symbol at an address to the machine's symbol table", asSchema);
 
     // remove_symbol
     Json rsSchema(Json::OBJ); rsSchema.oVal["type"] = Json("object");
@@ -374,10 +376,10 @@ Json handleDescribe() {
     rsSchema.oVal["properties"] = rsProps;
     Json rsReq(Json::ARR); rsReq.push_back(Json("machine_id")); rsReq.push_back(Json("label"));
     rsSchema.oVal["required"] = rsReq;
-    addTool("remove_symbol", "Remove a symbol from the symbol table", rsSchema);
+    addTool("remove_symbol", "Remove a named symbol from the machine's symbol table", rsSchema);
 
     // clear_symbols
-    addTool("clear_symbols", "Clear all symbols from the symbol table", lsSchema);
+    addTool("clear_symbols", "Remove all symbols from the machine's symbol table", lsSchema);
 
     // load_symbols
     Json ldsSchema(Json::OBJ); ldsSchema.oVal["type"] = Json("object");
@@ -386,17 +388,17 @@ Json handleDescribe() {
     ldsSchema.oVal["properties"] = ldsProps;
     Json ldsReq(Json::ARR); ldsReq.push_back(Json("machine_id")); ldsReq.push_back(Json("path"));
     ldsSchema.oVal["required"] = ldsReq;
-    addTool("load_symbols", "Load symbols from a .sym file", ldsSchema);
+    addTool("load_symbols", "Load symbols from a KickAssembler .sym file into the machine's symbol table", ldsSchema);
 
     // run_cpu
     Json runSchema(Json::OBJ); runSchema.oVal["type"] = Json("object");
     Json runProps(Json::OBJ); runProps.oVal["machine_id"] = midProp;
-    Json maxStepsProp(Json::OBJ); maxStepsProp.oVal["type"] = Json("integer");
+    Json maxStepsProp(Json::OBJ); maxStepsProp.oVal["type"] = Json("integer"); maxStepsProp.oVal["description"] = Json("Maximum instructions to execute before stopping (default 10000000)");
     runProps.oVal["max_steps"] = maxStepsProp;
     runSchema.oVal["properties"] = runProps;
     Json runReq(Json::ARR); runReq.push_back(Json("machine_id"));
     runSchema.oVal["required"] = runReq;
-    addTool("run_cpu", "Run until breakpoint, program end, or max_steps (default 10000000)", runSchema);
+    addTool("run_cpu", "Run the CPU until a breakpoint is hit, the program ends (BRK/RTS to empty stack), or max_steps is reached (default 10000000)", runSchema);
 
     // disassemble
     Json daSchema(Json::OBJ); daSchema.oVal["type"] = Json("object");
@@ -404,39 +406,39 @@ Json handleDescribe() {
     daSchema.oVal["properties"] = daProps;
     Json daReq(Json::ARR); daReq.push_back(Json("machine_id"));
     daSchema.oVal["required"] = daReq;
-    addTool("disassemble", "Disassemble instructions (addr defaults to PC, count defaults to 10)", daSchema);
+    addTool("disassemble", "Disassemble instructions starting at addr (defaults to PC). count defaults to 10.", daSchema);
 
     // fill_memory
     Json fmSchema(Json::OBJ); fmSchema.oVal["type"] = Json("object");
     Json fmProps(Json::OBJ); fmProps.oVal["machine_id"] = midProp; fmProps.oVal["addr"] = addrProp;
-    Json valProp(Json::OBJ); valProp.oVal["type"] = Json("integer");
+    Json valProp(Json::OBJ); valProp.oVal["type"] = Json("integer"); valProp.oVal["description"] = Json("Byte value (0-255) to fill with");
     fmProps.oVal["value"] = valProp; fmProps.oVal["size"] = sizeProp;
     fmSchema.oVal["properties"] = fmProps;
     Json fmReq(Json::ARR); fmReq.push_back(Json("machine_id")); fmReq.push_back(Json("addr")); fmReq.push_back(Json("value")); fmReq.push_back(Json("size"));
     fmSchema.oVal["required"] = fmReq;
-    addTool("fill_memory", "Fill a memory range with a byte value", fmSchema);
+    addTool("fill_memory", "Fill a memory range starting at addr for size bytes with a single byte value", fmSchema);
 
     // copy_memory
     Json cpSchema(Json::OBJ); cpSchema.oVal["type"] = Json("object");
     Json cpProps(Json::OBJ); cpProps.oVal["machine_id"] = midProp;
-    Json srcProp(Json::OBJ); srcProp.oVal["type"] = Json("integer");
-    Json dstProp(Json::OBJ); dstProp.oVal["type"] = Json("integer");
+    Json srcProp(Json::OBJ); srcProp.oVal["type"] = Json("integer"); srcProp.oVal["description"] = Json("Source start address");
+    Json dstProp(Json::OBJ); dstProp.oVal["type"] = Json("integer"); dstProp.oVal["description"] = Json("Destination start address");
     cpProps.oVal["src_addr"] = srcProp; cpProps.oVal["dst_addr"] = dstProp; cpProps.oVal["size"] = sizeProp;
     cpSchema.oVal["properties"] = cpProps;
     Json cpReq(Json::ARR); cpReq.push_back(Json("machine_id")); cpReq.push_back(Json("src_addr")); cpReq.push_back(Json("dst_addr")); cpReq.push_back(Json("size"));
     cpSchema.oVal["required"] = cpReq;
-    addTool("copy_memory", "Copy a memory range to another address", cpSchema);
+    addTool("copy_memory", "Copy size bytes from src_addr to dst_addr", cpSchema);
 
     // swap_memory
     Json swmSchema(Json::OBJ); swmSchema.oVal["type"] = Json("object");
     Json swmProps(Json::OBJ); swmProps.oVal["machine_id"] = midProp;
-    Json addr1Prop(Json::OBJ); addr1Prop.oVal["type"] = Json("integer");
-    Json addr2Prop(Json::OBJ); addr2Prop.oVal["type"] = Json("integer");
+    Json addr1Prop(Json::OBJ); addr1Prop.oVal["type"] = Json("integer"); addr1Prop.oVal["description"] = Json("First region start address");
+    Json addr2Prop(Json::OBJ); addr2Prop.oVal["type"] = Json("integer"); addr2Prop.oVal["description"] = Json("Second region start address");
     swmProps.oVal["addr1"] = addr1Prop; swmProps.oVal["addr2"] = addr2Prop; swmProps.oVal["size"] = sizeProp;
     swmSchema.oVal["properties"] = swmProps;
     Json swmReq(Json::ARR); swmReq.push_back(Json("machine_id")); swmReq.push_back(Json("addr1")); swmReq.push_back(Json("addr2")); swmReq.push_back(Json("size"));
     swmSchema.oVal["required"] = swmReq;
-    addTool("swap_memory", "Swap two memory ranges of equal size", swmSchema);
+    addTool("swap_memory", "Swap the contents of two equal-sized memory regions", swmSchema);
 
     // set_breakpoint
     Json sbpSchema(Json::OBJ); sbpSchema.oVal["type"] = Json("object");
@@ -444,32 +446,32 @@ Json handleDescribe() {
     sbpSchema.oVal["properties"] = sbpProps;
     Json sbpReq(Json::ARR); sbpReq.push_back(Json("machine_id")); sbpReq.push_back(Json("addr"));
     sbpSchema.oVal["required"] = sbpReq;
-    addTool("set_breakpoint", "Set an execution breakpoint at an address", sbpSchema);
+    addTool("set_breakpoint", "Set an execution breakpoint at an address. Returns the breakpoint ID.", sbpSchema);
 
     // set_watchpoint
     Json swpSchema(Json::OBJ); swpSchema.oVal["type"] = Json("object");
     Json swpProps(Json::OBJ); swpProps.oVal["machine_id"] = midProp; swpProps.oVal["addr"] = addrProp;
-    Json wpTypeProp(Json::OBJ); wpTypeProp.oVal["type"] = Json("string");
+    Json wpTypeProp(Json::OBJ); wpTypeProp.oVal["type"] = Json("string"); wpTypeProp.oVal["description"] = Json("Watchpoint type: \"read\" or \"write\"");
     swpProps.oVal["type"] = wpTypeProp;
     swpSchema.oVal["properties"] = swpProps;
     Json swpReq(Json::ARR); swpReq.push_back(Json("machine_id")); swpReq.push_back(Json("addr")); swpReq.push_back(Json("type"));
     swpSchema.oVal["required"] = swpReq;
-    addTool("set_watchpoint", "Set a read or write watchpoint (type: \"read\" or \"write\")", swpSchema);
+    addTool("set_watchpoint", "Set a memory watchpoint that triggers on read or write access. Returns the watchpoint ID.", swpSchema);
 
     // delete_breakpoint / enable_breakpoint / disable_breakpoint share the same schema
     Json bpIdSchema(Json::OBJ); bpIdSchema.oVal["type"] = Json("object");
     Json bpIdProps(Json::OBJ); bpIdProps.oVal["machine_id"] = midProp;
-    Json idProp(Json::OBJ); idProp.oVal["type"] = Json("integer");
+    Json idProp(Json::OBJ); idProp.oVal["type"] = Json("integer"); idProp.oVal["description"] = Json("Breakpoint/watchpoint ID from set_breakpoint, set_watchpoint, or list_breakpoints");
     bpIdProps.oVal["id"] = idProp;
     bpIdSchema.oVal["properties"] = bpIdProps;
     Json bpIdReq(Json::ARR); bpIdReq.push_back(Json("machine_id")); bpIdReq.push_back(Json("id"));
     bpIdSchema.oVal["required"] = bpIdReq;
-    addTool("delete_breakpoint",  "Delete a breakpoint or watchpoint by id", bpIdSchema);
-    addTool("enable_breakpoint",  "Enable a breakpoint or watchpoint by id", bpIdSchema);
-    addTool("disable_breakpoint", "Disable a breakpoint or watchpoint by id", bpIdSchema);
+    addTool("delete_breakpoint",  "Permanently remove a breakpoint or watchpoint by its ID", bpIdSchema);
+    addTool("enable_breakpoint",  "Re-enable a previously disabled breakpoint or watchpoint", bpIdSchema);
+    addTool("disable_breakpoint", "Temporarily disable a breakpoint or watchpoint without deleting it", bpIdSchema);
 
     // list_breakpoints
-    addTool("list_breakpoints", "List all breakpoints and watchpoints", cmSchema);  // reuse machine_id-only schema
+    addTool("list_breakpoints", "List all breakpoints and watchpoints with their IDs, addresses, types, and enabled status", cmSchema);  // reuse machine_id-only schema
 
     // get_stack
     Json gsSchema(Json::OBJ); gsSchema.oVal["type"] = Json("object");
@@ -477,20 +479,20 @@ Json handleDescribe() {
     gsSchema.oVal["properties"] = gsProps;
     Json gsReq(Json::ARR); gsReq.push_back(Json("machine_id"));
     gsSchema.oVal["required"] = gsReq;
-    addTool("get_stack", "Show stack trace (count defaults to 8, 0 = all)", gsSchema);
+    addTool("get_stack", "Read bytes from the CPU stack. count defaults to 8 entries; use 0 for all (SP to $01FF).", gsSchema);
 
     // list_devices
-    addTool("list_devices", "List all devices in a machine", cmSchema);
+    addTool("list_devices", "List all IO devices registered in the machine (name, address range)", cmSchema);
 
     // get_device_info
     Json gdiSchema(Json::OBJ); gdiSchema.oVal["type"] = Json("object");
     Json gdiProps(Json::OBJ); gdiProps.oVal["machine_id"] = midProp;
-    Json devProp(Json::OBJ); devProp.oVal["type"] = Json("string");
+    Json devProp(Json::OBJ); devProp.oVal["type"] = Json("string"); devProp.oVal["description"] = Json("Device name from list_devices");
     gdiProps.oVal["device"] = devProp;
     gdiSchema.oVal["properties"] = gdiProps;
     Json gdiReq(Json::ARR); gdiReq.push_back(Json("machine_id")); gdiReq.push_back(Json("device"));
     gdiSchema.oVal["required"] = gdiReq;
-    addTool("get_device_info", "Get detailed information about a device", gdiSchema);
+    addTool("get_device_info", "Get detailed register and status information for a specific device", gdiSchema);
 
     std::vector<std::string> pluginTools;
     PluginToolRegistry::instance().listTools(pluginTools);
@@ -975,16 +977,28 @@ Json handleToolsCall(const Json& params) {
             textItem.oVal["text"] = Json("Set logger '" + target + "' to " + levelStr);
         }
     } else if (name == "list_machines") {
-        std::vector<std::string> ids;
-        MachineRegistry::instance().enumerate(ids);
+        std::vector<std::pair<std::string, std::string>> entries;
+        MachineRegistry::instance().enumerateDetailed(entries);
         std::stringstream ss;
-        for (const auto& id : ids) ss << id << "\n";
+        for (const auto& entry : entries) {
+            ss << entry.first;
+            if (!entry.second.empty()) ss << " — " << entry.second;
+            ss << "\n";
+        }
         textItem.oVal["text"] = Json(ss.str().empty() ? "(none)\n" : ss.str());
     } else if (name == "create_machine") {
         std::string mid = args["machine_id"].sVal;
         MachineState* ms = getMachine(mid);
         if (!ms) {
-            textItem.oVal["text"] = Json("Error: Unknown machine ID: " + mid);
+            std::vector<std::string> validIds;
+            MachineRegistry::instance().enumerate(validIds);
+            std::string validList;
+            for (size_t i = 0; i < validIds.size(); ++i) {
+                if (i > 0) validList += ", ";
+                validList += validIds[i];
+            }
+            textItem.oVal["text"] = Json("Error: Unknown machine ID: " + mid +
+                ". Valid IDs: " + (validList.empty() ? "(none)" : validList));
             textItem.oVal["isError"] = Json(true);
         } else {
             textItem.oVal["text"] = Json("Created machine: " + std::string(ms->machine->displayName));
