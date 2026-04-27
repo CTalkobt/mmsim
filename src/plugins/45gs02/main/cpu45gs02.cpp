@@ -1102,6 +1102,20 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0xDB: snprintf(buf, bufsz, "PHZ"); return (int)(currentAddr - addr);
         case 0xFB: snprintf(buf, bufsz, "PLZ"); return (int)(currentAddr - addr);
         case 0xEA: snprintf(buf, bufsz, "NOP"); return (int)(currentAddr - addr);
+
+        case 0x88: snprintf(buf, bufsz, "DEY"); return (int)(currentAddr - addr);
+        case 0xC8: snprintf(buf, bufsz, "INY"); return (int)(currentAddr - addr);
+        case 0xCA: snprintf(buf, bufsz, "DEX"); return (int)(currentAddr - addr);
+        case 0xE8: snprintf(buf, bufsz, "INX"); return (int)(currentAddr - addr);
+        
+        case 0x07: case 0x17: case 0x27: case 0x37: case 0x47: case 0x57: case 0x67: case 0x77:
+            snprintf(buf, bufsz, "RMB%d $%02X", (op >> 4), bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x87: case 0x97: case 0xA7: case 0xB7: case 0xC7: case 0xD7: case 0xE7: case 0xF7:
+            snprintf(buf, bufsz, "SMB%d $%02X", ((op - 0x87) >> 4), bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x0F: case 0x1F: case 0x2F: case 0x3F: case 0x4F: case 0x5F: case 0x6F: case 0x7F:
+            snprintf(buf, bufsz, "BBR%d $%02X,$%04X", (op >> 4), bus->peek8(currentAddr), (uint16_t)(currentAddr + 2 + (int8_t)bus->peek8(currentAddr+1))); return (int)(currentAddr + 2 - addr);
+        case 0x8F: case 0x9F: case 0xAF: case 0xBF: case 0xCF: case 0xDF: case 0xEF: case 0xFF:
+            snprintf(buf, bufsz, "BBS%d $%02X,$%04X", ((op - 0x8F) >> 4), bus->peek8(currentAddr), (uint16_t)(currentAddr + 2 + (int8_t)bus->peek8(currentAddr+1))); return (int)(currentAddr + 2 - addr);
         
         case 0xA9: snprintf(buf, bufsz, "LDA #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0xAD: snprintf(buf, bufsz, "%s $%04X", prefix, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
@@ -1324,8 +1338,11 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0x5C: snprintf(buf, bufsz, "MAP"); return (int)(currentAddr - addr);
         case 0x7C: snprintf(buf, bufsz, "EOM"); return (int)(currentAddr - addr);
 
+        case 0x89: snprintf(buf, bufsz, "BIT #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x24: snprintf(buf, bufsz, "%s $%02X", bit_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0x2C: snprintf(buf, bufsz, "%s $%04X", bit_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x34: snprintf(buf, bufsz, "BIT $%02X,X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0x3C: snprintf(buf, bufsz, "BIT $%04X,X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
 
         case 0x83: { int16_t r=(int16_t)bus->peek8(currentAddr)|((int16_t)bus->peek8(currentAddr+1)<<8); snprintf(buf, bufsz, "LBRA $%04X", (uint16_t)(currentAddr + 2 + r)); return (int)(currentAddr + 2 - addr); }
         case 0xD3: { int16_t r=(int16_t)bus->peek8(currentAddr)|((int16_t)bus->peek8(currentAddr+1)<<8); snprintf(buf, bufsz, "LBNE $%04X", (uint16_t)(currentAddr + 2 + r)); return (int)(currentAddr + 2 - addr); }
