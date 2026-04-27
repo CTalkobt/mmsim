@@ -1074,6 +1074,33 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0x03: snprintf(buf, bufsz, "SEE"); return (int)(currentAddr - addr);
         case 0x0B: snprintf(buf, bufsz, "TSY"); return (int)(currentAddr - addr);
         case 0x2B: snprintf(buf, bufsz, "TYS"); return (int)(currentAddr - addr);
+        case 0xAA: snprintf(buf, bufsz, "TAX"); return (int)(currentAddr - addr);
+        case 0x8A: snprintf(buf, bufsz, "TXA"); return (int)(currentAddr - addr);
+        case 0xA8: snprintf(buf, bufsz, "TAY"); return (int)(currentAddr - addr);
+        case 0x98: snprintf(buf, bufsz, "TYA"); return (int)(currentAddr - addr);
+        case 0xBA: snprintf(buf, bufsz, "TSX"); return (int)(currentAddr - addr);
+        case 0x9A: snprintf(buf, bufsz, "TXS"); return (int)(currentAddr - addr);
+        case 0x4B: snprintf(buf, bufsz, "TAZ"); return (int)(currentAddr - addr);
+        case 0x6B: snprintf(buf, bufsz, "TZA"); return (int)(currentAddr - addr);
+        case 0x5B: snprintf(buf, bufsz, "TAB"); return (int)(currentAddr - addr);
+        case 0x7B: snprintf(buf, bufsz, "TBA"); return (int)(currentAddr - addr);
+        case 0x18: snprintf(buf, bufsz, "CLC"); return (int)(currentAddr - addr);
+        case 0x38: snprintf(buf, bufsz, "SEC"); return (int)(currentAddr - addr);
+        case 0x58: snprintf(buf, bufsz, "CLI"); return (int)(currentAddr - addr);
+        case 0x78: snprintf(buf, bufsz, "SEI"); return (int)(currentAddr - addr);
+        case 0xD8: snprintf(buf, bufsz, "CLD"); return (int)(currentAddr - addr);
+        case 0xF8: snprintf(buf, bufsz, "SED"); return (int)(currentAddr - addr);
+        case 0xB8: snprintf(buf, bufsz, "CLV"); return (int)(currentAddr - addr);
+        case 0x08: snprintf(buf, bufsz, "PHP"); return (int)(currentAddr - addr);
+        case 0x28: snprintf(buf, bufsz, "PLP"); return (int)(currentAddr - addr);
+        case 0x48: snprintf(buf, bufsz, "PHA"); return (int)(currentAddr - addr);
+        case 0x68: snprintf(buf, bufsz, "PLA"); return (int)(currentAddr - addr);
+        case 0xDA: snprintf(buf, bufsz, "PHX"); return (int)(currentAddr - addr);
+        case 0xFA: snprintf(buf, bufsz, "PLX"); return (int)(currentAddr - addr);
+        case 0x5A: snprintf(buf, bufsz, "PHY"); return (int)(currentAddr - addr);
+        case 0x7A: snprintf(buf, bufsz, "PLY"); return (int)(currentAddr - addr);
+        case 0xDB: snprintf(buf, bufsz, "PHZ"); return (int)(currentAddr - addr);
+        case 0xFB: snprintf(buf, bufsz, "PLZ"); return (int)(currentAddr - addr);
         case 0xEA: snprintf(buf, bufsz, "NOP"); return (int)(currentAddr - addr);
         
         case 0xA9: snprintf(buf, bufsz, "LDA #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
@@ -1255,6 +1282,8 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0xD4: snprintf(buf, bufsz, "CPZ $%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0xDC: snprintf(buf, bufsz, "CPZ $%04X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
 
+        case 0xE3: snprintf(buf, bufsz, "INW $%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+        case 0xC3: snprintf(buf, bufsz, "DEW $%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
         case 0xEE: snprintf(buf, bufsz, "%s $%04X", inc_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0xFE: snprintf(buf, bufsz, "%s $%04X,X", inc_pfx, bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0xE6: snprintf(buf, bufsz, "%s $%02X", inc_pfx, bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
@@ -1270,11 +1299,26 @@ int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
         case 0x1A: snprintf(buf, bufsz, "%s A", inc_pfx); return (int)(currentAddr - addr);
         case 0x3A: snprintf(buf, bufsz, "%s A", dec_pfx); return (int)(currentAddr - addr);
 
+        case 0x20: snprintf(buf, bufsz, "JSR $%04X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0x22: snprintf(buf, bufsz, "JSR ($%04X)", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
         case 0x23: snprintf(buf, bufsz, "JSR ($%04X,X)", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x4C: snprintf(buf, bufsz, "JMP $%04X", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x6C: snprintf(buf, bufsz, "JMP ($%04X)", bus->peek8(currentAddr)|(bus->peek8(currentAddr+1)<<8)); return (int)(currentAddr + 2 - addr);
+        case 0x60: snprintf(buf, bufsz, "RTS"); return (int)(currentAddr - addr);
+        case 0x40: snprintf(buf, bufsz, "RTI"); return (int)(currentAddr - addr);
 
         case 0x63: { int16_t r=(int16_t)bus->peek8(currentAddr)|((int16_t)bus->peek8(currentAddr+1)<<8); snprintf(buf, bufsz, "BSR $%04X", (uint16_t)(currentAddr + 2 + r)); return (int)(currentAddr + 2 - addr); }
         case 0x62: snprintf(buf, bufsz, "RTN #$%02X", bus->peek8(currentAddr)); return (int)(currentAddr + 1 - addr);
+
+        case 0x80: snprintf(buf, bufsz, "BRA $%04X", (uint16_t)(currentAddr + 1 + (int8_t)bus->peek8(currentAddr))); return (int)(currentAddr + 1 - addr);
+        case 0xF0: snprintf(buf, bufsz, "BEQ $%04X", (uint16_t)(currentAddr + 1 + (int8_t)bus->peek8(currentAddr))); return (int)(currentAddr + 1 - addr);
+        case 0xD0: snprintf(buf, bufsz, "BNE $%04X", (uint16_t)(currentAddr + 1 + (int8_t)bus->peek8(currentAddr))); return (int)(currentAddr + 1 - addr);
+        case 0xB0: snprintf(buf, bufsz, "BCS $%04X", (uint16_t)(currentAddr + 1 + (int8_t)bus->peek8(currentAddr))); return (int)(currentAddr + 1 - addr);
+        case 0x90: snprintf(buf, bufsz, "BCC $%04X", (uint16_t)(currentAddr + 1 + (int8_t)bus->peek8(currentAddr))); return (int)(currentAddr + 1 - addr);
+        case 0x10: snprintf(buf, bufsz, "BPL $%04X", (uint16_t)(currentAddr + 1 + (int8_t)bus->peek8(currentAddr))); return (int)(currentAddr + 1 - addr);
+        case 0x30: snprintf(buf, bufsz, "BMI $%04X", (uint16_t)(currentAddr + 1 + (int8_t)bus->peek8(currentAddr))); return (int)(currentAddr + 1 - addr);
+        case 0x50: snprintf(buf, bufsz, "BVC $%04X", (uint16_t)(currentAddr + 1 + (int8_t)bus->peek8(currentAddr))); return (int)(currentAddr + 1 - addr);
+        case 0x70: snprintf(buf, bufsz, "BVS $%04X", (uint16_t)(currentAddr + 1 + (int8_t)bus->peek8(currentAddr))); return (int)(currentAddr + 1 - addr);
 
         case 0x42: snprintf(buf, bufsz, "%s", neg_pfx); return (int)(currentAddr - addr);
         case 0x5C: snprintf(buf, bufsz, "MAP"); return (int)(currentAddr - addr);
