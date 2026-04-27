@@ -1369,12 +1369,37 @@ Json handleToolsCall(const Json& params) {
     return res;
 }
 
+static Json handleInitialize(const Json& params) {
+    (void)params;
+    Json res(Json::OBJ);
+    res.oVal["protocolVersion"] = Json("2024-11-05");
+
+    Json info(Json::OBJ);
+    info.oVal["name"] = Json("mmemu-mcp");
+    info.oVal["version"] = Json("0.1.0");
+    res.oVal["serverInfo"] = info;
+
+    Json caps(Json::OBJ);
+    Json toolsCap(Json::OBJ);
+    caps.oVal["tools"] = toolsCap;
+    Json resCap(Json::OBJ);
+    caps.oVal["resources"] = resCap;
+    res.oVal["capabilities"] = caps;
+    return res;
+}
+
 static Json handleCall(const std::string& method, const Json& params) {
-    if (method == "list_resources") return handleResourcesList();
-    if (method == "read_resource") return handleResourcesRead(params);
-    if (method == "call_tool") return handleToolsCall(params);
-    if (method == "describe") return handleDescribe();
-    
+    if (method == "initialize")              return handleInitialize(params);
+    if (method == "tools/list")              return handleDescribe();
+    if (method == "tools/call")              return handleToolsCall(params);
+    if (method == "resources/list")           return handleResourcesList();
+    if (method == "resources/read")           return handleResourcesRead(params);
+    // Keep legacy names for backward compat
+    if (method == "list_resources")           return handleResourcesList();
+    if (method == "read_resource")            return handleResourcesRead(params);
+    if (method == "call_tool")               return handleToolsCall(params);
+    if (method == "describe")                return handleDescribe();
+
     Json res(Json::OBJ);
     res.oVal["error"] = Json("Method not found");
     return res;
@@ -1388,28 +1413,48 @@ void mcpCleanup() {
 #ifndef TEST_BUILD
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
-    
+
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty()) continue;
         try {
             Json req = Json::parse(line);
             std::string method = req["method"].sVal;
-            Json params = req["params"];
-            
-            Json res = handleCall(method, params);
-            res.oVal["id"] = req["id"];
-            std::cout << res.stringify() << std::endl;
+            Json params = req.contains("params") ? req["params"] : Json(Json::OBJ);
+
+            // Notifications (no id) get no response
+            if (method.rfind("notifications/", 0) == 0) continue;
+
+            Json inner = handleCall(method, params);
+
+            // Wrap in JSON-RPC 2.0 envelope
+            Json rpc(Json::OBJ);
+            rpc.oVal["jsonrpc"] = Json("2.0");
+            if (req.contains("id")) rpc.oVal["id"] = req["id"];
+            if (inner.contains("error")) {
+                Json err(Json::OBJ);
+                err.oVal["code"] = Json(-32601.0);
+                err.oVal["message"] = inner["error"];
+                rpc.oVal["error"] = err;
+            } else {
+                rpc.oVal["result"] = inner;
+            }
+            std::cout << rpc.stringify() << std::endl;
         } catch (const std::exception& e) {
-            Json res(Json::OBJ);
-            res.oVal["error"] = Json(e.what());
-            std::cout << res.stringify() << std::endl;
+            Json rpc(Json::OBJ);
+            rpc.oVal["jsonrpc"] = Json("2.0");
+            rpc.oVal["id"] = Json(); // null
+            Json err(Json::OBJ);
+            err.oVal["code"] = Json(-32700.0);
+            err.oVal["message"] = Json(e.what());
+            rpc.oVal["error"] = err;
+            std::cout << rpc.stringify() << std::endl;
         }
     }
-    
+
     g_machines.clear();
     PluginLoader::instance().unloadAll();
-    
+
     return 0;
 }
 #endif

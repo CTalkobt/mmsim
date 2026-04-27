@@ -135,6 +135,136 @@ TEST_CASE(cpu6502_illegal_opcodes) {
     ASSERT(cpu.regRead(1) == 0x42);
 }
 
+TEST_CASE(cpu6502_jsr_rts_stack) {
+    FlatMemoryBus bus("system", 16);
+    MOS6502 cpu;
+    cpu.setDataBus(&bus);
+
+    // Subroutine at $2000: STA $30; RTS
+    bus.write8(0x2000, 0x85); // STA $30
+    bus.write8(0x2001, 0x30);
+    bus.write8(0x2002, 0x60); // RTS
+
+    // Main at $1000: LDA #$AA; JSR $2000; LDA #$BB; BRK
+    bus.write8(0x1000, 0xA9); // LDA #$AA
+    bus.write8(0x1001, 0xAA);
+    bus.write8(0x1002, 0x20); // JSR $2000
+    bus.write8(0x1003, 0x00);
+    bus.write8(0x1004, 0x20);
+    bus.write8(0x1005, 0xA9); // LDA #$BB
+    bus.write8(0x1006, 0xBB);
+    bus.write8(0x1007, 0x00); // BRK
+
+    cpu.setPc(0x1000);
+    cpu.regWrite(3, 0xFF); // SP = $FF (top of stack page)
+    cpu.regWrite(5, FLAG_U);
+
+    cpu.step(); // LDA #$AA
+    ASSERT(cpu.regRead(0) == 0xAA);
+
+    cpu.step(); // JSR $2000
+    ASSERT(cpu.pc() == 0x2000);
+
+    // JSR pushes return address - 1 ($1004, the last byte of the JSR instruction).
+    // Stack should contain: $01FE = $04 (low), $01FF = $10 (high)
+    // SP should now be $FD (two bytes pushed)
+    ASSERT(cpu.regRead(3) == 0xFD);
+    uint8_t pushedHi = bus.read8(0x01FF);
+    uint8_t pushedLo = bus.read8(0x01FE);
+    uint16_t pushedAddr = (pushedHi << 8) | pushedLo;
+    ASSERT(pushedHi == 0x10); // high byte of $1004
+    ASSERT(pushedLo == 0x04); // low byte of $1004
+    ASSERT(pushedAddr == 0x1004); // return address - 1
+
+    // Verify the pushed address is NOT the instruction after JSR ($1005),
+    // but rather JSR_addr + 2 = $1004 (last byte of the 3-byte JSR instruction)
+    ASSERT(pushedAddr != 0x1005);
+
+    // Write a sentinel value adjacent to the stack entries to confirm
+    // no overwrite occurs during subroutine execution.
+    // Place sentinel at $01FD (current top of stack)
+    bus.write8(0x01FD, 0x42);
+
+    cpu.step(); // STA $30 (inside subroutine)
+    ASSERT(bus.read8(0x0030) == 0xAA);
+
+    // Verify sentinel and return address are still intact
+    ASSERT(bus.read8(0x01FD) == 0x42);
+    ASSERT(bus.read8(0x01FF) == 0x10);
+    ASSERT(bus.read8(0x01FE) == 0x04);
+
+    cpu.step(); // RTS — pops $1004, adds 1 -> PC = $1005
+    ASSERT(cpu.pc() == 0x1005);
+    ASSERT(cpu.regRead(3) == 0xFF); // SP restored
+
+    cpu.step(); // LDA #$BB
+    ASSERT(cpu.regRead(0) == 0xBB);
+}
+
+TEST_CASE(cpu6502_nested_jsr_rts) {
+    FlatMemoryBus bus("system", 16);
+    MOS6502 cpu;
+    cpu.setDataBus(&bus);
+
+    // Inner subroutine at $3000: INX; RTS
+    bus.write8(0x3000, 0xE8); // INX
+    bus.write8(0x3001, 0x60); // RTS
+
+    // Outer subroutine at $2000: JSR $3000; INX; RTS
+    bus.write8(0x2000, 0x20); // JSR $3000
+    bus.write8(0x2001, 0x00);
+    bus.write8(0x2002, 0x30);
+    bus.write8(0x2003, 0xE8); // INX
+    bus.write8(0x2004, 0x60); // RTS
+
+    // Main at $1000: LDX #$00; JSR $2000; STX $40; BRK
+    bus.write8(0x1000, 0xA2); // LDX #$00
+    bus.write8(0x1001, 0x00);
+    bus.write8(0x1002, 0x20); // JSR $2000
+    bus.write8(0x1003, 0x00);
+    bus.write8(0x1004, 0x20);
+    bus.write8(0x1005, 0x86); // STX $40
+    bus.write8(0x1006, 0x40);
+
+    cpu.setPc(0x1000);
+    cpu.regWrite(3, 0xFF);
+    cpu.regWrite(5, FLAG_U);
+
+    cpu.step(); // LDX #$00
+    cpu.step(); // JSR $2000
+    ASSERT(cpu.pc() == 0x2000);
+    ASSERT(cpu.regRead(3) == 0xFD);
+
+    // Verify outer return address ($1004) on stack
+    ASSERT(bus.read8(0x01FF) == 0x10);
+    ASSERT(bus.read8(0x01FE) == 0x04);
+
+    cpu.step(); // JSR $3000 (nested)
+    ASSERT(cpu.pc() == 0x3000);
+    ASSERT(cpu.regRead(3) == 0xFB);
+
+    // Verify inner return address ($2002) on stack
+    ASSERT(bus.read8(0x01FD) == 0x20);
+    ASSERT(bus.read8(0x01FC) == 0x02);
+
+    // Both return addresses intact
+    ASSERT(bus.read8(0x01FF) == 0x10); // outer hi
+    ASSERT(bus.read8(0x01FE) == 0x04); // outer lo
+
+    cpu.step(); // INX (X=1)
+    cpu.step(); // RTS -> $2003
+    ASSERT(cpu.pc() == 0x2003);
+    ASSERT(cpu.regRead(3) == 0xFD);
+
+    cpu.step(); // INX (X=2)
+    cpu.step(); // RTS -> $1005
+    ASSERT(cpu.pc() == 0x1005);
+    ASSERT(cpu.regRead(3) == 0xFF);
+
+    cpu.step(); // STX $40
+    ASSERT(bus.read8(0x0040) == 0x02);
+}
+
 TEST_CASE(cpu6502_flags_overflow) {
     FlatMemoryBus bus("system", 16);
     MOS6502 cpu;
