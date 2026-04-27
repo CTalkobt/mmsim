@@ -1,6 +1,6 @@
 # mmemu — Multi Machine Emulator
 # Top-level Makefile
-.PHONY: all cli gui mcp libs test plugins clean man
+.PHONY: all cli gui mcp libs test test-mcp plugins clean man serve
 
 all: cli gui mcp plugins
 
@@ -504,8 +504,12 @@ src/mcp/main/main_test.o: src/mcp/main/main.cpp
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-test: $(TEST_BIN) plugins test-mega65
+test: $(TEST_BIN) plugins test-mega65 test-mcp
 	./$(TEST_BIN)
+
+test-mcp: $(MCP_BIN) plugins
+	@echo "Running MCP integration tests..."
+	python3 src/mcp/test/mcp_test.py
 
 test-mega65: $(CLI_BIN) plugins
 	@echo "Running 45GS02 Validation Suite..."
@@ -513,6 +517,39 @@ test-mega65: $(CLI_BIN) plugins
 	./tests/45gs02/validate.py tests/45gs02/transfers.asm
 	./tests/45gs02/validate.py tests/45gs02/advanced.asm
 	./tests/45gs02/validate.py tests/45gs02/quad.asm
+
+serve: $(MCP_BIN) plugins
+	@echo "============================================"
+	@echo " mmemu MCP server"
+	@echo "============================================"
+	@echo ""
+	@echo "--- Claude (claude_desktop_config.json or .mcp.json) ---"
+	@echo '{'
+	@echo '  "mcpServers": {'
+	@echo '    "mmemu": {'
+	@echo '      "command": "$(CURDIR)/$(MCP_BIN)",'
+	@echo '      "args": [],'
+	@echo '      "cwd": "$(CURDIR)"'
+	@echo '    }'
+	@echo '  }'
+	@echo '}'
+	@echo ""
+	@echo "--- Gemini (mcp_config.json) ---"
+	@echo '{'
+	@echo '  "mcpServers": {'
+	@echo '    "mmemu": {'
+	@echo '      "command": "$(CURDIR)/$(MCP_BIN)",'
+	@echo '      "args": [],'
+	@echo '      "cwd": "$(CURDIR)",'
+	@echo '      "timeout": 30'
+	@echo '    }'
+	@echo '  }'
+	@echo '}'
+	@echo ""
+	@echo "============================================"
+	@echo "Starting server on stdio..."
+	@echo "============================================"
+	@exec $(CURDIR)/$(MCP_BIN)
 
 man:
 	mkdir -p $(MANDIR)

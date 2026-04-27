@@ -1335,13 +1335,17 @@ Json handleToolsCall(const Json& params) {
             textItem.oVal["isError"] = Json(true);
         } else {
             const auto& bps = ms->dbg->breakpoints().breakpoints();
-            std::stringstream ss;
-            ss << "ID  Type   Addr  En  Hits\n";
-            for (const auto& bp : bps) {
-                const char* t = (bp.type == BreakpointType::EXEC) ? "exec" : (bp.type == BreakpointType::READ_WATCH ? "read" : "write");
-                ss << std::left << std::setw(4) << bp.id << std::setw(7) << t << "$" << toHex(bp.addr) << "  " << (bp.enabled ? "Y" : "N") << "   " << bp.hitCount << "\n";
+            if (bps.empty()) {
+                textItem.oVal["text"] = Json("No breakpoints set");
+            } else {
+                std::stringstream ss;
+                ss << "ID  Type   Addr  En  Hits\n";
+                for (const auto& bp : bps) {
+                    const char* t = (bp.type == BreakpointType::EXEC) ? "exec" : (bp.type == BreakpointType::READ_WATCH ? "read" : "write");
+                    ss << std::left << std::setw(4) << bp.id << std::setw(7) << t << "$" << toHex(bp.addr) << "  " << (bp.enabled ? "Y" : "N") << "   " << bp.hitCount << "\n";
+                }
+                textItem.oVal["text"] = Json(ss.str());
             }
-            textItem.oVal["text"] = Json(ss.str().empty() ? "(no breakpoints)\n" : ss.str());
         }
     } else if (name == "get_stack") {
         std::string mid = args["machine_id"].sVal;
@@ -1413,6 +1417,9 @@ void mcpCleanup() {
 #ifndef TEST_BUILD
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
+
+    LogRegistry::instance().init();
+    PluginLoader::instance().loadFromStandardLocations();
 
     std::string line;
     while (std::getline(std::cin, line)) {
