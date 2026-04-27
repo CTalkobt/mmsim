@@ -951,7 +951,20 @@ Json handleToolsCall(const Json& params) {
             textItem.oVal["text"] = Json("Error: Invalid machine ID");
             textItem.oVal["isError"] = Json(true);
         } else {
-            if (ms->machine->onReset) ms->machine->onReset(*ms->machine);
+            if (ms->machine->onReset) {
+                ms->machine->onReset(*ms->machine);
+            } else {
+                // Raw machines don't set onReset — reset components directly
+                if (ms->machine->ioRegistry) ms->machine->ioRegistry->resetAll();
+                for (auto& slot : ms->machine->cpus)
+                    if (slot.cpu) slot.cpu->reset();
+                for (auto& slot : ms->machine->buses)
+                    if (slot.bus) slot.bus->reset();
+            }
+            if (ms->dbg) {
+                ms->dbg->breakpoints().clearHitCounts();
+                ms->dbg->stackTrace().clear();
+            }
             textItem.oVal["text"] = Json("Machine " + mid + " reset.");
         }
     } else if (name == "list_loggers") {
@@ -988,6 +1001,8 @@ Json handleToolsCall(const Json& params) {
         textItem.oVal["text"] = Json(ss.str().empty() ? "(none)\n" : ss.str());
     } else if (name == "create_machine") {
         std::string mid = args["machine_id"].sVal;
+        // Destroy any existing instance so getMachine creates a fresh one
+        g_machines.erase(mid);
         MachineState* ms = getMachine(mid);
         if (!ms) {
             std::vector<std::string> validIds;
