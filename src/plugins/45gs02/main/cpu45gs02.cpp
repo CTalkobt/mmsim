@@ -241,8 +241,8 @@ int MOS45GS02::step() {
         case 0x00: m_state.haltLine = 1; break; // BRK
         case 0x02: m_state.p &= ~FLAG_E; break; // CLE
         case 0x03: m_state.p |=  FLAG_E; break; // SEE
-        case 0x0B: m_state.y = (uint8_t)(m_state.sp & 0xFF); updateNZ(m_state.y); break; // TSY
-        case 0x2B: m_state.sp = (m_state.sp & 0xFF00) | m_state.y; break; // TYS
+        case 0x0B: m_state.y = (uint8_t)((m_state.sp >> 8) & 0xFF); updateNZ(m_state.y); break; // TSY
+        case 0x2B: m_state.sp = (m_state.sp & 0x00FF) | ((uint16_t)m_state.y << 8); break; // TYS
         case 0xEA: break; // NOP (naked NOP)
         
         // --- 1. Load / Store ---
