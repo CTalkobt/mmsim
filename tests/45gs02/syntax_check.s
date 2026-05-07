@@ -1,9 +1,8 @@
-.cpu _45gs02
+; 45GS02 Syntax Check Test
+EXIT_TRIGGER = $d6cf
+RESULTS_BASE = $0400
 
-.const EXIT_TRIGGER = $d6cf
-.const RESULTS_BASE = $0400
-
-* = $2000 "Program"
+.org $2000
 
 start:
     lda #$01

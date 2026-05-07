@@ -518,10 +518,10 @@ test-mcp: $(MCP_BIN) plugins
 
 test-mega65: $(CLI_BIN) plugins
 	@echo "Running 45GS02 Validation Suite..."
-	./tests/45gs02/validate.py tests/45gs02/arithmetic.asm
-	./tests/45gs02/validate.py tests/45gs02/transfers.asm
-	./tests/45gs02/validate.py tests/45gs02/advanced.asm
-	./tests/45gs02/validate.py tests/45gs02/quad.asm
+	./tests/45gs02/validate.py tests/45gs02/arithmetic.s
+	./tests/45gs02/validate.py tests/45gs02/transfers.s
+	./tests/45gs02/validate.py tests/45gs02/advanced.s
+	./tests/45gs02/validate.py tests/45gs02/quad.s
 
 serve: $(MCP_BIN) plugins
 	@echo "============================================"

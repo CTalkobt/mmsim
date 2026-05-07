@@ -1,15 +1,13 @@
-// KickAssembler 45GS02 Arithmetic Test (Memory Results)
-.cpu _45gs02
+; 45GS02 Arithmetic Test (Memory Results)
+SERIAL_DATA = $d6c1
+EXIT_TRIGGER = $d6cf
+MEGA65_KEY = $d02f
+RESULTS_BASE = $0400
 
-.const SERIAL_DATA = $d6c1
-.const EXIT_TRIGGER = $d6cf
-.const MEGA65_KEY   = $d02f  // VIC-IV I/O mode key: $47,$53 unlocks MEGA65 I/O space
-.const RESULTS_BASE = $0400
-
-* = $2000 "Program"
+.org $2000
 
 start:
-    // Initialize results memory to $20 (space)
+    ; Initialize results memory to $20 (space)
     lda #$20
     ldx #0
 loop_clear:
@@ -17,7 +15,7 @@ loop_clear:
     inx
     bne loop_clear
 
-    // Test ADC: 1 + 1 = 2
+    ; Test ADC: 1 + 1 = 2
     clc
     lda #1
     adc #1
@@ -31,7 +29,7 @@ adc1_ok:
     sta RESULTS_BASE
 
 test_sbc:
-    // Test SBC: 5 - 3 = 2
+    ; Test SBC: 5 - 3 = 2
     sec
     lda #5
     sbc #3
@@ -45,9 +43,9 @@ sbc1_ok:
     sta RESULTS_BASE + 1
 
 end:
-    lda #10 // Newline for serial log still (optional)
+    lda #10
     sta SERIAL_DATA
-    lda #$47        // Unlock MEGA65 I/O mode so $D6CF reaches MEGA65 I/O space
+    lda #$47
     sta MEGA65_KEY
     lda #$53
     sta MEGA65_KEY

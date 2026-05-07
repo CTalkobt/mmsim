@@ -1,11 +1,9 @@
-// KickAssembler 45GS02 Quad Instructions Test
-.cpu _45gs02
+; 45GS02 Quad Instructions Test
+EXIT_TRIGGER = $d6cf
+MEGA65_KEY = $d02f
+RESULTS_BASE = $0400
 
-.const EXIT_TRIGGER = $d6cf
-.const MEGA65_KEY   = $d02f  // VIC-IV I/O mode key: $47,$53 unlocks MEGA65 I/O space
-.const RESULTS_BASE = $0400
-
-* = $2000 "Program"
+.org $2000
 
 start:
     lda #$20
@@ -15,12 +13,12 @@ loop_clear:
     inx
     bne loop_clear
 
-    // 1. Test LDQ / STQ Zero Page
+    ; 1. Test LDQ / STQ Zero Page
     lda #$11
     ldx #$22
     ldy #$33
     ldz #$44
-    stq $10         // $10=$11, $11=$22, $12=$33, $13=$44
+    stq $10
     
     lda #0
     ldx #0
@@ -30,23 +28,23 @@ loop_clear:
     ldq $10
     
     cpx #$22
-    lbne zp_fail
+    bne zp_fail
     cpy #$33
-    lbne zp_fail
+    bne zp_fail
     cpz #$44
-    lbne zp_fail
+    bne zp_fail
     cmp #$11
-    lbne zp_fail
+    bne zp_fail
 
     lda #$01
     sta RESULTS_BASE
 
-    // 2. Test LDQ / STQ Absolute
+    ; 2. Test LDQ / STQ Absolute
     lda #$55
     ldx #$66
     ldy #$77
     ldz #$88
-    stq $1000       // $1000=$55, $1001=$66, $1002=$77, $1003=$88
+    stq $1000
     
     lda #0
     ldx #0
@@ -56,19 +54,18 @@ loop_clear:
     ldq $1000
     
     cpx #$66
-    lbne abs_fail
+    bne abs_fail
     cpy #$77
-    lbne abs_fail
+    bne abs_fail
     cpz #$88
-    lbne abs_fail
+    bne abs_fail
     cmp #$55
-    lbne abs_fail
+    bne abs_fail
 
     lda #$01
     sta RESULTS_BASE + 1
 
-    // 3. Test LDQ / STQ 32-bit Indirect [zp],z
-    // We'll point to $2000
+    ; 3. Test LDQ / STQ 32-bit Indirect [zp],z
     lda #$00
     sta $20
     lda #$20
@@ -84,7 +81,7 @@ loop_clear:
     ldz #$DD
     
     ldz #0
-    .byte $42, $42, $EA, $92, $20  // STQ [$20],z
+    .byte $42, $42, $EA, $92, $20
     
     lda #0
     ldx #0
@@ -92,56 +89,55 @@ loop_clear:
     ldz #0
     
     ldz #0
-    .byte $42, $42, $EA, $B2, $20  // LDQ [$20],z
+    .byte $42, $42, $EA, $B2, $20
     
     cpx #$BB
-    lbne ind_fail
+    bne ind_fail
     cpy #$CC
-    lbne ind_fail
+    bne ind_fail
     cpz #$00          
-    lbne ind_fail
+    bne ind_fail
     cmp #$AA
-    lbne ind_fail
+    bne ind_fail
 
     lda #$01
     sta RESULTS_BASE + 2
 
-    // 4. Test ADCQ
+    ; 4. Test ADCQ
     lda #$01
     ldx #$00
     ldy #$00
     ldz #$00
-    stq $10         // $10 = 0x00000001
+    stq $10
     
     lda #$FF
     ldx #$00
     ldy #$00
     ldz #$00
     clc
-    adcq $10        // Q = 0x000000FF + 0x00000001 = 0x00000100
+    adcq $10
     
-    cpx #$01        // X should be $01
-    lbne arith_fail
-    cmp #$00        // A should be $00
-    lbne arith_fail
+    cpx #$01
+    bne arith_fail
+    cmp #$00
+    bne arith_fail
     
     lda #$01
     sta RESULTS_BASE + 3
 
-    // 5. Test ASLQ
+    ; 5. Test ASLQ
     lda #$00
     ldx #$00
     ldy #$00
     ldz #$80
-    // Q = 0x80000000
     
-    aslq            // Q = 0x00000000, Carry = 1
+    aslq
     
-    lbcc shift_fail // Should have carry
+    bcc shift_fail
     cmp #$00
-    lbne shift_fail
+    bne shift_fail
     cpz #$00
-    lbne shift_fail
+    bne shift_fail
 
     lda #$01
     sta RESULTS_BASE + 4
@@ -173,7 +169,7 @@ shift_fail:
     jmp end
 
 end:
-    lda #$47        // Unlock MEGA65 I/O mode so $D6CF reaches MEGA65 I/O space
+    lda #$47
     sta MEGA65_KEY
     lda #$53
     sta MEGA65_KEY

@@ -1,12 +1,10 @@
-// KickAssembler 45GS02 Full single-byte + Addressing Modes + Quad Test
-.cpu _45gs02
+; 45GS02 Full single-byte + Addressing Modes + Quad Test
+RESULTS = $0400
+EXIT = $d6cf
+SUCCESS = $55
+MEGA65_KEY = $d02f
 
-.const RESULTS = $0400
-.const EXIT = $d6cf
-.const SUCCESS = $55
-.const MEGA65_KEY = $d02f
-
-* = $2000 "Program"
+.org $2000
 
 start:
     lda #$20
@@ -16,7 +14,7 @@ loop_clear:
     inx
     bne loop_clear
 
-    // 1. TSB/TRB abs
+    ; 1. TSB/TRB abs
     lda #$00
     sta $1000
     lda #$FF
@@ -31,13 +29,13 @@ tsb_abs_ok:
     lda #SUCCESS
     sta RESULTS + 0
 
-    // 2. ADC abs,X
+    ; 2. ADC abs,X
     lda #$10
     sta $1005
     ldx #5
     clc
     lda #$02
-    adc $1000,x // ADC $1005
+    adc $1000,x
     cmp #$12
     beq adc_absx_ok
     lda #$E2
@@ -47,13 +45,13 @@ adc_absx_ok:
     lda #SUCCESS
     sta RESULTS + 1
 
-    // 3. AND (zp),Y
+    ; 3. AND (zp),Y
     lda #$AA
     sta $1000
     lda #$00
     sta $20
     lda #$10
-    sta $21    // $20 points to $1000
+    sta $21
     ldy #0
     lda #$FF
     and ($20),y
@@ -66,7 +64,7 @@ and_ind_ok:
     lda #SUCCESS
     sta RESULTS + 2
 
-    // 4. Quad LDQ/STQ abs
+    ; 4. Quad LDQ/STQ abs
     lda #$11
     sta $1100
     lda #$22
@@ -76,11 +74,11 @@ and_ind_ok:
     lda #$44
     sta $1103
     
-    // LDQ abs
-    .byte $42, $42, $AD, $00, $11 // LDQ $1100
+    ; LDQ abs
+    .byte $42, $42, $AD, $00, $11
     
-    // STQ zp
-    .byte $42, $42, $85, $30 // STQ $30
+    ; STQ zp
+    .byte $42, $42, $85, $30
     
     lda $30
     cmp #$11
@@ -103,12 +101,12 @@ quad_fail:
     jmp end
 quad_ok:
 
-    // 5. INQ A (Quad INC A)
+    ; 5. INQ A (Quad INC A)
     lda #$FF
     ldx #0
     ldy #0
-    ldz #0 // Q = $000000FF
-    .byte $42, $42, $1A // INQ A
+    ldz #0
+    .byte $42, $42, $1A
     cmp #$00
     bne inq_fail
     cpx #$01
@@ -122,7 +120,7 @@ inq_fail:
 inq_ok:
 
 end:
-    lda #$47        // Unlock MEGA65 I/O mode
+    lda #$47
     sta MEGA65_KEY
     lda #$53
     sta MEGA65_KEY

@@ -6,21 +6,26 @@ import time
 
 XMEGA65 = "/usr/local/bin/xemu-xmega65"
 MMSIM_CLI = "./bin/mmemu-cli"
-KICKASS = "tools/KickAss65CE02.jar"
+CA45 = "/usr/local/bin/ca45"
 
 EXIT_TRIGGER_ADDR = 0xD6CF
 EXIT_VALUE = 0x42
 
-def assemble(asm_path):
-    cmd = ["java", "-jar", KICKASS, asm_path, "-odir", "tests/45gs02/"]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    basename = os.path.basename(asm_path).replace(".asm", ".prg")
-    expected = f"tests/45gs02/tests/45gs02/{basename}"
-    if not os.path.exists(expected):
-         for root, dirs, files in os.walk("tests/45gs02/"):
-             if basename in files:
-                 return os.path.join(root, basename)
-    return expected
+def assemble(src_path):
+    # Determine output filename
+    basename = os.path.basename(src_path).replace(".s", ".prg")
+    output_path = f"tests/45gs02/tests/45gs02/{basename}"
+
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    # Compile with ca45
+    cmd = [CA45, src_path, "-o", output_path]
+    result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    if result.returncode == 0 and os.path.exists(output_path):
+        return output_path
+    return None
 
 def run_xmega65(prg_path):
     dump_path = "xmega65.dump"
@@ -83,17 +88,17 @@ def run_mmsim(prg_path):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: validate.py <test.asm>")
+        print("Usage: validate.py <test.s>")
         sys.exit(1)
 
-    asm = sys.argv[1]
-    prg = assemble(asm)
+    src_path = sys.argv[1]
+    prg = assemble(src_path)
 
-    if not os.path.exists(prg):
-        print(f"Assembly failed for {asm}")
+    if not prg or not os.path.exists(prg):
+        print(f"Assembly failed for {src_path}")
         sys.exit(1)
 
-    print(f"Validating {asm}...")
+    print(f"Validating {src_path}...")
     start_time = time.time()
     mmsim_res = run_mmsim(prg)
     if time.time() - start_time > 30:

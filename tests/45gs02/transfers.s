@@ -1,12 +1,10 @@
-// KickAssembler 45GS02 Register Transfer Test (Memory Results)
-.cpu _45gs02
+; 45GS02 Register Transfer Test (Memory Results)
+SERIAL_DATA = $d6c1
+EXIT_TRIGGER = $d6cf
+MEGA65_KEY = $d02f
+RESULTS_BASE = $0400
 
-.const SERIAL_DATA = $d6c1
-.const EXIT_TRIGGER = $d6cf
-.const MEGA65_KEY   = $d02f  // VIC-IV I/O mode key: $47,$53 unlocks MEGA65 I/O space
-.const RESULTS_BASE = $0400
-
-* = $2000 "Program"
+.org $2000
 
 start:
     lda #$20
@@ -16,7 +14,7 @@ loop_clear:
     inx
     bne loop_clear
 
-    // Test TAZ / TZA
+    ; Test TAZ / TZA
     lda #$55
     taz
     lda #$00
@@ -31,7 +29,7 @@ z_ok:
     sta RESULTS_BASE
 
 test_b:
-    // Test TAB / TBA
+    ; Test TAB / TBA
     lda #$AA
     tab
     lda #$00
@@ -46,7 +44,7 @@ b_ok:
     sta RESULTS_BASE + 1
 
 end:
-    lda #$47        // Unlock MEGA65 I/O mode so $D6CF reaches MEGA65 I/O space
+    lda #$47
     sta MEGA65_KEY
     lda #$53
     sta MEGA65_KEY
