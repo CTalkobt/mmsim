@@ -24,6 +24,18 @@
   [x] - Update validate.py for ca45 assembler
   [x] - Update documentation with ca45 project link
 
+## MEGA65 Emulation
+[x] Phase 20.2: F018B DMA Controller (basic implementation)
+  [x] - Register file ($D700-$D70F) with shadow array
+  [x] - Job list parsing and execution
+  [x] - Copy, Fill, Swap operations
+  [x] - 28-bit address support with bank register
+  [x] - CPU halt during DMA execution
+  [x] - Plugin creation and machine wiring
+  [ ] - Mix operation implementation
+  [ ] - Fractional stepping and modulus modes
+  [ ] - Interrupt on completion (bit 3)
+
 ## Assembler Support & Selection
 [ ] Add ca45 assembler backend support for GUI, CLI, and MCP (similar to KickAssembler)
   [ ] - Implement `Ca45AssemblerBackend` in libtoolchain
