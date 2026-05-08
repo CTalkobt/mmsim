@@ -1381,10 +1381,10 @@ bool MOS45GS02::isProgramEnd(IBus* bus) {
     if (m_state.haltLine) return true;
     if (bus && bus->isHaltRequested()) return true;
 
-    // Check for RTS/RTI on empty stack (SP at initial value)
+    // Check for RTS/RTI/RTN on empty stack (SP at initial value)
     if (m_state.sp == 0x01FF && bus) {
         uint8_t op = bus->peek8(m_state.pc);
-        if (op == 0x60 || op == 0x40 || op == 0x62) return true; // RTS, RTI, RTZ
+        if (op == 0x60 || op == 0x40 || op == 0x62) return true; // RTS, RTI, RTN
     }
 
     // Check for JMP * (infinite loop at current PC)
