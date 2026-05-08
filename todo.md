@@ -36,13 +36,15 @@
   [d] - Mix operation implementation
   [d] - Interrupt on completion (bit 3)
 
-## Phase 19: SparseMemoryBus(28) and MAP MMU
+## Phase 19: SparseMemoryBus(28) and MAP MMU ✓ COMPLETE
 [x] - SparseMemoryBus with 4KB lazy-allocated pages and pre-mapped ROM regions
 [x] - MapMmu as pure address translator (MAP instruction support)
 [x] - Snapshot serialization (sparse format)
 [x] - Unit tests for both components
+    - `test_sparse_memory.cpp`: Validates lazy allocation, ROM overlays, snapshots
+    - `test_map_mmu.cpp`: Validates memory mapping and translation
 
-## MEGA65 Machine Integration (Phase 21)
+## MEGA65 Machine Integration (Phase 21) - IN PROGRESS
 [x] - Wire MapMmu as CPU's bus pointer (CPU reads/writes via MapMmu → SparseMemoryBus)
 [x] - Wire MapMmu pointer to 45GS02 CPU for MAP instruction support
 [ ] - Implement MAP instruction (0x5C) in 45GS02 CPU to call MapMmu.setMapState()

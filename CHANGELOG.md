@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0-dev] - 2026-05-07
+
+### Added
+- **Phase 19: Sparse Memory and Memory Management Unit (MEGA65)**:
+    - **SparseMemoryBus**: 28-bit address space with 4KB lazy-allocated pages for efficient MEGA65 memory management.
+    - Pre-mapped ROM regions for KERNAL, BASIC, and Character ROM with configurable overlays.
+    - Snapshot serialization support for sparse memory format.
+    - **MapMmu**: Pure address translator implementing MEGA65 memory mapping (MAP instruction support).
+    - Full support for memory region translation with snapshot persistence.
+    - Unit tests validating both `SparseMemoryBus` and `MapMmu` functionality.
+- **Phase 21: MEGA65 Machine Factory (In Progress)**:
+    - Wire `MapMmu` as CPU's bus pointer for transparent address translation.
+    - Integration with 45GS02 CPU for MAP instruction support.
+    - Foundation for ROM loading and I/O personality switching.
+
+### Changed
+- **Memory Architecture**: Moved from flat 16-bit memory model to sparse 28-bit addressing for MEGA65 support.
+
 ## [0.7.0-dev] - 2026-04-25
 
 ### Added
