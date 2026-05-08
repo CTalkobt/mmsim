@@ -59,8 +59,13 @@ TEST_CASE(validate_all_plugins) {
     std::cout << "Validating Machines..." << std::endl;
     std::vector<std::string> machineIds;
     MachineRegistry::instance().enumerate(machineIds);
+    std::cout << "Total machines to validate: " << machineIds.size() << std::endl;
     for (const auto& id : machineIds) {
+        std::cout << "  Creating machine: " << id << std::flush << std::endl;
+        std::cerr << "[DEBUG] About to create machine: " << id << std::endl;
+        std::cerr.flush();
         MachineDescriptor* machine = MachineRegistry::instance().createMachine(id);
+        std::cout << "  Created machine: " << id << std::flush << std::endl;
         ASSERT(machine != nullptr);
         ASSERT(!machine->machineId.empty());
         std::cout << "  Machine: " << id << " (Descriptor ID: " << machine->machineId << ")" << std::endl;
@@ -69,12 +74,22 @@ TEST_CASE(validate_all_plugins) {
         if (machine->ioRegistry) {
             std::vector<IOHandler*> handlers;
             machine->ioRegistry->enumerate(handlers);
-            for (auto* h : handlers) {
+            std::cout << "    Devices in machine: " << handlers.size() << std::endl;
+            for (size_t i = 0; i < handlers.size(); ++i) {
+                std::cout << "      [" << i << "] Checking device pointer..." << std::flush;
+                auto* h = handlers[i];
+                if (h == nullptr) {
+                    std::cerr << " NULL!" << std::endl;
+                    ASSERT(h != nullptr);
+                }
+                std::cout << " (0x" << std::hex << (uintptr_t)h << std::dec << ") calling name()..." << std::flush;
                 const char* hname = h->name();
+                std::cout << " got 0x" << std::hex << (uintptr_t)hname << std::dec << std::endl;
                 if (hname == nullptr) {
-                    std::cerr << "CRITICAL: Machine '" << id << "' has device with NULL name!" << std::endl;
+                    std::cerr << "CRITICAL: Machine '" << id << "' device[" << i << "] has NULL name!" << std::endl;
                 }
                 ASSERT(hname != nullptr);
+                std::cout << "      [" << i << "] Device name: " << hname << std::endl;
             }
         }
         

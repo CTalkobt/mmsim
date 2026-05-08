@@ -4,7 +4,6 @@
 #include "libdevices/main/io_registry.h"
 #include "libmem/main/sparse_memory_bus.h"
 #include "plugins/devices/map_mmu/main/map_mmu.h"
-#include "plugins/45gs02/main/cpu45gs02.h"
 #include "util/path_util.h"
 #include <cstring>
 
@@ -27,13 +26,11 @@ MachineDescriptor* Mega65MachineFactory::create() {
     auto* mmu = new MapMmu("mmu", physBus);
     desc->buses.push_back({"mmu", mmu});
 
-    // Register a deleter for MapMmu since it's not owned by a vector above
-    desc->deleters.push_back([mmu]() { delete mmu; });
-
     // -----------------------------------------------------------------------
     // Create 45GS02 CPU
     // -----------------------------------------------------------------------
-    ICore* cpu = CoreRegistry::instance().createCore("45gs02");
+    CoreRegistry& reg = CoreRegistry::instance();
+    ICore* cpu = reg.createCore("45GS02");
     if (!cpu) {
         delete desc;
         return nullptr;
@@ -43,10 +40,10 @@ MachineDescriptor* Mega65MachineFactory::create() {
     cpu->setCodeBus(mmu);
 
     // Wire MapMmu to CPU so MAP instruction can update mapping state
-    MOS45GS02* cpu45gs02 = dynamic_cast<MOS45GS02*>(cpu);
-    if (cpu45gs02) {
-        cpu45gs02->setMapMmu(mmu);
-    }
+    // Note: We avoid the dynamic_cast here due to symbol visibility issues when
+    // loading plugins. The MAP instruction will need to be implemented differently.
+    // For now, the MapMmu is wired as the CPU's bus, so address translation works.
+    // TODO: Implement a virtual method on ICore to pass custom data like MapMmu.
 
     desc->cpus.push_back({"main", cpu, mmu, mmu, nullptr, true, 1});
 
