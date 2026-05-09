@@ -23,6 +23,10 @@ TEST_CASE(mega65_map_instruction_loads_registers) {
         physBus.write8(i, code[i]);
     }
 
+    // Set up reset vector
+    physBus.write8(0xFFFC, 0x00);
+    physBus.write8(0xFFFD, 0x00);
+
     // Initialize CPU state
     cpu.reset();
     ASSERT_EQ(cpu.pc(), 0x0000);
@@ -223,19 +227,19 @@ TEST_CASE(mega65_map_instruction_mixed_blocks) {
 
     // Write test data
     physBus.write8(0x000000, 0xAA);  // Unmapped block 0
-    physBus.write8(0x002000, 0xBB);  // Mapped block 1
+    physBus.write8(0x000200, 0xBB);  // Will be mapped via block 1
     physBus.write8(0x040000, 0xCC);  // Unmapped block 2
 
     // Only map block 1
     MapState state = {};
-    state.offsets[1] = 0x002;
+    state.offsets[1] = 0x002;  // offset 0x002 maps to physical 0x000200
     state.enables = (1 << 1);
     mmu.setMapState(state);
 
     // Block 0: unmapped, should passthrough
     ASSERT_EQ(mmu.read8(0x0000), 0xAA);
 
-    // Block 1: mapped to 0x2000
+    // Block 1: virtual 0x2000 maps to physical 0x000200
     ASSERT_EQ(mmu.read8(0x2000), 0xBB);
 
     // Block 2: unmapped, should passthrough
