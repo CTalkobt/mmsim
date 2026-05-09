@@ -494,6 +494,21 @@ Json handleDescribe() {
     gdiSchema.oVal["required"] = gdiReq;
     addTool("get_device_info", "Get detailed register and status information for a specific device", gdiSchema);
 
+    // asm
+    Json asmSchema(Json::OBJ); asmSchema.oVal["type"] = Json("object");
+    Json asmProps(Json::OBJ);
+    asmProps.oVal["machine_id"] = midProp;
+    Json asmSrcProp(Json::OBJ); asmSrcProp.oVal["type"] = Json("string");
+    asmSrcProp.oVal["description"] = Json("Assembly source code to compile");
+    asmProps.oVal["source"] = asmSrcProp;
+    Json asmLaProp(Json::OBJ); asmLaProp.oVal["type"] = Json("integer");
+    asmLaProp.oVal["description"] = Json("If set, write assembled bytes into machine memory at this address");
+    asmProps.oVal["load_addr"] = asmLaProp;
+    asmSchema.oVal["properties"] = asmProps;
+    Json asmReq(Json::ARR); asmReq.push_back(Json("machine_id")); asmReq.push_back(Json("source"));
+    asmSchema.oVal["required"] = asmReq;
+    addTool("asm", "Assemble source code for the machine's ISA. Returns JSON: {\"bytes\":[...],\"symbols\":{},\"errors\":[...]}. Optional load_addr writes assembled bytes into machine memory.", asmSchema);
+
     std::vector<std::string> pluginTools;
     PluginToolRegistry::instance().listTools(pluginTools);
     for (const auto& name : pluginTools) {
@@ -1156,6 +1171,75 @@ Json handleToolsCall(const Json& params) {
                 textItem.oVal["text"] = Json("Error: Device '" + devName + "' not found");
                 textItem.oVal["isError"] = Json(true);
             }
+        }
+    } else if (name == "asm") {
+        std::string mid = args["machine_id"].sVal;
+        std::string source = args["source"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            std::string isa = ms->cpu->isaName();
+            IAssembler* asmb = ToolchainRegistry::instance().createAssembler(isa);
+            std::vector<uint8_t> bytes;
+            std::vector<std::string> errors;
+
+            if (!asmb) {
+                errors.push_back("No assembler registered for ISA: " + isa);
+            } else {
+                uint32_t curAddr = 0;
+                std::istringstream lineStream(source);
+                std::string line;
+                while (std::getline(lineStream, line)) {
+                    std::string trimmed = line;
+                    trimmed.erase(0, trimmed.find_first_not_of(" \t"));
+                    if (trimmed.empty() || trimmed[0] == ';') continue;
+                    // Detect .org / *= directive to rebase current address
+                    std::string low = trimmed;
+                    std::transform(low.begin(), low.end(), low.begin(), ::tolower);
+                    if (low.size() >= 4 && low.substr(0, 4) == ".org") {
+                        size_t pos = line.find_first_of("$0123456789");
+                        if (pos != std::string::npos) {
+                            std::string addrStr = line.substr(pos);
+                            try {
+                                if (addrStr[0] == '$')
+                                    curAddr = std::stoul(addrStr.substr(1), nullptr, 16);
+                                else
+                                    curAddr = std::stoul(addrStr, nullptr, 0);
+                            } catch (...) { }
+                        }
+                        continue;
+                    }
+                    uint8_t buf[32];
+                    int n = asmb->assembleLine(line, buf, sizeof(buf), curAddr);
+                    if (n < 0) {
+                        errors.push_back("Error on line: " + line);
+                    } else {
+                        for (int i = 0; i < n; i++) bytes.push_back(buf[i]);
+                        curAddr += (uint32_t)n;
+                    }
+                }
+                delete asmb;
+            }
+
+            // Optionally write to machine memory
+            if (errors.empty() && !bytes.empty() && args.contains("load_addr")) {
+                uint32_t loadAddr = (uint32_t)args["load_addr"].nVal;
+                for (size_t i = 0; i < bytes.size(); i++)
+                    ms->bus->write8(loadAddr + (uint32_t)i, bytes[i]);
+            }
+
+            // Build result JSON
+            Json result(Json::OBJ);
+            Json byteArr(Json::ARR);
+            for (auto b : bytes) byteArr.push_back(Json((double)b));
+            result.oVal["bytes"] = byteArr;
+            result.oVal["symbols"] = Json(Json::OBJ);
+            Json errArr(Json::ARR);
+            for (auto& e : errors) errArr.push_back(Json(e));
+            result.oVal["errors"] = errArr;
+            textItem.oVal["text"] = Json(result.stringify());
         }
     } else if (name == "run_cpu") {
         std::string mid = args["machine_id"].sVal;

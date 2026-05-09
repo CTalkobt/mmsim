@@ -154,7 +154,18 @@ def run_tests():
     assert "raw6502" in res["result"]["contents"][0]["text"]
     print("Resource read OK")
 
-
+    print("\n--- 8. Assembler ---")
+    res = client.call_tool("asm", {
+        "machine_id": "raw6502",
+        "source": "LDA #$42\nNOP",
+        "load_addr": 0x1000
+    })
+    asm_result = json.loads(res["result"]["content"][0]["text"])
+    assert asm_result["errors"] == [], f"Unexpected errors: {asm_result['errors']}"
+    assert len(asm_result["bytes"]) >= 2, f"Expected assembled bytes, got: {asm_result['bytes']}"
+    res2 = client.call_tool("read_memory", {"machine_id": "raw6502", "addr": 0x1000, "size": 2})
+    assert "a9 42" in res2["result"]["content"][0]["text"].lower(), "LDA #$42 bytes not in memory"
+    print("Assembler OK")
 
     client.close()
     print("\nALL MCP TESTS PASSED")
