@@ -22,6 +22,9 @@
 #include "libdebug/main/breakpoint_list.h"
 #include "libdebug/main/stack_trace.h"
 #include "libdebug/main/expression_evaluator.h"
+#include "plugins/devices/map_mmu/main/map_mmu.h"
+#include "plugins/devices/map_mmu/main/key_register.h"
+#include "imap_controller.h"
 
 static bool resolveAddr(const Json& val, DebugContext* dbg, uint32_t& result) {
     if (val.type == Json::NUM) {
@@ -225,6 +228,48 @@ Json handleDescribe() {
     Json spReq(Json::ARR); spReq.push_back(Json("machine_id"));
     spSchema.oVal["required"] = spReq;
     addTool("search_prior", "Find the previous occurrence of the last search_memory pattern, wrapping at start of address space.", spSchema);
+
+    Json gmSchema(Json::OBJ);
+    gmSchema.oVal["type"] = Json("object");
+    Json gmProps(Json::OBJ);
+    gmProps.oVal["machine_id"] = midProp;
+    gmSchema.oVal["properties"] = gmProps;
+    Json gmReq(Json::ARR); gmReq.push_back(Json("machine_id"));
+    gmSchema.oVal["required"] = gmReq;
+    addTool("get_map_state", "Read current MEGA65 MAP configuration (block offsets and enable masks). Only available on mega65 machine.", gmSchema);
+
+    Json smSchema2(Json::OBJ);
+    smSchema2.oVal["type"] = Json("object");
+    Json smProps2(Json::OBJ);
+    smProps2.oVal["machine_id"] = midProp;
+    Json offProp(Json::OBJ); offProp.oVal["type"] = Json("string"); offProp.oVal["description"] = Json("Comma-separated list of up to 8 block offsets (e.g. \"0,1000,2000,3000,0,0,0,0\")");
+    smProps2.oVal["offsets"] = offProp;
+    Json enProp(Json::OBJ); enProp.oVal["type"] = Json("integer"); enProp.oVal["description"] = Json("Enable mask (0-255, bit i enables block i)");
+    smProps2.oVal["enables"] = enProp;
+    smSchema2.oVal["properties"] = smProps2;
+    Json smReq2(Json::ARR); smReq2.push_back(Json("machine_id")); smReq2.push_back(Json("offsets")); smReq2.push_back(Json("enables"));
+    smSchema2.oVal["required"] = smReq2;
+    addTool("set_map_state", "Configure MEGA65 address translation by setting MAP block offsets and enable mask. Only available on mega65 machine.", smSchema2);
+
+    Json gpSchema(Json::OBJ);
+    gpSchema.oVal["type"] = Json("object");
+    Json gpProps(Json::OBJ);
+    gpProps.oVal["machine_id"] = midProp;
+    gpSchema.oVal["properties"] = gpProps;
+    Json gpReq(Json::ARR); gpReq.push_back(Json("machine_id"));
+    gpSchema.oVal["required"] = gpReq;
+    addTool("get_personality", "Read current I/O personality mode (C64, C65, MEGA65, or ETHERNET). Only available if KEY register is present.", gpSchema);
+
+    Json spSchema2(Json::OBJ);
+    spSchema2.oVal["type"] = Json("object");
+    Json spProps2(Json::OBJ);
+    spProps2.oVal["machine_id"] = midProp;
+    Json persProp(Json::OBJ); persProp.oVal["type"] = Json("string"); persProp.oVal["description"] = Json("Personality mode: C64, C65, MEGA65, or ETHERNET");
+    spProps2.oVal["personality"] = persProp;
+    spSchema2.oVal["properties"] = spProps2;
+    Json spReq2(Json::ARR); spReq2.push_back(Json("machine_id")); spReq2.push_back(Json("personality"));
+    spSchema2.oVal["required"] = spReq2;
+    addTool("set_personality", "Switch I/O personality mode via KEY register knock sequence. Only available if KEY register is present.", spSchema2);
 
     Json mtSchema(Json::OBJ);
     mtSchema.oVal["type"] = Json("object");
@@ -771,6 +816,124 @@ Json handleToolsCall(const Json& params) {
                 std::stringstream ss;
                 ss << "Found at $" << std::hex << std::setw(4) << std::setfill('0') << found;
                 textItem.oVal["text"] = Json(ss.str());
+            }
+        }
+    } else if (name == "get_map_state") {
+        std::string mid = args["machine_id"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            IMapController* mapCtrl = ms->cpu->getMapMmu();
+            if (!mapCtrl) {
+                textItem.oVal["text"] = Json("Error: Machine does not have MAP controller (only mega65 supports this)");
+                textItem.oVal["isError"] = Json(true);
+            } else {
+                const MapState& state = mapCtrl->getMapState();
+                std::stringstream ss;
+                ss << "MAP State:\n";
+                ss << "  Enables: $" << std::hex << std::setw(2) << std::setfill('0') << (int)state.enables << "\n";
+                for (int i = 0; i < 8; i++) {
+                    ss << "  Block " << i << ": offset=$" << std::hex << std::setw(5) << std::setfill('0') << state.offsets[i];
+                    ss << " (enabled=" << ((state.enables & (1 << i)) ? "yes" : "no") << ")\n";
+                }
+                textItem.oVal["text"] = Json(ss.str());
+            }
+        }
+    } else if (name == "set_map_state") {
+        std::string mid = args["machine_id"].sVal;
+        std::string offsetsStr = args["offsets"].sVal;
+        uint8_t enables = (uint8_t)(int)args["enables"].nVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            IMapController* mapCtrl = ms->cpu->getMapMmu();
+            if (!mapCtrl) {
+                textItem.oVal["text"] = Json("Error: Machine does not have MAP controller (only mega65 supports this)");
+                textItem.oVal["isError"] = Json(true);
+            } else {
+                MapState newState = mapCtrl->getMapState();
+                newState.enables = enables;
+                std::stringstream pss(offsetsStr);
+                std::string token;
+                int idx = 0;
+                while (idx < 8 && std::getline(pss, token, ',')) {
+                    try {
+                        newState.offsets[idx] = std::stoul(token, nullptr, 0);
+                        idx++;
+                    } catch (...) {}
+                }
+                mapCtrl->setMapState(newState);
+                std::stringstream ss;
+                ss << "MAP state updated with " << idx << " offsets, enables=$" << std::hex << (int)enables;
+                textItem.oVal["text"] = Json(ss.str());
+            }
+        }
+    } else if (name == "get_personality") {
+        std::string mid = args["machine_id"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            IOHandler* keyReg = ms->machine->ioRegistry ? ms->machine->ioRegistry->findHandler("KEY") : nullptr;
+            if (!keyReg) {
+                textItem.oVal["text"] = Json("Error: Machine does not have KEY register (I/O personality not available)");
+                textItem.oVal["isError"] = Json(true);
+            } else {
+                KeyRegister* kr = static_cast<KeyRegister*>(keyReg);
+                std::string modeStr;
+                switch (kr->getCurrentPersonality()) {
+                    case IopersonalityMode::C64: modeStr = "C64"; break;
+                    case IopersonalityMode::C65: modeStr = "C65"; break;
+                    case IopersonalityMode::MEGA65: modeStr = "MEGA65"; break;
+                    case IopersonalityMode::ETHERNET: modeStr = "ETHERNET"; break;
+                    default: modeStr = "UNKNOWN"; break;
+                }
+                textItem.oVal["text"] = Json("Current personality: " + modeStr);
+            }
+        }
+    } else if (name == "set_personality") {
+        std::string mid = args["machine_id"].sVal;
+        std::string persStr = args["personality"].sVal;
+        MachineState* ms = getMachine(mid);
+        if (!ms) {
+            textItem.oVal["text"] = Json("Error: Invalid machine ID");
+            textItem.oVal["isError"] = Json(true);
+        } else {
+            IOHandler* keyReg = ms->machine->ioRegistry ? ms->machine->ioRegistry->findHandler("KEY") : nullptr;
+            if (!keyReg) {
+                textItem.oVal["text"] = Json("Error: Machine does not have KEY register (I/O personality not available)");
+                textItem.oVal["isError"] = Json(true);
+            } else {
+                KeyRegister* kr = static_cast<KeyRegister*>(keyReg);
+                const std::pair<uint8_t, uint8_t>* sequence = nullptr;
+                if (persStr == "C64") {
+                    static const std::pair<uint8_t, uint8_t> c64Seq = {0x00, 0x00};
+                    sequence = &c64Seq;
+                } else if (persStr == "C65") {
+                    static const std::pair<uint8_t, uint8_t> c65Seq = {0xA5, 0x96};
+                    sequence = &c65Seq;
+                } else if (persStr == "MEGA65") {
+                    static const std::pair<uint8_t, uint8_t> m65Seq = {0x47, 0x53};
+                    sequence = &m65Seq;
+                } else if (persStr == "ETHERNET") {
+                    static const std::pair<uint8_t, uint8_t> ethernetSeq = {0x45, 0x54};
+                    sequence = &ethernetSeq;
+                } else {
+                    textItem.oVal["text"] = Json("Error: Invalid personality (valid: C64, C65, MEGA65, ETHERNET)");
+                    textItem.oVal["isError"] = Json(true);
+                    sequence = nullptr;
+                }
+
+                if (sequence) {
+                    kr->ioWrite(ms->bus, 0xD02F, sequence->first);
+                    kr->ioWrite(ms->bus, 0xD02F, sequence->second);
+                    textItem.oVal["text"] = Json("Personality switched to " + persStr);
+                }
             }
         }
     } else if (name == "mount_tape") {

@@ -192,6 +192,35 @@ def run_tests():
     assert "Error" in res2["result"]["content"][0]["text"], "Expected error for no prior search"
     print("Search navigation OK")
 
+    print("\n--- 10. MEGA65-Specific Features ---")
+    # Note: MAP features require mega65 machine, which uses SparseMemoryBus + MapMmu
+    # Personality features require KEY register, which may not be in all machine setups
+
+    # Test that get_map_state fails gracefully on non-mega65 machines
+    res = client.call_tool("get_map_state", {"machine_id": "raw6502"})
+    assert "Error" in res["result"]["content"][0]["text"], "Expected error for non-mega65 machine"
+    print("get_map_state error handling OK")
+
+    # Test that get_personality fails gracefully if KEY register not available
+    res = client.call_tool("get_personality", {"machine_id": "raw6502"})
+    assert "Error" in res["result"]["content"][0]["text"], "Expected error when KEY register not available"
+    print("get_personality error handling OK")
+
+    # Test set_map_state error handling
+    res = client.call_tool("set_map_state", {"machine_id": "raw6502", "offsets": "0,0,0,0,0,0,0,0", "enables": 0})
+    assert "Error" in res["result"]["content"][0]["text"], "Expected error for non-mega65 machine"
+    print("set_map_state error handling OK")
+
+    # Test set_personality error handling
+    res = client.call_tool("set_personality", {"machine_id": "raw6502", "personality": "C64"})
+    assert "Error" in res["result"]["content"][0]["text"], "Expected error when KEY register not available"
+    print("set_personality error handling OK")
+
+    # Test invalid personality name
+    res = client.call_tool("set_personality", {"machine_id": "raw6502", "personality": "INVALID"})
+    assert "Error" in res["result"]["content"][0]["text"], "Expected error for invalid personality"
+    print("MEGA65-specific features error handling OK")
+
     client.close()
     print("\nALL MCP TESTS PASSED")
 
