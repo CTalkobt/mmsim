@@ -4,7 +4,6 @@
 #include "libdevices/main/io_registry.h"
 #include "libmem/main/sparse_memory_bus.h"
 #include "plugins/devices/map_mmu/main/map_mmu.h"
-#include "plugins/45gs02/main/cpu45gs02.h"
 #include "util/path_util.h"
 #include <cstring>
 
@@ -42,7 +41,7 @@ MachineDescriptor* Mega65MachineFactory::create() {
 
     // Wire MapMmu to CPU so MAP instruction can update mapping state
     // Use IMapController interface to avoid cross-plugin symbol visibility issues
-    dynamic_cast<MOS45GS02*>(cpu)->setMapMmu(static_cast<IMapController*>(mmu));
+    cpu->setMapMmu(static_cast<IMapController*>(mmu));
 
     desc->cpus.push_back({"main", cpu, mmu, mmu, nullptr, true, 1});
 

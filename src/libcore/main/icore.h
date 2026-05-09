@@ -5,6 +5,7 @@
 #include "libmem/main/ibus.h"
 
 class ISignalLine;
+class IMapController;
 
 /**
  * Register width.
@@ -129,6 +130,10 @@ public:
     virtual IBus* getIoBus()   const = 0;
 
     virtual uint64_t cycles() const = 0;
+
+    // Memory map support (MEGA65 MAP instruction)
+    virtual void          setMapMmu(IMapController*) { }
+    virtual IMapController* getMapMmu() const { return nullptr; }
 
     void setObserver(ExecutionObserver* obs) { m_observer = obs; }
     ExecutionObserver* getObserver() const { return m_observer; }

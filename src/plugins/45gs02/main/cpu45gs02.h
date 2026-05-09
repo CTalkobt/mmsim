@@ -102,8 +102,8 @@ public:
     uint64_t cycles() const override { return m_state.cycles; }
 
     // MEGA65 MAP instruction support (optional — only set if MapMmu is in use)
-    IMapController* getMapMmu() const { return m_mapMmu; }
-    void setMapMmu(IMapController* mmu) { m_mapMmu = mmu; }
+    IMapController* getMapMmu() const override { return m_mapMmu; }
+    void setMapMmu(IMapController* mmu) override { m_mapMmu = mmu; }
 
 private:
     CPU45GS02State m_state;
