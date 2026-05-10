@@ -45,7 +45,7 @@ LIBMEM_SRCS       = src/libmem/main/ibus.cpp src/libmem/main/memory_bus.cpp \
 LIBCORE_SRCS      = src/libcore/main/icore.cpp src/libcore/main/rom_loader.cpp src/libcore/main/core_registry.cpp \
 	src/libcore/main/machines/machine_registry.cpp src/libcore/main/libcore.cpp \
 	src/libcore/main/image_loader.cpp src/libcore/main/json_machine_loader.cpp \
-	src/libcore/main/path_util.cpp
+	src/libcore/main/path_util.cpp src/libcore/main/sim_config.cpp
 LIBDEVICES_SRCS   = src/libdevices/main/libdevices.cpp src/libdevices/main/io_registry.cpp \
                     src/libdevices/main/ivideo_output.cpp \
                     src/libdevices/main/device_registry.cpp src/libdevices/main/joystick.cpp \
@@ -71,6 +71,7 @@ PLUGIN_6502_SRCS = src/plugins/6502/main/cpu6502.cpp \
 	src/plugins/6502/main/plugin_init.cpp
 
 PLUGIN_45GS02_SRCS = src/plugins/45gs02/main/cpu45gs02.cpp \
+	src/plugins/45gs02/main/ca45_assembler.cpp \
 	src/plugins/45gs02/main/plugin_init.cpp
 
 PLUGIN_HYPERSERIAL_SRCS = src/plugins/devices/hyper_serial/main/hyper_serial.cpp \
@@ -210,7 +211,6 @@ TEST_SRCS = tests/src/test_main.cpp \
 	src/libtoolchain/test/test_toolchain.cpp \
 	src/libtoolchain/test/test_symbol_table_enhanced.cpp \
 	src/libcore/test/test_machine_symbols.cpp \
-	src/mcp/test/test_mcp_symbols.cpp \
 	src/plugins/6502/test/test_cpu6502.cpp \
 	src/plugins/6502/test/test_disasm6502.cpp \
 	src/plugins/6502/test/test_assembler6502.cpp \
