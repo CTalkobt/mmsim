@@ -16,12 +16,26 @@ public:
     virtual ~ExecutionObserver() {}
 
     /**
+     * Query whether disassembly is needed for onStep().
+     * Used to optimize the hot path when no debugging is active.
+     */
+    virtual bool needsDisasm() const { return true; }
+
+    /**
      * Called before each instruction executes.
      * Returns false to abort execution of the current instruction (e.g. breakpoint hit).
      */
     virtual bool onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
         (void)cpu; (void)bus; (void)entry;
         return true;
+    }
+
+    /**
+     * Called before each instruction executes, without disassembly.
+     * Used when needsDisasm() returns false to reduce observer overhead.
+     */
+    virtual void onStepLite(ICore* cpu, uint32_t pc) {
+        (void)cpu; (void)pc;
     }
 
     /**

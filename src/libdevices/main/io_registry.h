@@ -60,6 +60,12 @@ public:
      */
     void clear();
 
+    /**
+     * Return the lowest address that any registered handler claims.
+     * Returns UINT32_MAX if no handlers are registered or all have base address 0.
+     */
+    uint32_t lowestHandlerBase() const;
+
 private:
     std::vector<IOHandler*> m_handlers;
     std::vector<IOHandler*> m_ownedHandlers;

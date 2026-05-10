@@ -125,9 +125,13 @@ int MOS45GS02::step() {
 
     // Reset PC to startPc if observer fails
     if (m_observer) {
-        DisasmEntry entry; disassembleEntry(m_bus, startPc, &entry);
-        if (!m_observer->onStep(this, m_bus, entry)) {
-            return 1;
+        if (m_observer->needsDisasm()) {
+            DisasmEntry entry; disassembleEntry(m_bus, startPc, &entry);
+            if (!m_observer->onStep(this, m_bus, entry)) {
+                return 1;
+            }
+        } else {
+            m_observer->onStepLite(this, startPc);
         }
     }
 

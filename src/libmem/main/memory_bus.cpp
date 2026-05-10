@@ -32,6 +32,17 @@ const RomOverlay* FlatMemoryBus::findOverlay(uint32_t addr) const {
 
 uint8_t FlatMemoryBus::read8(uint32_t addr) {
     addr &= m_config.addrMask;
+    if (addr < m_ioLowBase) {
+        const RomOverlay* overlay = findOverlay(addr);
+        uint8_t val;
+        if (overlay) {
+            val = overlay->data[addr - overlay->base];
+        } else {
+            val = m_data[addr];
+        }
+        if (m_observer) m_observer->onMemoryRead(this, addr, val);
+        return val;
+    }
     if (m_ioRead) {
         uint8_t ioVal;
         if (m_ioRead(this, addr, &ioVal)) {
@@ -57,6 +68,23 @@ uint8_t FlatMemoryBus::read8Raw(uint32_t addr) {
 
 void FlatMemoryBus::write8(uint32_t addr, uint8_t val) {
     addr &= m_config.addrMask;
+    if (addr < m_ioLowBase) {
+        const RomOverlay* overlay = findOverlay(addr);
+        uint8_t before;
+        if (overlay) {
+            before = overlay->data[addr - overlay->base];
+        } else {
+            before = m_data[addr];
+        }
+        if (overlay && !overlay->writable) {
+            if (m_observer) m_observer->onMemoryWrite(this, addr, before, val);
+            return;
+        }
+        m_data[addr] = val;
+        if (m_observer) m_observer->onMemoryWrite(this, addr, before, val);
+        m_writeLog.push({addr, before, val});
+        return;
+    }
     uint8_t before = peek8(addr);
     if (m_ioWrite && m_ioWrite(this, addr, val)) {
         if (m_observer) m_observer->onMemoryWrite(this, addr, before, val);
@@ -77,12 +105,19 @@ void FlatMemoryBus::write8(uint32_t addr, uint8_t val) {
     }
 
     if (m_observer) m_observer->onMemoryWrite(this, addr, before, val);
-    
+
     m_writeLog.push({addr, before, val});
 }
 
 uint8_t FlatMemoryBus::peek8(uint32_t addr) {
     addr &= m_config.addrMask;
+    if (addr < m_ioLowBase) {
+        const RomOverlay* overlay = findOverlay(addr);
+        if (overlay) {
+            return overlay->data[addr - overlay->base];
+        }
+        return m_data[addr];
+    }
     if (m_ioRead) {
         uint8_t ioVal;
         if (m_ioRead(this, addr, &ioVal)) {

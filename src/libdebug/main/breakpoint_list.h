@@ -34,8 +34,10 @@ public:
     Breakpoint* checkRead(uint32_t addr, DebugContext* dbg);
 
     const std::vector<Breakpoint>& breakpoints() const { return m_breakpoints; }
+    bool hasExecBreakpoints() const { return m_execCount > 0; }
 
 private:
     std::vector<Breakpoint> m_breakpoints;
     int m_nextId = 1;
+    int m_execCount = 0;
 };

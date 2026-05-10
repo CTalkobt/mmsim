@@ -20,6 +20,17 @@ DebugContext::DebugContext(ICore* cpu, IBus* bus)
     : m_cpu(cpu), m_bus(bus) {
 }
 
+bool DebugContext::needsDisasm() const {
+    return true;
+}
+
+void DebugContext::onStepLite(ICore* cpu, uint32_t pc) {
+    TraceEntry te;
+    te.addr = pc;
+    te.cycles = cpu->cycles();
+    m_trace.push(te);
+}
+
 bool DebugContext::onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) {
     bool cont = true;
     for (auto* obs : ObserverRegistry::instance().observers()) {

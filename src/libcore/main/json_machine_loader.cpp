@@ -18,6 +18,7 @@
 #include <sstream>
 #include <map>
 #include <string>
+#include <iostream>
 
 // ---------------------------------------------------------------------------
 // Local signal-line helpers (CpuIrqLine, CpuNmiLine)
@@ -139,8 +140,10 @@ int JsonMachineLoader::registerAll(const nlohmann::json& doc) {
         std::string displayName;
         if (spec.contains("displayName") && spec["displayName"].is_string())
             displayName = spec["displayName"].get<std::string>();
+        std::cerr << "[JsonMachineLoader::registerAll] Registering machine: " << id << "\n" << std::flush;
         MachineRegistry::instance().registerMachine(id,
             [specCopy]() -> MachineDescriptor* {
+                std::cerr << "[JsonMachineLoader] Factory lambda called for machine\n" << std::flush;
                 return JsonMachineLoader::buildFromSpec(specCopy);
             }, displayName);
         ++count;
@@ -153,12 +156,16 @@ int JsonMachineLoader::registerAll(const nlohmann::json& doc) {
 // ---------------------------------------------------------------------------
 
 MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) {
+    std::cerr << "\n========== [JsonMachineLoader::buildFromSpec] CALLED ==========\n" << std::flush;
+    std::cerr << "Spec contents: " << spec.dump() << "\n" << std::flush;
     auto* desc = new MachineDescriptor();
 
-    desc->machineId    = spec.value("id",          "");
-    desc->displayName  = spec.value("displayName",  "");
-    desc->licenseClass = spec.value("licenseClass", "");
-    desc->sourceSpec   = spec;
+    desc->machineId        = spec.value("id",          "");
+    desc->displayName      = spec.value("displayName",  "");
+    desc->licenseClass     = spec.value("licenseClass", "");
+    desc->preferredAssembler = spec.value("assembler",  "");
+    desc->sourceSpec       = spec;
+    std::cerr << "[JsonMachineLoader::buildFromSpec] Machine ID: " << desc->machineId << "\n" << std::flush;
 
     // -----------------------------------------------------------------------
     // Step 3 — Bus
@@ -167,12 +174,16 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
     std::map<std::string, IBus*> busPtrs;
 
     if (spec.contains("bus")) {
+        std::cerr << "[JsonMachineLoader] spec contains 'bus' field\n" << std::flush;
         const auto& busSpec = spec["bus"];
         std::string busName = busSpec.value("name",     "system");
         int         addrBits = busSpec.value("addrBits", 16);
         bus = new FlatMemoryBus(busName, addrBits);
         desc->buses.push_back({busName, bus});
         busPtrs[busName] = bus;
+        std::cerr << "[JsonMachineLoader] Created bus: " << busName << " (" << desc->buses.size() << " buses total)\n" << std::flush;
+    } else {
+        std::cerr << "[JsonMachineLoader] ERROR: No 'bus' field in spec for " << desc->machineId << "\n" << std::flush;
     }
 
     // -----------------------------------------------------------------------
@@ -181,11 +192,14 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
     ICore* cpu = nullptr;
 
     if (spec.contains("cpu")) {
+        std::cerr << "[JsonMachineLoader] spec contains 'cpu' field\n" << std::flush;
         const auto& cpuSpec = spec["cpu"];
         std::string cpuType = cpuSpec.value("type", "");
+        std::cerr << "[JsonMachineLoader] Looking for CPU type: '" << cpuType << "'\n" << std::flush;
         cpu = CoreRegistry::instance().createCore(cpuType);
 
         if (cpu) {
+            std::cerr << "[JsonMachineLoader] CPU created successfully\n" << std::flush;
             std::string dataBusName = cpuSpec.value("dataBus", "system");
             std::string codeBusName = cpuSpec.value("codeBus", "system");
             IBus* dataBus = busPtrs.count(dataBusName) ? busPtrs[dataBusName] : bus;
@@ -193,7 +207,12 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
             cpu->setDataBus(dataBus);
             cpu->setCodeBus(codeBus);
             desc->cpus.push_back({"main", cpu, dataBus, codeBus, nullptr, true, 1});
+            std::cerr << "[JsonMachineLoader] CPU added to cpus list (" << desc->cpus.size() << " CPUs total)\n" << std::flush;
+        } else {
+            std::cerr << "[JsonMachineLoader] ERROR: Failed to create CPU of type '" << cpuType << "'\n" << std::flush;
         }
+    } else {
+        std::cerr << "[JsonMachineLoader] ERROR: No 'cpu' field in spec\n" << std::flush;
     }
 
     // -----------------------------------------------------------------------
@@ -473,6 +492,10 @@ MachineDescriptor* JsonMachineLoader::buildFromSpec(const nlohmann::json& spec) 
             }
             return false;
         });
+
+        if (io) {
+            bus->setIoLowBase(io->lowestHandlerBase());
+        }
     }
 
     // -----------------------------------------------------------------------

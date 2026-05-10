@@ -6,14 +6,17 @@
 int BreakpointList::add(uint32_t addr, BreakpointType type) {
     int id = m_nextId++;
     m_breakpoints.push_back({addr, type, "", 0, true, id});
+    if (type == BreakpointType::EXEC) m_execCount++;
     return id;
 }
 
 void BreakpointList::remove(int id) {
-    m_breakpoints.erase(
-        std::remove_if(m_breakpoints.begin(), m_breakpoints.end(),
-                       [id](const Breakpoint& b) { return b.id == id; }),
-        m_breakpoints.end());
+    auto it = std::find_if(m_breakpoints.begin(), m_breakpoints.end(),
+                           [id](const Breakpoint& b) { return b.id == id; });
+    if (it != m_breakpoints.end()) {
+        if (it->type == BreakpointType::EXEC) m_execCount--;
+        m_breakpoints.erase(it);
+    }
 }
 
 void BreakpointList::setEnabled(int id, bool enabled) {

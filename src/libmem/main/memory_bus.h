@@ -85,7 +85,9 @@ public:
      */
     void setIoHooks(std::function<bool(IBus*, uint32_t, uint8_t*)> readFn,
                     std::function<bool(IBus*, uint32_t, uint8_t)>  writeFn);
-    
+
+    void setIoLowBase(uint32_t base) { m_ioLowBase = base; }
+
     void setHaltCheck(std::function<bool()> checkFn) { m_haltCheck = std::move(checkFn); }
 
 private:
@@ -100,6 +102,7 @@ private:
     std::function<bool(IBus*, uint32_t, uint8_t*)> m_ioRead;
     std::function<bool(IBus*, uint32_t, uint8_t)>  m_ioWrite;
     std::function<bool()>                          m_haltCheck;
+    uint32_t m_ioLowBase = UINT32_MAX;
 
     const RomOverlay* findOverlay(uint32_t addr) const;
 };

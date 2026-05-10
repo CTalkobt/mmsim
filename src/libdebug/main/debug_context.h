@@ -19,7 +19,9 @@ class DebugContext : public ExecutionObserver {
 public:
     DebugContext(ICore* cpu, IBus* bus);
 
+    bool needsDisasm() const override;
     bool onStep(ICore* cpu, IBus* bus, const DisasmEntry& entry) override;
+    void onStepLite(ICore* cpu, uint32_t pc) override;
     void onMemoryWrite(IBus* bus, uint32_t addr, uint8_t before, uint8_t after) override;
     void onMemoryRead(IBus* bus, uint32_t addr, uint8_t val) override;
     void onMachineLoad(MachineDescriptor* desc) override;

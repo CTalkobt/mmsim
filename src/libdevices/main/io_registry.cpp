@@ -68,3 +68,11 @@ IOHandler* IORegistry::findHandler(const std::string& name) {
 void IORegistry::clear() {
     m_handlers.clear();
 }
+
+uint32_t IORegistry::lowestHandlerBase() const {
+    for (const auto* handler : m_handlers) {
+        uint32_t base = handler->baseAddr();
+        if (base > 0) return base;
+    }
+    return UINT32_MAX;
+}
