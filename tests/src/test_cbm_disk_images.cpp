@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <cstring>
 #include <iostream>
+#include <memory>
 
 namespace fs = std::filesystem;
 
@@ -211,31 +212,32 @@ TEST_CASE(demo_disk_load_first) {
         std::cout << "Skipping demo_disk_load_first: disk image not found." << std::endl;
         return;
     }
-std::cerr << "0" << std::endl;
+
     D64Parser parser;
     ASSERT(parser.open(path));
-std::cerr << "1" << std::endl;
 
     auto dir = parser.getDirectory();
     ASSERT(!dir.empty());
-std::cerr << "2" << std::endl;
     std::string firstFile = dir[0].filename;
     std::cout << "Loading first file: " << firstFile << std::endl;
-    
+
     std::vector<uint8_t> fileData;
     ASSERT(parser.readFile(firstFile, fileData));
     ASSERT(fileData.size() >= 2);
-    
+
     uint16_t loadAddr = fileData[0] | (fileData[1] << 8);
     std::cout << "  Load address: $" << std::hex << loadAddr << std::dec << std::endl;
     std::cout << "  Size: " << (fileData.size() - 2) << " bytes" << std::endl;
-    
-    FlatMemoryBus bus("test", 16);
+
+    // Heap-allocate to work around GCC 15 stack frame layout bug
+    // that corrupts the stack canary when FlatMemoryBus (272 bytes)
+    // shares a frame with multiple std::string/vector locals.
+    auto bus = std::make_unique<FlatMemoryBus>("test", 16);
     DiskImageLoader loader;
-    ASSERT(loader.load(path, &bus, nullptr));
-    
+    ASSERT(loader.load(path, bus.get(), nullptr));
+
     // Verify first few bytes of the program were loaded into the bus at loadAddr
     for (size_t i = 0; i < std::min((size_t)10, fileData.size() - 2); ++i) {
-        ASSERT(bus.read8(loadAddr + i) == fileData[i + 2]);
+        ASSERT(bus->read8(loadAddr + i) == fileData[i + 2]);
     }
 }
