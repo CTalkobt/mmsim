@@ -14,6 +14,7 @@ INCLUDES  = -Isrc -Isrc/include -Isrc/cli/main -Isrc/gui/main -Isrc/libcore/main
 	-Isrc/plugins/devices/kbd_vic20/main -Isrc/plugins/viceImporter/main \
 	-Isrc/plugins/devices/c64_pla/main -Isrc/plugins/devices/cia6526/main \
 	-Isrc/plugins/devices/vic2/main -Isrc/plugins/devices/sid6581/main \
+	-Isrc/plugins/devices/sid_pair/main \
 	-Isrc/plugins/machines/c64/main -Isrc/plugins/devices/pia6520/main \
 	-Isrc/plugins/devices/crtc6545/main -Isrc/plugins/devices/pet_video/main \
 	-Isrc/plugins/devices/pokey/main -Isrc/plugins/devices/datasette/main \
@@ -156,6 +157,9 @@ PLUGIN_MAP_MMU_SRCS = src/plugins/devices/map_mmu/main/map_mmu.cpp \
 	src/plugins/devices/map_mmu/main/key_register.cpp \
 	src/plugins/devices/map_mmu/main/plugin_init.cpp
 
+PLUGIN_SID_PAIR_SRCS = src/plugins/devices/sid_pair/main/sid_pair.cpp \
+	src/plugins/devices/sid_pair/main/plugin_init.cpp
+
 PLUGIN_MEGA65_SRCS = src/plugins/machines/mega65/main/machine_mega65.cpp \
 	src/plugins/machines/mega65/main/plugin_init.cpp
 
@@ -236,7 +240,8 @@ TEST_SRCS = tests/src/test_main.cpp \
 	tests/src/test_cbm_disk_images.cpp \
 	tests/src/test_d81_directory_listing.cpp \
 	tests/src/test_plugin_validation.cpp \
-	tests/src/test_ffd0_bug.cpp
+	tests/src/test_ffd0_bug.cpp \
+	src/plugins/devices/sid_pair/test/test_sid_pair.cpp
 
 LIBDEBUG_TEST_SRCS = src/libdebug/test/test_breakpoints.cpp
 LIBCORE_TEST_SRCS = src/libcore/test/test_c_compatibility.c
@@ -265,6 +270,7 @@ PLUGIN_ANTIC_TEST_SRCS = src/plugins/devices/antic/test/test_atari_boot.cpp \
 	src/plugins/devices/cia6526/main/cia6526.o \
 	src/plugins/devices/vic2/main/vic2.o \
 	src/plugins/devices/sid6581/main/sid6581.o \
+	src/plugins/devices/sid_pair/main/sid_pair.o \
 	src/plugins/devices/datasette/main/datasette.o \
 	src/plugins/cbm-loader/main/tap_parser.o \
 	src/plugins/machines/c64/main/kbd_c64.o \
@@ -350,6 +356,7 @@ PLUGIN_POKEY_OBJS = $(PLUGIN_POKEY_SRCS:.cpp=.o)
 PLUGIN_VIRTUALIEC_OBJS = $(PLUGIN_VIRTUALIEC_SRCS:.cpp=.o)
 PLUGIN_F018B_DMA_OBJS = $(PLUGIN_F018B_DMA_SRCS:.cpp=.o)
 PLUGIN_MAP_MMU_OBJS = $(PLUGIN_MAP_MMU_SRCS:.cpp=.o)
+PLUGIN_SID_PAIR_OBJS = $(PLUGIN_SID_PAIR_SRCS:.cpp=.o)
 PLUGIN_MEGA65_OBJS = $(PLUGIN_MEGA65_SRCS:.cpp=.o)
 PLUGIN_EXIT_TRAP_OBJS = src/plugins/devices/exit_trap/main/exit_trap.o
 PLUGIN_MEGA65_MATH_OBJS = src/plugins/devices/mega65_math/main/mega65_math.o
@@ -393,6 +400,7 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
 	$(LIBDIR)/mmemu-plugin-mega65.so \
 	$(LIBDIR)/mmemu-plugin-exit-trap.so \
 	$(LIBDIR)/mmemu-plugin-mega65-math.so \
+	$(LIBDIR)/mmemu-plugin-sid-pair.so \
 	$(LIBDIR)/mmemu-plugin-cbm-hle.so
 
 LIBS = $(ILIBDIR)/libmem.a $(ILIBDIR)/libcore.a $(ILIBDIR)/libdevices.a \
@@ -516,6 +524,9 @@ $(LIBDIR)/mmemu-plugin-exit-trap.so: $(PLUGIN_EXIT_TRAP_OBJS) | $(LIBDIR)
 
 $(LIBDIR)/mmemu-plugin-mega65-math.so: $(PLUGIN_MEGA65_MATH_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
+
+$(LIBDIR)/mmemu-plugin-sid-pair.so: $(PLUGIN_SID_PAIR_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(PLUGIN_LIBS)
 
 $(LIBDIR)/mmemu-plugin-cbm-hle.so: $(PLUGIN_CBMHLE_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
