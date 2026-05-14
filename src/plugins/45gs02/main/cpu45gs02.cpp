@@ -1013,35 +1013,42 @@ int MOS45GS02::step() {
             else { m_state.a = -(int8_t)m_state.a; updateNZ(m_state.a); }
             m_state.cycles++; break;
         }
-        case 0x5C: { // MAP - Update memory mapping
+        case 0x5C: { // MAP - Set memory mapping
+            // MEGA65 MAP register encoding:
+            //   Lower 32KB: mb_offset = ((X & 0x0F) << 8) | A   (12-bit)
+            //                enables  = (X >> 4) & 0x0F  (blocks 0-3)
+            //   Upper 32KB: mb_offset = ((Z & 0x0F) << 8) | Y   (12-bit)
+            //                enables  = (Z >> 4) & 0x0F  (blocks 4-7)
+            //
+            // Physical address for an enabled block b:
+            //   phys = vaddr + (mb_offset << 8)
+            //
+            // MapMmu stores per-block absolute offsets where:
+            //   phys = (stored_offset << 8) | (vaddr & 0x1FFF)
+            // So: stored_offset = (block_base >> 8) + mb_offset
             if (m_mapMmu) {
-                // From MEGA65 specification:
-                // Lower 32KB (blocks 0-3): offset = ((X & 0x0F) << 8) | A
-                //                           enables = (Z >> 4) & 0x0F
-                // Upper 32KB (blocks 4-7): offset = ((Z & 0x0F) << 8) | Y
-                //                           enables = (X >> 4) & 0x0F
                 MapState state = {};
 
-                // Compute offsets
-                uint32_t lo = ((m_state.x & 0x0F) << 8) | m_state.a;
-                uint32_t hi = ((m_state.z & 0x0F) << 8) | m_state.y;
+                uint32_t loOff = ((m_state.x & 0x0F) << 8) | m_state.a;
+                uint32_t hiOff = ((m_state.z & 0x0F) << 8) | m_state.y;
 
-                // Apply same offset to all 4 blocks in each half
-                for (int i = 0; i < 4; i++) state.offsets[i] = lo;
-                for (int i = 4; i < 8; i++) state.offsets[i] = hi;
+                // Compute per-block absolute offsets
+                for (int i = 0; i < 4; i++)
+                    state.offsets[i] = (i * 0x20) + loOff;
+                for (int i = 4; i < 8; i++)
+                    state.offsets[i] = (i * 0x20) + hiOff;
 
-                // Compute enable bits: lower 4 from Z[7:4], upper 4 from X[7:4]
-                state.enables = ((m_state.z >> 4) & 0x0F) | (((m_state.x >> 4) & 0x0F) << 4);
+                // Enable bits: X[7:4] for lower half, Z[7:4] for upper half
+                state.enables = ((m_state.x >> 4) & 0x0F) | (((m_state.z >> 4) & 0x0F) << 4);
 
                 m_mapMmu->setMapState(state);
-                m_state.cycles++;
             }
+            m_state.cycles++;
             break;
         }
-        case 0x7C: { // EOM - Exit MAP mode
-            if (m_mapMmu) {
-                m_mapMmu->clearMapState();
-            }
+        case 0x7C: { // EOM - End of mapping sequence (NOP)
+            // EOM does NOT clear map state — it only re-enables interrupts
+            // after a MAP instruction. MAP state persists until another MAP or RESET.
             m_state.cycles++;
             break;
         }

@@ -81,13 +81,21 @@ Prefixing an indirect instruction (like `LDA ($zp),Z`) with `$EA` enables 32-bit
 Syntax in disassembly: `LDA [$zp],Z`.
 
 ### 3.2 MMU (MAP)
-When `MAP` is active, the 64KB virtual space is split into four 16KB slots:
-- Slot 0: `$0000–$3FFF`
-- Slot 1: `$4000–$7FFF`
-- Slot 2: `$8000–$BFFF`
-- Slot 3: `$C000–$FFFF`
+When `MAP` is active, the 64KB virtual space is split into eight 8KB blocks:
+- Block 0: `$0000–$1FFF`  (Lower half)
+- Block 1: `$2000–$3FFF`
+- Block 2: `$4000–$5FFF`
+- Block 3: `$6000–$7FFF`
+- Block 4: `$8000–$9FFF`  (Upper half)
+- Block 5: `$A000–$BFFF`
+- Block 6: `$C000–$DFFF`
+- Block 7: `$E000–$FFFF`
 
-Physical Address = `(map[slot] << 8) | (vaddr & 0x3FFF)`.
+Register encoding: `A`/`X` control the lower half, `Y`/`Z` control the upper half.
+- Lower: offset = `((X & 0x0F) << 8) | A`, enables = `X[7:4]` (blocks 0–3)
+- Upper: offset = `((Z & 0x0F) << 8) | Y`, enables = `Z[7:4]` (blocks 4–7)
+
+Physical Address = `vaddr + (offset << 8)` for enabled blocks.
 
 ---
 

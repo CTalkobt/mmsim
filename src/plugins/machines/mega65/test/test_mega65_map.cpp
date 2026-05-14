@@ -3,49 +3,171 @@
 #include "plugins/45gs02/main/cpu45gs02.h"
 #include "libmem/main/sparse_memory_bus.h"
 
-// Test 1: Basic MAP instruction execution - CPU loads A,X,Y,Z and executes MAP
-TEST_CASE(mega65_map_instruction_loads_registers) {
+// Helper: set up a 45GS02 CPU wired through MapMmu to a SparseMemoryBus
+struct MapTestFixture {
+    SparseMemoryBus physBus;
+    MapMmu mmu;
+    MOS45GS02 cpu;
+
+    MapTestFixture() : physBus("phys", 28), mmu("mmu", &physBus) {
+        cpu.setDataBus(&mmu);
+        cpu.setCodeBus(&mmu);
+        cpu.setMapMmu(&mmu);
+        // Reset vector → $0200 (code area away from block 0 mapping tests)
+        physBus.write8(0xFFFC, 0x00);
+        physBus.write8(0xFFFD, 0x02);
+        cpu.reset();
+    }
+
+    // Write a small program at addr and reset PC there
+    void loadCode(uint16_t addr, const uint8_t* code, size_t len) {
+        for (size_t i = 0; i < len; i++)
+            physBus.write8(addr + i, code[i]);
+        cpu.setPc(addr);
+    }
+};
+
+// Test 1: MAP instruction sets enables from X[7:4] (lower) and Z[7:4] (upper)
+TEST_CASE(mega65_map_enable_bits) {
+    MapTestFixture f;
+
+    // A=$00, X=$30 (enables blocks 0,1), Y=$00, Z=$C0 (enables blocks 6,7)
+    // Lower offset = ((X & 0x0F) << 8) | A = 0
+    // Upper offset = ((Z & 0x0F) << 8) | Y = 0
+    uint8_t code[] = {
+        0xA9, 0x00,   // LDA #$00
+        0xA2, 0x30,   // LDX #$30  (enables = 0011 for blocks 0,1)
+        0xA0, 0x00,   // LDY #$00
+        0xA3, 0xC0,   // LDZ #$C0  (enables = 1100 for blocks 6,7)
+        0x5C,         // MAP
+    };
+    f.loadCode(0x0200, code, sizeof(code));
+
+    for (int i = 0; i < 5; i++) f.cpu.step();
+
+    const MapState& ms = f.mmu.getMapState();
+    // Lower enables from X[7:4] = 0x3 → blocks 0,1
+    // Upper enables from Z[7:4] = 0xC → blocks 6,7
+    ASSERT_EQ(ms.enables, 0x03 | (0x0C << 4));  // 0xC3
+}
+
+// Test 2: MAP instruction computes per-block offsets correctly
+TEST_CASE(mega65_map_per_block_offsets) {
+    MapTestFixture f;
+
+    // Lower offset = ((X & 0x0F) << 8) | A = ((0x02) << 8) | 0x00 = 0x200
+    // Enable all lower blocks: X[7:4] = 0xF → X = 0xF2
+    // Upper offset = ((Z & 0x0F) << 8) | Y = ((0x03) << 8) | 0x00 = 0x300
+    // Enable all upper blocks: Z[7:4] = 0xF → Z = 0xF3
+    uint8_t code[] = {
+        0xA9, 0x00,   // LDA #$00
+        0xA2, 0xF2,   // LDX #$F2
+        0xA0, 0x00,   // LDY #$00
+        0xA3, 0xF3,   // LDZ #$F3
+        0x5C,         // MAP
+    };
+    f.loadCode(0x0200, code, sizeof(code));
+
+    for (int i = 0; i < 5; i++) f.cpu.step();
+
+    const MapState& ms = f.mmu.getMapState();
+    ASSERT_EQ(ms.enables, 0xFF);
+
+    // Each block's stored offset = block_base/256 + mb_offset
+    // Block 0: base=$0000 → stored = 0x00 + 0x200 = 0x200
+    // Block 1: base=$2000 → stored = 0x20 + 0x200 = 0x220
+    // Block 2: base=$4000 → stored = 0x40 + 0x200 = 0x240
+    // Block 3: base=$6000 → stored = 0x60 + 0x200 = 0x260
+    ASSERT_EQ(ms.offsets[0], 0x200);
+    ASSERT_EQ(ms.offsets[1], 0x220);
+    ASSERT_EQ(ms.offsets[2], 0x240);
+    ASSERT_EQ(ms.offsets[3], 0x260);
+
+    // Block 4: base=$8000 → stored = 0x80 + 0x300 = 0x380
+    // Block 5: base=$A000 → stored = 0xA0 + 0x300 = 0x3A0
+    // Block 6: base=$C000 → stored = 0xC0 + 0x300 = 0x3C0
+    // Block 7: base=$E000 → stored = 0xE0 + 0x300 = 0x3E0
+    ASSERT_EQ(ms.offsets[4], 0x380);
+    ASSERT_EQ(ms.offsets[5], 0x3A0);
+    ASSERT_EQ(ms.offsets[6], 0x3C0);
+    ASSERT_EQ(ms.offsets[7], 0x3E0);
+}
+
+// Test 3: MAP + data access end-to-end
+TEST_CASE(mega65_map_end_to_end_data_access) {
+    MapTestFixture f;
+
+    // Place test data at physical $030000
+    f.physBus.write8(0x030000, 0x42);
+
+    // Map block 4 ($8000-$9FFF) with mb_offset so that $8000 → phys $030000
+    // stored_offset[4] = block_base/256 + mb_offset = 0x80 + mb_offset
+    // We want stored_offset[4] = 0x300, so mb_offset = 0x300 - 0x80 = 0x280
+    // A = low byte = 0x80, X[3:0] = high byte = 0x02, X[7:4] = enable bit 0 (block 4) = 0x1
+    // Wait — enables for upper half come from Z, not X.
+    // Lower enables = X[7:4], upper enables = Z[7:4]
+    // We want to enable block 4 (bit 0 of upper enables) → Z[7:4] = 0x1 → Z = 0x1?
+    // Upper offset = ((Z & 0x0F) << 8) | Y = ((Z[3:0]) << 8) | Y
+    // mb_offset = 0x280, so Y = 0x80, Z[3:0] = 0x02, Z[7:4] = 0x01
+    // Z = 0x12
+    // Code runs from $0200 (block 1, unmapped) — safe.
+    uint8_t code[] = {
+        0xA9, 0x00,   // LDA #$00
+        0xA2, 0x00,   // LDX #$00  (no lower enables)
+        0xA0, 0x80,   // LDY #$80  (upper offset low byte)
+        0xA3, 0x12,   // LDZ #$12  (enable block 4, offset high nybble = 2)
+        0x5C,         // MAP
+        0xAD, 0x00, 0x80,  // LDA $8000 (should read from phys $030000)
+    };
+    f.loadCode(0x0200, code, sizeof(code));
+
+    for (int i = 0; i < 5; i++) f.cpu.step();  // Load regs + MAP
+    f.cpu.step();  // LDA $8000
+
+    ASSERT_EQ(f.cpu.regRead(0), 0x42);  // A should be $42
+}
+
+// Test 4: EOM does NOT clear MAP state
+TEST_CASE(mega65_eom_preserves_map_state) {
+    MapTestFixture f;
+
+    // Set up a mapping via MAP then execute EOM
+    uint8_t code[] = {
+        0xA9, 0x00,   // LDA #$00
+        0xA2, 0x10,   // LDX #$10  (enable block 0, offset=0)
+        0xA0, 0x00,   // LDY #$00
+        0xA3, 0x00,   // LDZ #$00
+        0x5C,         // MAP
+        0x7C,         // EOM
+    };
+    f.loadCode(0x0200, code, sizeof(code));
+
+    for (int i = 0; i < 6; i++) f.cpu.step();  // Load regs + MAP + EOM
+
+    const MapState& ms = f.mmu.getMapState();
+    // EOM should NOT have cleared the enables
+    ASSERT_EQ(ms.enables & 0x01, 0x01);
+}
+
+// Test 5: MAP without MapMmu doesn't crash
+TEST_CASE(mega65_map_no_mmu_no_crash) {
     SparseMemoryBus physBus("phys", 28);
     MapMmu mmu("mmu", &physBus);
     MOS45GS02 cpu;
     cpu.setDataBus(&mmu);
     cpu.setCodeBus(&mmu);
-    cpu.setMapMmu(&mmu);
+    // Deliberately do NOT call cpu.setMapMmu()
 
-    // Load test program:
-    // $0000: A9 $20       LDA #$20   (A = $20, lower offset low byte)
-    // $0002: A2 $01       LDX #$01   (X = $01, lower offset high nibble + enables)
-    // $0004: A0 $00       LDY #$00   (Y = $00, upper offset low byte)
-    // $0006: C2 $00       LDZ #$00   (Z = $00, upper offset high nibble + enables)
-    // $0008: 5C           MAP
-    uint8_t code[] = {0xA9, 0x20, 0xA2, 0x01, 0xA0, 0x00, 0xC2, 0x00, 0x5C};
-    for (size_t i = 0; i < sizeof(code); i++) {
-        physBus.write8(i, code[i]);
-    }
-
-    // Set up reset vector
     physBus.write8(0xFFFC, 0x00);
-    physBus.write8(0xFFFD, 0x00);
-
-    // Initialize CPU state
+    physBus.write8(0xFFFD, 0x02);
     cpu.reset();
-    ASSERT_EQ(cpu.pc(), 0x0000);
 
-    // Execute the program
-    cpu.step();  // LDA #$20
-    ASSERT_EQ(cpu.regRead(0), 0x20);  // A = 0x20
+    uint8_t code[] = { 0x5C, 0x7C };  // MAP, EOM
+    for (size_t i = 0; i < sizeof(code); i++)
+        physBus.write8(0x0200 + i, code[i]);
 
-    cpu.step();  // LDX #$01
-    ASSERT_EQ(cpu.regRead(1), 0x01);  // X = 0x01
-
-    cpu.step();  // LDY #$00
-    ASSERT_EQ(cpu.regRead(2), 0x00);  // Y = 0x00
-
-    cpu.step();  // LDZ #$00
-    ASSERT_EQ(cpu.regRead(3), 0x00);  // Z = 0x00
-
-    cpu.step();  // MAP
-    // MAP instruction should have set mapEnabled in the CPU
+    cpu.step();  // MAP — should not crash
+    cpu.step();  // EOM — should not crash
 }
 
 // Test 2: MAP instruction with address translation
