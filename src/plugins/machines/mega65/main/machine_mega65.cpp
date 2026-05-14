@@ -5,6 +5,7 @@
 #include "libmem/main/sparse_memory_bus.h"
 #include "plugins/devices/map_mmu/main/map_mmu.h"
 #include "plugins/devices/map_mmu/main/c64_bank_controller.h"
+#include "plugins/devices/map_mmu/main/key_register.h"
 #include "util/path_util.h"
 #include <cstring>
 
@@ -34,12 +35,19 @@ MachineDescriptor* Mega65MachineFactory::create() {
     bankCtrl->setMapMmu(mmu);
 
     // -----------------------------------------------------------------------
-    // Create IORegistry and register the bank controller
+    // Create KEY register ($D02F) for I/O personality switching
+    // -----------------------------------------------------------------------
+    auto* keyReg = new KeyRegister();
+
+    // -----------------------------------------------------------------------
+    // Create IORegistry and register handlers
     // -----------------------------------------------------------------------
     auto* io = new IORegistry();
     io->registerHandler(bankCtrl);
+    io->registerHandler(keyReg);
     desc->ioRegistry = io;
     desc->deleters.push_back([bankCtrl]() { delete bankCtrl; });
+    desc->deleters.push_back([keyReg]() { delete keyReg; });
 
     // -----------------------------------------------------------------------
     // Create 45GS02 CPU

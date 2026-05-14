@@ -50,7 +50,7 @@
 [x] - Implement MAP instruction (0x5C) in 45GS02 CPU to call MapMmu.setMapState()
 [x] - Separate C64 mode path (use C64BankController) from MEGA65 mode path (use MapMmu)
 [ ] - Load MEGA65 ROM and wire overlays on SparseMemoryBus (KERNAL, BASIC, CHARROM)
-[ ] - Implement I/O personality switching ($D02F) in machine factory
+[x] - Implement I/O personality switching ($D02F) in machine factory
 [ ] - Implement MAP instruction parameter parsing (read map spec from memory)
 [ ] - MEGA65 integration tests (MAP functionality, address translation, ROM visibility)
 

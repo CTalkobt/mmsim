@@ -1,7 +1,9 @@
 #include "test_harness.h"
 #include "plugins/devices/map_mmu/main/map_mmu.h"
+#include "plugins/devices/map_mmu/main/key_register.h"
 #include "plugins/45gs02/main/cpu45gs02.h"
 #include "libmem/main/sparse_memory_bus.h"
+#include "libdevices/main/io_registry.h"
 
 // Helper: set up a 45GS02 CPU wired through MapMmu to a SparseMemoryBus
 struct MapTestFixture {
@@ -597,4 +599,71 @@ TEST_CASE(mega65_map_instruction_full_coverage) {
     ASSERT_EQ(mmu.read8(0x0000), 0x00);
     ASSERT_EQ(mmu.read8(0x1000), 0x00);  // Within mapped region
     ASSERT_EQ(mmu.read8(0x5000), (uint8_t)(0x5000 & 0xFF));  // Maps to phys (0x5000 & 0x1FFF)
+}
+
+// -----------------------------------------------------------------------
+// I/O Personality switching (KEY register at $D02F)
+// -----------------------------------------------------------------------
+
+TEST_CASE(mega65_key_register_in_ioregistry) {
+    IORegistry io;
+    KeyRegister keyReg;
+    io.registerHandler(&keyReg);
+
+    // KEY register should be discoverable by name
+    IOHandler* found = io.findHandler("KEY");
+    ASSERT(found != nullptr);
+    ASSERT_EQ(std::string(found->name()), "KEY");
+}
+
+TEST_CASE(mega65_key_register_dispatch_write_read) {
+    IORegistry io;
+    KeyRegister keyReg;
+    io.registerHandler(&keyReg);
+
+    // Write MEGA65 knock sequence via IORegistry dispatch
+    io.dispatchWrite(nullptr, 0xD02F, 0x47);
+    io.dispatchWrite(nullptr, 0xD02F, 0x53);
+
+    ASSERT_EQ(keyReg.getCurrentPersonality(), IopersonalityMode::MEGA65);
+
+    // Read back via dispatch
+    uint8_t val = 0;
+    ASSERT(io.dispatchRead(nullptr, 0xD02F, &val));
+    ASSERT_EQ(val, 0x53);  // last written byte
+}
+
+TEST_CASE(mega65_key_personality_callback_fires) {
+    IORegistry io;
+    KeyRegister keyReg;
+    io.registerHandler(&keyReg);
+
+    IopersonalityMode received = IopersonalityMode::C64;
+    bool called = false;
+    keyReg.setPersonalityChangeCallback([&](IopersonalityMode mode) {
+        received = mode;
+        called = true;
+    });
+
+    // Switch to C65
+    io.dispatchWrite(nullptr, 0xD02F, 0xA5);
+    io.dispatchWrite(nullptr, 0xD02F, 0x96);
+
+    ASSERT(called);
+    ASSERT_EQ(received, IopersonalityMode::C65);
+}
+
+TEST_CASE(mega65_key_reset_returns_c64) {
+    IORegistry io;
+    KeyRegister keyReg;
+    io.registerHandler(&keyReg);
+
+    // Switch to MEGA65
+    io.dispatchWrite(nullptr, 0xD02F, 0x47);
+    io.dispatchWrite(nullptr, 0xD02F, 0x53);
+    ASSERT_EQ(keyReg.getCurrentPersonality(), IopersonalityMode::MEGA65);
+
+    // Reset all handlers
+    io.resetAll();
+    ASSERT_EQ(keyReg.getCurrentPersonality(), IopersonalityMode::C64);
 }
