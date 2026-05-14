@@ -135,7 +135,7 @@ bool PluginLoader::load(const std::string& path) {
     m_plugins.push_back({path, handle, manifest});
     registerPluginItems(manifest);
 
-    std::cerr << "Loaded plugin: " << manifest->pluginId << " v" << manifest->version << std::endl;
+    LogRegistry::instance().getLogger("system")->debug("Loaded plugin: {} v{}", manifest->pluginId, manifest->version);
     return true;
 }
 
