@@ -120,6 +120,8 @@ private:
     void     write8(uint16_t addr, uint8_t val);
     uint8_t  read8_phys(uint32_t physAddr);
     void     write8_phys(uint32_t physAddr, uint8_t val);
+    void     doAdc8(uint8_t v);
+    void     doSbc8(uint8_t v);
     void     updateNZ(uint8_t val);
     void     updateNZ16(uint16_t val);
     void     updateNZ32(uint32_t val);
