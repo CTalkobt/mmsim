@@ -48,7 +48,7 @@
 [x] - Wire MapMmu as CPU's bus pointer (CPU reads/writes via MapMmu → SparseMemoryBus)
 [x] - Wire MapMmu pointer to 45GS02 CPU for MAP instruction support
 [x] - Implement MAP instruction (0x5C) in 45GS02 CPU to call MapMmu.setMapState()
-[ ] - Separate C64 mode path (use C64BankController) from MEGA65 mode path (use MapMmu)
+[x] - Separate C64 mode path (use C64BankController) from MEGA65 mode path (use MapMmu)
 [ ] - Load MEGA65 ROM and wire overlays on SparseMemoryBus (KERNAL, BASIC, CHARROM)
 [ ] - Implement I/O personality switching ($D02F) in machine factory
 [ ] - Implement MAP instruction parameter parsing (read map spec from memory)

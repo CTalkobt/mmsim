@@ -158,6 +158,7 @@ PLUGIN_F018B_DMA_SRCS = src/plugins/devices/f018b_dma/main/f018b_dma.cpp
 
 PLUGIN_MAP_MMU_SRCS = src/plugins/devices/map_mmu/main/map_mmu.cpp \
 	src/plugins/devices/map_mmu/main/key_register.cpp \
+	src/plugins/devices/map_mmu/main/c64_bank_controller.cpp \
 	src/plugins/devices/map_mmu/main/plugin_init.cpp
 
 PLUGIN_SID_PAIR_SRCS = src/plugins/devices/sid_pair/main/sid_pair.cpp \
@@ -239,6 +240,7 @@ TEST_SRCS = tests/src/test_main.cpp \
 	src/plugins/devices/f018b_dma/test/test_f018b_dma.cpp \
 	src/plugins/devices/map_mmu/test/test_map_mmu.cpp \
 	src/plugins/devices/map_mmu/test/test_key_register.cpp \
+	src/plugins/devices/map_mmu/test/test_c64_bank_controller.cpp \
 	src/plugins/machines/mega65/test/test_mega65_map.cpp \
 	tests/src/test_cbm_disk_images.cpp \
 	tests/src/test_d81_directory_listing.cpp \
@@ -295,6 +297,7 @@ PLUGIN_ANTIC_TEST_SRCS = src/plugins/devices/antic/test/test_atari_boot.cpp \
 	src/plugins/devices/f018b_dma/main/f018b_dma.o \
 	src/plugins/devices/map_mmu/main/map_mmu.o \
 	src/plugins/devices/map_mmu/main/key_register.o \
+	src/plugins/devices/map_mmu/main/c64_bank_controller.o \
 	src/plugins/cbm-hle/main/kernal_hle.o
 REGISTRY_OBJS = src/cli/main/cli_interpreter.o \
 	src/cli/main/plugin_command_registry.o \
