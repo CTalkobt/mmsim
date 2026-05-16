@@ -171,7 +171,7 @@ public:
     static constexpr uint8_t IRQ_LP   = 0x08; // light pen
     static constexpr uint8_t IRQ_ANY  = 0x80; // set when any enabled IRQ fires
 
-private:
+protected:
     // Rendering helpers
     uint32_t palette(uint8_t index) const;
     uint8_t  charRomByte(uint32_t offset) const;

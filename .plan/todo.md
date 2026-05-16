@@ -498,20 +498,20 @@ physical addresses. See arch.md §3.1 and the `SparseMemoryBus(28)` note.*
 *Goal: VIC-IV, dual SID, F018B DMA controller, and math acceleration registers
 as concrete `IOHandler` implementations.*
 
-### Phase 20.1 VIC-IV (`src/plugins/devices/vic4/`)
+### Phase 20.1 VIC-IV (`src/plugins/devices/vic4/`) [COMPLETED]
 
 *Extends VIC-II (Phase 11.4). The VIC-IV is backward-compatible at $D000–$D02E;
 new registers are unlocked by the I/O personality at $D030 and above.*
 
-- [ ] Inherits or wraps `VIC2`; re-uses sprite engine and VIC-II register file.
-- [ ] **$D02F (KEY)**: personality unlock register. Write $47 ('G') then $53
+- [x] Inherits or wraps `VIC2`; re-uses sprite engine and VIC-II register file.
+- [x] **$D02F (KEY)**: personality unlock register. Write $47 ('G') then $53
       ('S') to enable MEGA65 extended registers; write any other value to lock.
       Managed by `MapMmu` but exposed to `VIC4` via a callback so the VIC-IV
       can enable its extended register window.
-- [ ] **$D030 (VIC-III banking)**: ROM control bits (CRAM2K, ROM-B), V400 enable.
-- [ ] **$D031 (VIC-III control)**: H640 (80-column mode), V400, FAST CPU bit
+- [x] **$D030 (VIC-III banking)**: ROM control bits (CRAM2K, ROM-B), V400 enable.
+- [x] **$D031 (VIC-III control)**: H640 (80-column mode), V400, FAST CPU bit
       (forwards to `CPU45GS02` speed scalar), PAL/NTSC select.
-- [ ] **$D040–$D07F (VIC-IV extended registers)**:
+- [x] **$D040–$D07F (VIC-IV extended registers)**:
     - $D040–$D043: character X/Y pixel position (16-bit each).
     - $D044: `CHRCOUNT` (character columns in current row).
     - $D045: extended control (H1280 super-wide, 16-bit char mode enable).
@@ -528,10 +528,10 @@ new registers are unlocked by the I/O personality at $D030 and above.*
     - $D05D: raster compare high bit (bit 10 of 11-bit raster counter).
     - $D05E: horizontal smooth scroll (extended, 4-bit).
     - $D05F: vertical smooth scroll (extended, 4-bit).
-- [ ] **$D100–$D3FF (colour palette)**: 256 entries × 3 bytes (R, G, B in
+- [x] **$D100–$D3FF (colour palette)**: 256 entries × 3 bytes (R, G, B in
       separate $D100/$D200/$D300 arrays). Default power-on palette matches the
       16-colour MEGA65 system palette (compatible with C64 colours 0–15).
-- [ ] **Video modes** (controlled by $D031/$D054/$D045):
+- [x] **Video modes** (controlled by $D031/$D054/$D045):
     - Standard 40-column text (VIC-II compatible).
     - 80-column text (H640 bit).
     - Multicolour text and bitmap (VIC-II compatible).
@@ -539,16 +539,16 @@ new registers are unlocked by the I/O personality at $D030 and above.*
       data for a 8×8 full-colour glyph; screen RAM holds 16-bit character
       pointers. `renderFrame()` fetches from 28-bit character base address via
       `IBus::peek8()` on the `SparseMemoryBus`.
-- [ ] **Raster counter**: 11-bit (0–2047), set via $D012 (bits 7:0) and $D05D
+- [x] **Raster counter**: 11-bit (0–2047), set via $D012 (bits 7:0) and $D05D
       (bit 10); compare fires IRQ via `ISignalLine`.
-- [ ] **32 KB colour RAM** at 28-bit base $FF80000 (configurable via $D058–$D05B).
+- [x] **32 KB colour RAM** at 28-bit base $FF80000 (configurable via $D058–$D05B).
       Allocated as a pre-mapped `SparseMemoryBus` region; also mirrored at
       $D800–$DBFF (first 1 KB) for C64 compatibility.
-- [ ] `renderFrame()`: implements the MEGA65 raster pipeline for the active
+- [x] `renderFrame()`: implements the MEGA65 raster pipeline for the active
       video mode; fills an RGBA pixel buffer using register state and bus data.
       For FCM and 80-column modes, accesses the 28-bit address space.
-- [ ] `tick(cycles)`: drives raster counter; fires raster IRQ.
-- [ ] `ChipRegDescriptor` table: covers all $D000–$D07F registers and palette.
+- [x] `tick(cycles)`: drives raster counter; fires raster IRQ.
+- [x] `ChipRegDescriptor` table: covers all $D000–$D07F registers and palette.
 
 ### Phase 20.2 F018B DMA Controller (`src/plugins/devices/dma_f018b/`)
 
@@ -588,29 +588,32 @@ operations: copy, fill, swap, and mix.*
 - [ ] `reset()`: clears list address and active flag.
 - [ ] `ChipRegDescriptor` table covering $D700–$D70F.
 
-### Phase 20.3 Math Acceleration Registers (`src/plugins/devices/math_accel/`)
+### Phase 20.3 Math Acceleration Registers (`src/plugins/devices/mega65_math/`) [COMPLETED]
 
 *Hardware multiply and divide completing in a single CPU cycle. Exposed as an
-`IOHandler` at $D770–$D77F.*
+`IOHandler` at $D700–$D7FF.*
 
-- [ ] **Multiply**: write 16-bit MULTINA ($D770–$D771) and MULTINB ($D772–$D773);
-      result appears immediately in MULTOUT ($D774–$D777, 32-bit read-only).
-- [ ] **Divide**: write 32-bit DIVINA ($D778–$D77B) and 16-bit DIVINB ($D77C–$D77D);
-      DIVOUT quotient ($D77E–$D77F) and remainder ($D77C–$D77D read-back) are
+- [x] **Multiply**: write 32-bit MULTINA ($D770–$D773) and MULTINB ($D774–$D777);
+      result appears immediately in MULTOUT ($D778–$D77F, 64-bit read-only).
+- [x] **Divide**: write 32-bit DIVINA ($D760–$D763) and 32-bit DIVINB ($D764–$D767);
+      DIVOUT quotient ($D768–$D76F) and remainder ($D770–$D773 read-back) are
       available on the very next read (model as synchronous — no latency).
-- [ ] Division by zero: set quotient and remainder to $FFFF (hardware behaviour).
-- [ ] `ioRead` / `ioWrite` implement the register semantics; no `tick()` logic
+- [x] Division by zero: set quotient and remainder to all ones (hardware behaviour).
+- [x] `ioRead` / `ioWrite` implement the register semantics; no `tick()` logic
       required (combinatorial hardware model).
+- [x] **RNG**: Hardware LFSR at $D7EF (read returns random byte, advances LFSR).
+- [x] **Unit tests**: `src/plugins/devices/mega65_math/test/test_mega65_math.cpp`.
 
-### Phase 20.4 Dual SID (`src/plugins/devices/sid_pair/`)
+### Phase 20.4 Dual SID (`src/plugins/devices/sid_pair/`) [COMPLETED]
 
-- [ ] Thin wrapper that instantiates two `SID6581` objects (Phase 11.5) at
+- [x] Thin wrapper that instantiates two `SID6581` objects (Phase 11.5) at
       $D400–$D41F (SID1) and $D420–$D43F (SID2).
-- [ ] Stereo mix: SID1 output mixed right-biased, SID2 output mixed left-biased
+- [x] Stereo mix: SID1 output mixed right-biased, SID2 output mixed left-biased
       (MEGA65 default panning). Mix weights configurable via constructor.
-- [ ] `IOHandler` spans $D400–$D43F; dispatch to SID1 or SID2 by address bit 5.
-- [ ] `reset()`: resets both SIDs.
-- [ ] `tick(cycles)`: ticks both SIDs.
+- [x] `IOHandler` spans $D400–$D43F; dispatch to SID1 or SID2 by address bit 5.
+- [x] `reset()`: resets both SIDs.
+- [x] `tick(cycles)`: ticks both SIDs.
+- [x] **Unit tests**: `src/plugins/devices/sid_pair/test/test_sid_pair.cpp`.
 
 ### Phase 20.5 Unit Tests (`tests/test_mega65_chips.cpp`)
 
@@ -698,24 +701,24 @@ $E000–$FFFF   KERNAL ROM (from MEGA65.ROM; overlay in Banks 2–3)
 
 *Goal: Wire the MEGA65 keyboard (C65-derived matrix) to CIA1.*
 
-### Phase 22.1 C65 Keyboard Matrix (`src/plugins/devices/keyboard/main/keyboard_matrix_c65.h/cpp`)
+### Phase 22.1 C65 Keyboard Matrix (`src/plugins/devices/keyboard/main/keyboard_matrix_mega65.h/cpp`) [COMPLETED]
 
-- [ ] 8×8 matrix (64 positions), wired to CIA1 port A (column output) and
+- [x] 8×8 matrix (64 positions), wired to CIA1 port A (column output) and
       CIA1 port B (row input) — same electrical topology as the C64 but with
       a different key layout.
-- [ ] `keyDown(row, col)` / `keyUp(row, col)` API.
-- [ ] Implements `IPortDevice` on both CIA1 ports; VIA reads return active-low
+- [x] `keyDown(row, col)` / `keyUp(row, col)` API.
+- [x] Implements `IPortDevice` on both CIA1 ports; VIA reads return active-low
       row bits for the currently scanned column.
-- [ ] **Restore key**: wired directly to CIA1 NMI line (same as C64); a
+- [x] **Restore key**: wired directly to CIA1 NMI line (same as C64); a
       dedicated `ISignalLine` for NMI is pulsed on Restore press.
-- [ ] **CAPS LOCK LED**: `ISignalLine` output from the keyboard matrix to
+- [x] **CAPS LOCK LED**: `ISignalLine` output from the keyboard matrix to
       the host GUI for visual feedback. Host sets the LED state.
-- [ ] Key mapping constants: expose a `MEGA65_KEY_*` enum for all physical keys
+- [x] Key mapping constants: expose a `MEGA65_KEY_*` enum for all physical keys
       including the extra MEGA65-specific keys (Mega key, NO SCROLL, ALT).
 
-### Phase 22.2 Joystick Ports
+### Phase 22.2 Joystick Ports [COMPLETED]
 
-- [ ] Two joystick ports wired to CIA1 port B (joystick 2) and CIA2 port A
+- [x] Two joystick ports wired to CIA1 port B (joystick 2) and CIA2 port A
       (joystick 1), active-low — identical to the C64 wiring. Reuse the
       `Joystick` class from Phase 10.4.
 

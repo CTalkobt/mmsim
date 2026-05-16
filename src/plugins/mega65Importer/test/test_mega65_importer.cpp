@@ -40,7 +40,7 @@ TEST_CASE(mega65_importer_rom_files) {
     auto specs = romFilesFor("mega65");
     ASSERT(specs.size() == 1);
     ASSERT(specs[0].destName == "mega65.rom");
-    ASSERT(specs[0].expectedSize == 786432);
+    ASSERT(specs[0].expectedSize == 131072);
 }
 
 TEST_CASE(mega65_importer_discover_mock) {

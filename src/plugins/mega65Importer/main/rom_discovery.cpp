@@ -9,8 +9,8 @@ namespace mega65_importer {
 std::vector<RomFileSpec> romFilesFor(const std::string& machineId) {
     if (machineId == "mega65") {
         return {
-            // Standard full ROM image used by xemu and real hardware
-            { "MEGA65.ROM", "mega65.rom", 786432 }
+            // Standard full ROM image (128 KB for basic/kernal overlay)
+            { "MEGA65.ROM", "mega65.rom", 131072 }
         };
     }
     return {};
@@ -61,6 +61,7 @@ std::vector<RomSource> discoverSources(const std::string& machineId) {
     if (home) {
         std::string h(home);
         candidates.push_back(h + "/.local/share/xemu/mega65");
+        candidates.push_back(h + "/.local/share/xemu-lgb/mega65");
         candidates.push_back(h + "/Library/Application Support/xemu/mega65");
     }
 

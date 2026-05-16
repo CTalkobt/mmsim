@@ -227,3 +227,40 @@ TEST_CASE(mega65_integration_c64_rom_banking) {
 
     delete desc;
 }
+
+TEST_CASE(mega65_integration_joysticks) {
+    ensureMega65Registered();
+    auto* desc = MachineRegistry::instance().createMachine("mega65");
+    ASSERT(desc != nullptr);
+
+    // CIA1 Port B (0xDC01) is Joystick 2 (shared with kbd)
+    // CIA2 Port A (0xDD00) is Joystick 1
+
+    // 1. Test Joystick 1 (CIA2 Port A)
+    desc->onJoystick(0, 0xFE); // Press UP (bit 0 low)
+    uint8_t val = 0;
+    desc->ioRegistry->dispatchRead(nullptr, 0xDD00, &val);
+    ASSERT_EQ(val, 0xFE);
+
+    desc->onJoystick(0, 0xFF); // Release
+    desc->ioRegistry->dispatchRead(nullptr, 0xDD00, &val);
+    ASSERT_EQ(val, 0xFF);
+
+    // 2. Test Joystick 2 (CIA1 Port B)
+    // Note: Kbd rows are initially $FF.
+    desc->onJoystick(1, 0xEF); // Press FIRE (bit 4 low)
+    desc->ioRegistry->dispatchRead(nullptr, 0xDC01, &val);
+    ASSERT_EQ(val, 0xEF);
+
+    // 3. Test Kbd + Joystick 2 interaction
+    // Select column 1 (for RETURN key)
+    desc->ioRegistry->dispatchWrite(nullptr, 0xDC00, 0xFD);
+    // Press RETURN (Row 0 bit 0 low)
+    desc->onKey("RETURN", true);
+    
+    desc->ioRegistry->dispatchRead(nullptr, 0xDC01, &val);
+    // Should be (0xFE kbd row) & (0xEF joy) = 0xEE
+    ASSERT_EQ(val, 0xEE);
+
+    delete desc;
+}

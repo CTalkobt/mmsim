@@ -25,6 +25,12 @@
   [x] - Update documentation with ca45 project link
 
 ## MEGA65 Emulation
+[x] Phase 20.1: VIC-IV Video Controller
+  [x] - Personality unlock ($D02F KEY)
+  [x] - Extended registers ($D040-$D07F)
+  [x] - 256-color palette ($D100-$D3FF)
+  [x] - 32 KB internal color RAM
+  [x] - C64 mode compatibility (inherited from VIC2)
 [x] Phase 20.2: F018B DMA Controller (basic implementation)
   [x] - Register file ($D700-$D70F) with shadow array
   [x] - Job list parsing and execution
@@ -35,6 +41,17 @@
   [x] - Fractional stepping and modulus modes
   [d] - Mix operation implementation
   [d] - Interrupt on completion (bit 3)
+[x] Phase 20.3: Math Acceleration Registers
+  [x] - Hardware multiply/divide (single-cycle)
+  [x] - Hardware RNG (LFSR)
+[x] Phase 20.4: Dual SID (Stereo)
+  [x] - Independent SID dispatching
+  [x] - Stereo mixing with panning
+[x] Phase 22: MEGA65 Keyboard and Joysticks
+  [x] - C65 keyboard matrix (8x8)
+  [x] - CIA1/CIA2 wiring
+  [x] - Shared signal lines (IRQ/NMI)
+  [x] - Combined port devices (Kbd + Joy2)
 
 ## Phase 19: SparseMemoryBus(28) and MAP MMU ✓ COMPLETE
 [x] - SparseMemoryBus with 4KB lazy-allocated pages and pre-mapped ROM regions

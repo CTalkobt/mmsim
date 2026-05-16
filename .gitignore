@@ -21,3 +21,6 @@ man/
 
 tests/45gs02/tests
 src/include/version.h
+
+roms/mega65/mega65.rom
+MEGA65.ROM

@@ -116,6 +116,9 @@ PLUGIN_CIA6526_SRCS = src/plugins/devices/cia6526/main/cia6526.cpp \
 PLUGIN_VIC2_SRCS = src/plugins/devices/vic2/main/vic2.cpp \
 	src/plugins/devices/vic2/main/plugin_init.cpp
 
+PLUGIN_VIC4_SRCS = src/plugins/devices/vic4/main/vic4.cpp \
+	src/plugins/devices/vic4/main/plugin_init.cpp
+
 PLUGIN_SID6581_SRCS = src/plugins/devices/sid6581/main/sid6581.cpp \
 	src/plugins/devices/sid6581/main/plugin_init.cpp
 
@@ -171,6 +174,15 @@ PLUGIN_SID_PAIR_SRCS = src/plugins/devices/sid_pair/main/sid_pair.cpp \
 	src/plugins/devices/sid_pair/main/plugin_init.cpp
 
 PLUGIN_MEGA65_SRCS = src/plugins/machines/mega65/main/machine_mega65.cpp \
+	src/plugins/devices/keyboard/main/keyboard_matrix_mega65.cpp \
+	src/plugins/devices/cia6526/main/cia6526.cpp \
+	src/plugins/devices/vic4/main/vic4.cpp \
+	src/plugins/devices/vic2/main/vic2.cpp \
+	src/plugins/devices/map_mmu/main/map_mmu.cpp \
+	src/plugins/devices/map_mmu/main/key_register.cpp \
+	src/plugins/devices/map_mmu/main/c64_bank_controller.cpp \
+	src/plugins/devices/f018b_dma/main/f018b_dma.cpp \
+	src/plugins/devices/mega65_math/main/mega65_math.cpp \
 	src/plugins/machines/mega65/main/plugin_init.cpp
 
 PLUGIN_EXIT_TRAP_SRCS = src/plugins/devices/exit_trap/main/exit_trap.cpp \
@@ -253,8 +265,10 @@ TEST_SRCS = tests/src/test_main.cpp \
 	src/plugins/devices/map_mmu/test/test_map_mmu.cpp \
 	src/plugins/devices/map_mmu/test/test_key_register.cpp \
 	src/plugins/devices/map_mmu/test/test_c64_bank_controller.cpp \
+	src/plugins/devices/vic4/test/test_vic4.cpp \
 	src/plugins/machines/mega65/test/test_mega65_map.cpp \
 	src/plugins/machines/mega65/test/test_mega65_integration.cpp \
+	src/plugins/machines/mega65/test/test_mega65_keyboard.cpp \
 	tests/src/test_cbm_disk_images.cpp \
 	tests/src/test_d81_directory_listing.cpp \
 	tests/src/test_plugin_validation.cpp \
@@ -273,8 +287,8 @@ PLUGIN_ANTIC_TEST_SRCS = src/plugins/devices/antic/test/test_atari_boot.cpp \
 
 
 
-	# Test-related objects (excluding plugin entry points to avoid multiple mmemuPluginInit definitions)
-            ALL_PLUGIN_OBJS = src/plugins/6502/main/cpu6502.o \
+# Test-related objects (excluding plugin entry points to avoid multiple mmemuPluginInit definitions)
+ALL_PLUGIN_OBJS = src/plugins/6502/main/cpu6502.o \
 	src/plugins/6502/main/cpu6510.o \
 	src/plugins/6502/main/disassembler_6502.o \
 	src/plugins/6502/main/assembler_6502.o \
@@ -306,6 +320,7 @@ PLUGIN_ANTIC_TEST_SRCS = src/plugins/devices/antic/test/test_atari_boot.cpp \
 	src/plugins/devices/crtc6545/main/crtc6545.o \
 	src/plugins/devices/pet_video/main/pet_video.o \
 	src/plugins/devices/keyboard/main/keyboard_matrix_pet.o \
+	src/plugins/devices/keyboard/main/keyboard_matrix_mega65.o \
 	src/plugins/devices/antic/main/antic.o \
 	src/plugins/devices/gtia/main/gtia.o \
 	src/plugins/devices/pokey/main/pokey.o \
@@ -314,6 +329,7 @@ PLUGIN_ANTIC_TEST_SRCS = src/plugins/devices/antic/test/test_atari_boot.cpp \
 	src/plugins/devices/map_mmu/main/map_mmu.o \
 	src/plugins/devices/map_mmu/main/key_register.o \
 	src/plugins/devices/map_mmu/main/c64_bank_controller.o \
+	src/plugins/devices/vic4/main/vic4.o \
 	src/plugins/devices/mega65_math/main/mega65_math.o \
 	src/plugins/devices/hyper_serial/main/hyper_serial.o \
 	src/plugins/devices/exit_trap/main/exit_trap.o \
@@ -359,8 +375,10 @@ PLUGIN_VICEIMPORTER_OBJS = $(PLUGIN_VICEIMPORTER_SRCS:.cpp=.o)
 PLUGIN_MEGA65IMPORTER_OBJS = $(PLUGIN_MEGA65IMPORTER_SRCS:.cpp=.o)
 PLUGIN_C64PLA_OBJS   = $(PLUGIN_C64PLA_SRCS:.cpp=.o)
 PLUGIN_CIA6526_OBJS  = $(PLUGIN_CIA6526_SRCS:.cpp=.o)
-PLUGIN_VIC2_OBJS     = $(PLUGIN_VIC2_SRCS:.cpp=.o)
-PLUGIN_SID6581_OBJS  = $(PLUGIN_SID6581_SRCS:.cpp=.o)
+PLUGIN_VIC2_OBJS   = $(PLUGIN_VIC2_SRCS:.cpp=.o)
+PLUGIN_VIC4_OBJS   = $(PLUGIN_VIC4_SRCS:.cpp=.o)
+PLUGIN_SID6581_OBJS = $(PLUGIN_SID6581_SRCS:.cpp=.o)
+
 PLUGIN_C64_CORE_OBJS = $(PLUGIN_C64_CORE_SRCS:.cpp=.o) \
 	src/plugins/devices/cia6526/main/cia6526.o \
 	src/plugins/devices/vic2/main/vic2.o \
@@ -412,6 +430,7 @@ PLUGINS = $(LIBDIR)/mmemu-plugin-6502.so \
 	$(LIBDIR)/mmemu-plugin-c64-pla.so \
 	$(LIBDIR)/mmemu-plugin-cia6526.so \
 	$(LIBDIR)/mmemu-plugin-vic2.so \
+	$(LIBDIR)/mmemu-plugin-vic4.so \
 	$(LIBDIR)/mmemu-plugin-sid6581.so \
 	$(LIBDIR)/mmemu-plugin-c64.so \
 	$(LIBDIR)/mmemu-plugin-pia6520.so \
@@ -504,6 +523,9 @@ $(LIBDIR)/mmemu-plugin-cia6526.so: $(PLUGIN_CIA6526_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 $(LIBDIR)/mmemu-plugin-vic2.so: $(PLUGIN_VIC2_OBJS) | $(LIBDIR)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
+
+$(LIBDIR)/mmemu-plugin-vic4.so: $(PLUGIN_VIC4_OBJS) | $(LIBDIR)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(WXLIBS) $(PLUGIN_LIBS)
 
 $(LIBDIR)/mmemu-plugin-sid6581.so: $(PLUGIN_SID6581_OBJS) | $(LIBDIR)
