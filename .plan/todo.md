@@ -429,20 +429,20 @@ physical addresses. See arch.md §3.1 and the `SparseMemoryBus(28)` note.*
 
 ### Phase 19.1 `SparseMemoryBus` (`src/libmem/sparse_memory_bus.h/cpp`)
 
-- [ ] Template (or configurable) `SparseMemoryBus` class implementing `IBus`.
-- [ ] Internally uses a `std::unordered_map<uint32_t, uint8_t*>` of 4 KB pages,
+- [x] Template (or configurable) `SparseMemoryBus` class implementing `IBus`.
+- [x] Internally uses a `std::unordered_map<uint32_t, uint8_t*>` of 4 KB pages,
       allocated lazily on first write (reads to unallocated pages return $FF).
-- [ ] Constructor takes `addrBits` (28 for MEGA65; also used for 65C816 at 24).
-- [ ] `addRegion(base28, size, data, writable)` — maps a pre-allocated buffer
+- [x] Constructor takes `addrBits` (28 for MEGA65; also used for 65C816 at 24).
+- [x] `addRegion(base28, size, data, writable)` — maps a pre-allocated buffer
       (e.g., ROM image) into the sparse space; reads/writes redirect to `data`.
       Writable=false silently drops writes (ROM protection).
-- [ ] `read8(addr28)` / `write8(addr28, val)`: page lookup → buffer offset.
+- [x] `read8(addr28)` / `write8(addr28, val)`: page lookup → buffer offset.
       Write log appended on every `write8`.
-- [ ] `peek8(addr28)`: side-effect-free read, same as `read8` but does not
+- [x] `peek8(addr28)`: side-effect-free read, same as `read8` but does not
       trigger write-watch callbacks.
-- [ ] `stateSize/saveState/loadState`: serialises only allocated pages (sparse
+- [x] `stateSize/saveState/loadState`: serialises only allocated pages (sparse
       snapshot); restores by re-allocating and populating those pages.
-- [ ] `reset()`: deallocates all dynamically allocated pages; pre-mapped regions
+- [x] `reset()`: deallocates all dynamically allocated pages; pre-mapped regions
       (ROM buffers) remain mapped but intact.
 
 ### Phase 19.2 MAP MMU IOHandler (`src/plugins/devices/map_mmu/`)
@@ -450,45 +450,45 @@ physical addresses. See arch.md §3.1 and the `SparseMemoryBus(28)` note.*
 *The MAP MMU sits between the CPU's 16-bit address space and the 28-bit
 `SparseMemoryBus`. It intercepts every CPU read/write and translates.*
 
-- [ ] `MapMmu` implements `IOHandler` (responds to the full $0000–$FFFF range)
+- [x] `MapMmu` implements `IOHandler` (responds to the full $0000–$FFFF range)
       but is wired as a *pass-through* bus adapter rather than a device:
     - Internally holds a reference to the downstream `SparseMemoryBus*`.
     - The CPU's `IBus*` slot points to the `MapMmu` wrapper, not directly to
       `SparseMemoryBus`; `MapMmu::ioRead/ioWrite` performs the translation.
-- [ ] **MAP state**: eight 20-bit offsets (four for $0000–$7FFF, four for
+- [x] **MAP state**: eight 20-bit offsets (four for $0000–$7FFF, four for
       $8000–$FFFF, each covering an 8 KB block) plus a corresponding enable
       bitmask. Offsets are set by `CPU45GS02` calling `setMapState()`.
-- [ ] **Translation**: for each CPU 16-bit address:
+- [x] **Translation**: for each CPU 16-bit address:
     - Determine which 8 KB block it falls in (bits 15:13 → index 0–7).
     - If that block's enable bit is set: `phys = (offset[i] << 8) | (vaddr & 0x1FFF)`.
     - If not enabled: `phys = (c64_bank << 16) | vaddr` (C64-style banking,
       upper bank byte from the 6510-compatible port at $00/$01).
-- [ ] **ROM overlay fast path**: C64-compatibility banking (LORAM/HIRAM/CHAREN)
+- [x] **ROM overlay fast path**: C64-compatibility banking (LORAM/HIRAM/CHAREN)
       is handled by a `C64BankController` (similar to Phase 11.2 C64 PLA) that
       intercepts writes to $00/$01 and updates `SparseMemoryBus` overlays for
       KERNAL ($E000–$FFFF), BASIC ($A000–$BFFF), and I/O/CHARROM ($D000–$DFFF).
-- [ ] **I/O personality**: writes to $D02F (KEY register) cycle through
+- [x] **I/O personality**: writes to $D02F (KEY register) cycle through
       C64 → C65 → MEGA65 personality; the active personality controls which
       device handlers are visible in the $D000–$DFFF window.
-- [ ] `setMapState(const MapState&)` — called by `CPU45GS02::step()` when it
+- [x] `setMapState(const MapState&)` — called by `CPU45GS02::step()` when it
       executes MAP; stores new offsets and enable bits atomically.
-- [ ] `reset()`: clears all MAP enables; C64 banking lines default to $37
+- [x] `reset()`: clears all MAP enables; C64 banking lines default to $37
       (LORAM=HIRAM=CHAREN=1 — KERNAL+BASIC visible, I/O active).
 
 ### Phase 19.3 Unit Tests (`tests/test_sparse_memory_bus.cpp`)
 
-- [ ] Read from unallocated page returns $FF without crash.
-- [ ] Write to page allocates it; subsequent read returns the written value.
-- [ ] `addRegion()` with writable=false: write is silently dropped; read returns
+- [x] Read from unallocated page returns $FF without crash.
+- [x] Write to page allocates it; subsequent read returns the written value.
+- [x] `addRegion()` with writable=false: write is silently dropped; read returns
       region data.
-- [ ] Two non-overlapping regions at $20000 and $40000; verify each returns
+- [x] Two non-overlapping regions at $20000 and $40000; verify each returns
       its own data independently.
-- [ ] Snapshot: allocate two pages, write distinct values, save, overwrite,
+- [x] Snapshot: allocate two pages, write distinct values, save, overwrite,
       restore; verify original values recovered; unallocated page still $FF.
-- [ ] MAP MMU translation: enable MAP for $A000–$BFFF block pointing to $40000;
+- [x] MAP MMU translation: enable MAP for $A000–$BFFF block pointing to $40000;
       CPU read at $A000 reads from physical $40000; CPU read at $8000 (not
       mapped) reads from physical $8000.
-- [ ] C64 bank switch: set HIRAM=0; verify $E000 no longer reads KERNAL ROM
+- [x] C64 bank switch: set HIRAM=0; verify $E000 no longer reads KERNAL ROM
       overlay (reads underlying RAM).
 
 ---
@@ -679,7 +679,7 @@ $DC00–$DCFF   CIA1
 $DD00–$DDFF   CIA2
 $DE00–$DFFF   Cartridge I/O (stub)
 $E000–$FFFF   KERNAL ROM (from MEGA65.ROM; overlay in Banks 2–3)
-```
+### Phase 21.1 MEGA65 28-bit Memory Map [COMPLETED]
 
 ### Phase 21.2 Machine Factory (`src/plugins/machines/rawMega65/`) [COMPLETED]
 
@@ -688,6 +688,9 @@ $E000–$FFFF   KERNAL ROM (from MEGA65.ROM; overlay in Banks 2–3)
 - [x] Initial wiring of 45GS02 to system bus.
 - [x] Full 28-bit bus integration with `SparseMemoryBus`.
 - [x] All I/O devices registered in `IORegistry`.
+- [x] Load MEGA65 ROM and wire overlays on SparseMemoryBus (KERNAL, BASIC, CHARROM).
+- [x] MEGA65 integration tests (MAP functionality, address translation, ROM visibility).
+
 
 ---
 

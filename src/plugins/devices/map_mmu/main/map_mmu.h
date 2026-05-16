@@ -4,6 +4,7 @@
 #include "imap_controller.h"
 #include <cstdint>
 #include <string>
+#include <functional>
 
 class SparseMemoryBus;
 
@@ -75,11 +76,20 @@ public:
     const MapState& getMapState() const override { return m_mapState; }
     void clearMapState() override;
 
+    /**
+     * Set I/O hooks for the virtual address space (before translation).
+     */
+    void setIoHooks(std::function<bool(IBus*, uint32_t, uint8_t*)> readFn,
+                    std::function<bool(IBus*, uint32_t, uint8_t)>  writeFn);
+
 private:
     std::string m_name;
     BusConfig   m_config;
     SparseMemoryBus* m_physBus;
     MapState m_mapState;
+
+    std::function<bool(IBus*, uint32_t, uint8_t*)> m_ioRead;
+    std::function<bool(IBus*, uint32_t, uint8_t)>  m_ioWrite;
 
     uint32_t translate(uint32_t vaddr) const;
 };

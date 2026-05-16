@@ -156,3 +156,74 @@ TEST_CASE(mega65_integration_io_personality) {
     
     delete desc;
 }
+
+TEST_CASE(mega65_integration_c64_rom_banking) {
+    ensureMega65Registered();
+    auto* desc = MachineRegistry::instance().createMachine("mega65");
+    ASSERT(desc != nullptr);
+
+    IBus* mmuBus = nullptr;
+    for (auto& b : desc->buses) {
+        if (b.busName == "mmu") { mmuBus = b.bus; break; }
+    }
+    ASSERT(mmuBus != nullptr);
+
+    // Default state: KERNAL ($E000) and BASIC ($A000) should be visible.
+    // Since we fill with $FF if file is missing, we can't be 100% sure of content,
+    // but we can test banking by writing to underlying RAM.
+
+    uint32_t kernalAddr = 0xE000;
+    uint32_t basicAddr  = 0xA000;
+    uint32_t charAddr   = 0xD000;
+
+    // 1. Verify KERNAL is ROM (write-protected)
+    uint8_t kernalVal = mmuBus->read8(kernalAddr);
+    mmuBus->write8(kernalAddr, kernalVal ^ 0xFF);
+    ASSERT_EQ(mmuBus->read8(kernalAddr), kernalVal);
+
+    // 2. Bank out KERNAL (HIRAM=0)
+    // $01 bits: 0=LORAM, 1=HIRAM, 2=CHAREN. Port defaults to $37 (%00110111)
+    // Set HIRAM=0 -> $35 (%00110101). Note: $35 banks out BOTH KERNAL and BASIC.
+    desc->ioRegistry->dispatchWrite(nullptr, 0x0001, 0x35);
+    
+    // Now KERNAL should be RAM
+    mmuBus->write8(kernalAddr, 0x55);
+    ASSERT_EQ(mmuBus->read8(kernalAddr), 0x55);
+
+    // Now BASIC should also be RAM (on C64, HIRAM=0 banks out BASIC regardless of LORAM)
+    mmuBus->write8(basicAddr, 0x42);
+    ASSERT_EQ(mmuBus->read8(basicAddr), 0x42);
+
+    // 3. Restore BASIC ROM but keep KERNAL as RAM? Not possible on C64.
+    // Let's test BASIC as RAM while KERNAL is ROM (LORAM=0, HIRAM=1) -> $36 (%00110110)
+    desc->ioRegistry->dispatchWrite(nullptr, 0x0001, 0x36);
+    
+    // KERNAL should be back to ROM
+    ASSERT_EQ(mmuBus->read8(kernalAddr), kernalVal);
+    // BASIC should still be RAM
+    mmuBus->write8(basicAddr, 0x99);
+    ASSERT_EQ(mmuBus->read8(basicAddr), 0x99);
+
+    // 4. Restore everything to ROM
+    desc->ioRegistry->dispatchWrite(nullptr, 0x0001, 0x37);
+    ASSERT_EQ(mmuBus->read8(kernalAddr), kernalVal);
+    uint8_t basicVal = mmuBus->read8(basicAddr);
+    mmuBus->write8(basicAddr, basicVal ^ 0xFF);
+    ASSERT_EQ(mmuBus->read8(basicAddr), basicVal);
+
+    // 5. Verify Char ROM (CHAREN=0)
+    // Default CHAREN=1 (I/O visible). Write to $D02F (KeyReg)
+    desc->ioRegistry->dispatchWrite(nullptr, 0xD02F, 0x11);
+    uint8_t ioVal = 0;
+    desc->ioRegistry->dispatchRead(nullptr, 0xD02F, &ioVal);
+    ASSERT_EQ(ioVal, 0x11);
+    ASSERT_EQ(mmuBus->read8(0xD02F), 0x11);
+
+    // Set CHAREN=0 -> $33 (%00110011)
+    desc->ioRegistry->dispatchWrite(nullptr, 0x0001, 0x33);
+    // Now reading $D000 range should return Char ROM, not I/O
+    // (In our case, likely $FF if file missing, but definitely NOT 0x11 at $D02F)
+    ASSERT_NE(mmuBus->read8(0xD02F), 0x11);
+
+    delete desc;
+}

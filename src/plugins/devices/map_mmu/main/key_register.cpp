@@ -42,6 +42,7 @@ bool KeyRegister::isValidSequence(uint8_t first, uint8_t second, IopersonalityMo
 
 bool KeyRegister::ioRead(IBus* bus, uint32_t addr, uint8_t* val)
 {
+    if (addr != 0xD02F) return false;
     // $D02F read returns last written value (or 0 if nothing written)
     *val = m_lastWritten;
     return true;
@@ -49,6 +50,7 @@ bool KeyRegister::ioRead(IBus* bus, uint32_t addr, uint8_t* val)
 
 bool KeyRegister::ioWrite(IBus* bus, uint32_t addr, uint8_t val)
 {
+    if (addr != 0xD02F) return false;
     m_lastWritten = val;
 
     if (m_state == KeyState::WAITING_FIRST) {

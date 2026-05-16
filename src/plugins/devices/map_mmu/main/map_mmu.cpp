@@ -32,8 +32,17 @@ uint32_t MapMmu::translate(uint32_t vaddr) const {
 
 uint8_t MapMmu::read8(uint32_t addr) {
     addr &= 0xFFFF;
-    uint32_t physAddr = translate(addr);
 
+    // Check I/O hooks first (virtual address space)
+    uint8_t ioVal = 0;
+    if (m_ioRead && m_ioRead(this, addr, &ioVal)) {
+        if (m_observer) {
+            m_observer->onMemoryRead(this, addr, ioVal);
+        }
+        return ioVal;
+    }
+
+    uint32_t physAddr = translate(addr);
     uint8_t val = m_physBus->read8(physAddr);
     if (m_observer) {
         m_observer->onMemoryRead(this, addr, val);
@@ -43,20 +52,42 @@ uint8_t MapMmu::read8(uint32_t addr) {
 
 uint8_t MapMmu::peek8(uint32_t addr) {
     addr &= 0xFFFF;
+
+    // Check I/O hooks first (virtual address space)
+    uint8_t ioVal = 0;
+    if (m_ioRead && m_ioRead(this, addr, &ioVal)) {
+        return ioVal;
+    }
+
     uint32_t physAddr = translate(addr);
     return m_physBus->peek8(physAddr);
 }
 
 void MapMmu::write8(uint32_t addr, uint8_t val) {
     addr &= 0xFFFF;
-
     uint8_t before = peek8(addr);
+
+    // Check I/O hooks first (virtual address space)
+    if (m_ioWrite && m_ioWrite(this, addr, val)) {
+        if (m_observer) {
+            m_observer->onMemoryWrite(this, addr, before, val);
+        }
+        return;
+    }
+
     uint32_t physAddr = translate(addr);
     m_physBus->write8(physAddr, val);
 
     if (m_observer) {
         m_observer->onMemoryWrite(this, addr, before, val);
     }
+}
+
+void MapMmu::setIoHooks(std::function<bool(IBus*, uint32_t, uint8_t*)> readFn,
+                        std::function<bool(IBus*, uint32_t, uint8_t)>  writeFn)
+{
+    m_ioRead = std::move(readFn);
+    m_ioWrite = std::move(writeFn);
 }
 
 void MapMmu::setMapState(const MapState& state) {

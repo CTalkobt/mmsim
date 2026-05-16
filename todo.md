@@ -49,8 +49,9 @@
 [x] - Separate C64 mode path (C64BankController) from MEGA65 mode path (MapMmu)
 [x] - Implement I/O personality switching ($D02F KEY register) in machine factory
 [x] - MAP instruction parameter parsing (register encoding from A/X/Y/Z)
-[ ] - Load MEGA65 ROM and wire overlays on SparseMemoryBus (KERNAL, BASIC, CHARROM)
-[ ] - MEGA65 integration tests (MAP functionality, address translation, ROM visibility)
+- [x] - Load MEGA65 ROM and wire overlays on SparseMemoryBus (KERNAL, BASIC, CHARROM)
+- [x] - MEGA65 integration tests (MAP functionality, address translation, ROM visibility)
+
 
 ## 45GS02 CPU Core
 [x] - Quad immediate modes (LDQ/ADCQ/SBCQ/CMPQ/ANDQ/ORAQ/EORQ #imm32)

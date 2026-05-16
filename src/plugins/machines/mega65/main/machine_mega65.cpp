@@ -52,6 +52,14 @@ MachineDescriptor* Mega65MachineFactory::create() {
     auto* bankCtrl = new C64BankController(physBus);
     bankCtrl->setMapMmu(mmu);
 
+    // MEGA65 ROM layout (128KB image):
+    // $0000-$1FFF: C64 BASIC (8KB)
+    // $2000-$3FFF: C64 KERNAL (8KB)
+    // $4000-$4FFF: C64 Char ROM (4KB)
+    bankCtrl->setBasicRom (romBuf + 0x0000, 8192);
+    bankCtrl->setKernalRom(romBuf + 0x2000, 8192);
+    bankCtrl->setCharRom  (romBuf + 0x4000, 4096);
+
     // -----------------------------------------------------------------------
     // Create I/O Devices
     // -----------------------------------------------------------------------
@@ -74,6 +82,12 @@ MachineDescriptor* Mega65MachineFactory::create() {
     io->registerHandler(serial);
     io->registerHandler(exitTrap);
     desc->ioRegistry = io;
+
+    // Wire I/O hooks to MapMmu so virtual space accesses to $D000 etc. are dispatched
+    mmu->setIoHooks(
+        [io](IBus* b, uint32_t a, uint8_t* v) { return io->dispatchRead(b, a, v); },
+        [io](IBus* b, uint32_t a, uint8_t v) { return io->dispatchWrite(b, a, v); }
+    );
 
     desc->deleters.push_back([bankCtrl]() { delete bankCtrl; });
     desc->deleters.push_back([keyReg]() { delete keyReg; });
