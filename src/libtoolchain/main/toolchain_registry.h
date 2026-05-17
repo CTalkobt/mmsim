@@ -30,6 +30,9 @@ public:
     void registerAssemblerByName(const std::string& name, AsmFactoryFn fn);
     IAssembler* createAssemblerByName(const std::string& name);
 
+    // Enumerate all registered assembler names (both ISA-default and named)
+    std::vector<std::string> getAssemblerNames() const;
+
 private:
     ToolchainRegistry() = default;
     std::map<std::string, ToolchainInfo> m_toolchains;

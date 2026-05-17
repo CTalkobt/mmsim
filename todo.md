@@ -94,11 +94,11 @@
 [x] Pluggable Assembler Infrastructure (0.8.1)
 [x] CA45 Assembler Backend
 [x] MCP Server Assembler Tools (0.8.1)
-[ ] Add ca45 assembler backend support for CLI and GUI (phase 2)
-  [ ] - Update CLI `asm` command to support assembler selection and file-based mode
-  [ ] - Update GUI assemble dialog with assembler picker
-  [ ] - Add ca45 backend configuration to example config.json
-  [ ] - Document assembler backend architecture and how to add new assemblers
+[x] Add ca45 assembler backend support for CLI and GUI (phase 2)
+  [x] - Update CLI `asm` command to support assembler selection and file-based mode
+  [x] - Update GUI assemble dialog with assembler picker
+  [x] - Add ca45 backend configuration to example config.json
+  [x] - Document assembler backend architecture and how to add new assemblers
 
 ## Deprioritized
 - Cycle-accurate timing for all opcodes/modes

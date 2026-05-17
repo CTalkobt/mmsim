@@ -876,23 +876,30 @@ void MmemuFrame::OnSwapMem(wxCommandEvent& event) {
 void MmemuFrame::OnAssemble(wxCommandEvent& event) {
     (void)event;
     if (!m_cpu || !m_bus) return;
-    AssembleDialog dialog(this, m_cpu->pc());
+
+    std::string currentAsm = m_machine ? m_machine->preferredAssembler : "";
+    AssembleDialog dialog(this, m_cpu->pc(), currentAsm);
     if (dialog.ShowModal() == wxID_OK) {
         std::string instr = dialog.GetInstruction();
         uint32_t addr = dialog.GetAddress();
-        
-        IAssembler* assem = ToolchainRegistry::instance().createAssembler(m_cpu->isaName());
+        std::string selectedAsm = dialog.GetSelectedAssembler();
+
+        std::string machPref = m_machine ? m_machine->preferredAssembler : "";
+        IAssembler* assem = resolveAssembler(m_cpu->isaName(), machPref, selectedAsm);
         if (assem) {
             uint8_t opcodes[16];
-            int sz = assem->assembleLine(instr, opcodes, sizeof(opcodes));
+            int sz = assem->assembleLine(instr, opcodes, sizeof(opcodes), addr);
             if (sz > 0) {
                 for (int i = 0; i < sz; ++i) m_bus->write8(addr + i, opcodes[i]);
                 for (auto* p : m_memPanes) p->RefreshValues();
                 m_disasmPane->RefreshValues(m_cpu->pc());
             } else {
-                wxMessageBox("Assembly failed!", "Error", wxOK | wxICON_ERROR);
+                wxMessageBox("Assembly failed!\nThe selected assembler may not support line mode.",
+                             "Error", wxOK | wxICON_ERROR);
             }
             delete assem;
+        } else {
+            wxMessageBox("No assembler available for this ISA.", "Error", wxOK | wxICON_ERROR);
         }
     }
 }

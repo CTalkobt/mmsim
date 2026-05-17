@@ -1,0 +1,16 @@
+{
+    "tools": {
+        "assemblers": {
+            "ca45": {
+                "command": "ca45",
+                "extraOptions": "",
+                "workingDir": "/tmp"
+            },
+            "kickAssembler": {
+                "command": "java -jar /opt/KickAssembler/KickAss.jar",
+                "extraOptions": "",
+                "workingDir": "/tmp"
+            }
+        }
+    }
+}

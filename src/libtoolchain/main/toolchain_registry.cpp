@@ -41,6 +41,30 @@ IAssembler* ToolchainRegistry::createAssemblerByName(const std::string& name) {
     return nullptr;
 }
 
+std::vector<std::string> ToolchainRegistry::getAssemblerNames() const {
+    std::vector<std::string> names;
+    for (const auto& kv : m_assemblersByName) {
+        names.push_back(kv.first);
+    }
+    // Also include ISA-default assemblers (create temporarily to get their name)
+    for (const auto& kv : m_toolchains) {
+        if (kv.second.asmFactory) {
+            IAssembler* a = kv.second.asmFactory();
+            if (a) {
+                std::string n = a->name();
+                delete a;
+                // Avoid duplicates
+                bool found = false;
+                for (const auto& existing : names) {
+                    if (existing == n) { found = true; break; }
+                }
+                if (!found) names.push_back(n);
+            }
+        }
+    }
+    return names;
+}
+
 IAssembler* resolveAssembler(const std::string& isa,
                              const std::string& machinePreferred,
                              const std::string& runtimeOverride) {

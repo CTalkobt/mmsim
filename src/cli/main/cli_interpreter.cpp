@@ -799,16 +799,55 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
         if (!m_ctx.cpu || !m_ctx.assem) { m_output("No machine created.\n"); return; }
         std::string expr;
         if (ss >> expr) {
-            uint32_t addr;
-            if (parseAddr(expr, addr)) {
-                m_asmAddr = addr;
-                m_asmMode = true;
+            if (expr == "file") {
+                // File-based assembly: asm file <path> [loadAddr]
+                std::string path;
+                if (!(ss >> path)) { m_output("Syntax: asm file <path> [loadAddr]\n"); return; }
+                std::string outputPath = path + ".prg";
+                AssemblerResult res = m_ctx.assem->assemble(path, outputPath);
+                if (res.success) {
+                    // Load the .prg into memory
+                    uint32_t loadAddr = m_asmAddr;
+                    std::string addrStr;
+                    if (ss >> addrStr) parseAddr(addrStr, loadAddr);
+
+                    FILE* f = fopen(res.outputPath.c_str(), "rb");
+                    if (f) {
+                        // .prg format: first 2 bytes = load address (little-endian)
+                        uint8_t lo = 0, hi = 0;
+                        if (fread(&lo, 1, 1, f) == 1 && fread(&hi, 1, 1, f) == 1) {
+                            loadAddr = (uint16_t)lo | ((uint16_t)hi << 8);
+                        }
+                        int count = 0;
+                        uint8_t byte;
+                        while (fread(&byte, 1, 1, f) == 1) {
+                            m_ctx.bus->write8(loadAddr + count, byte);
+                            count++;
+                        }
+                        fclose(f);
+                        std::stringstream msg;
+                        msg << "Assembled " << count << " bytes, loaded at $"
+                            << std::hex << std::uppercase << std::setfill('0')
+                            << std::setw(4) << loadAddr << "\n";
+                        m_output(msg.str());
+                    } else {
+                        m_output("Assembly succeeded but could not read output: " + res.outputPath + "\n");
+                    }
+                } else {
+                    m_output("Assembly failed: " + res.errorMessage + "\n");
+                }
             } else {
-                m_output("Error: Invalid address '" + expr + "'\n");
-                return;
+                uint32_t addr;
+                if (parseAddr(expr, addr)) {
+                    m_asmAddr = addr;
+                    m_asmMode = true;
+                } else {
+                    m_output("Error: Invalid address '" + expr + "'\n");
+                    return;
+                }
             }
         } else {
-            m_output("Syntax: asm <address>\n");
+            m_output("Syntax: asm <address> | asm file <path>\n");
         }
     } else if (cmd == "config") {
         std::string subcmd;
@@ -824,13 +863,22 @@ void CliInterpreter::handleNormalCommand(const std::string& line) {
                     }
                     m_output("Assembler override set to: " + name + "\n");
                 } else {
-                    // Show current assembler
+                    // Show current assembler and available list
                     std::string current = m_ctx.assemblerOverride.empty()
                         ? (m_ctx.machine && !m_ctx.machine->preferredAssembler.empty()
                             ? m_ctx.machine->preferredAssembler
                             : "default")
                         : m_ctx.assemblerOverride;
                     m_output("Current assembler: " + current + "\n");
+                    auto names = ToolchainRegistry::instance().getAssemblerNames();
+                    if (!names.empty()) {
+                        m_output("Available: ");
+                        for (size_t i = 0; i < names.size(); ++i) {
+                            if (i > 0) m_output(", ");
+                            m_output(names[i]);
+                        }
+                        m_output("\n");
+                    }
                 }
             } else {
                 m_output("Unknown config: " + subcmd + "\n");
@@ -977,6 +1025,7 @@ void CliInterpreter::printHelp() {
              "  findprior        - Find prior occurrence of last search pattern\n"
              "  disasm <addr> [n]- Disassemble N instructions\n"
              "  asm <addr>       - Interactive assembly mode (end with '.')\n"
+             "  asm file <path>  - Assemble source file and load into memory\n"
              "  type <text>      - Type text into the machine (supports \\n)\n"
              "  key <name> <state>- Press/release a key (state: 1/0 or down/up)\n"
              "  load <path> [addr]- Load a program/binary file\n"
