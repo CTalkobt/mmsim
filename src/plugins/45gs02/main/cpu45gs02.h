@@ -34,6 +34,7 @@ struct CPU45GS02State {
 
     uint8_t  irqLine;
     uint8_t  nmiLine;
+    uint8_t  nmiPrev;
     uint8_t  haltLine;
 };
 

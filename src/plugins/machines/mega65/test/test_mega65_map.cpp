@@ -667,3 +667,256 @@ TEST_CASE(mega65_key_reset_returns_c64) {
     io.resetAll();
     ASSERT_EQ(keyReg.getCurrentPersonality(), IopersonalityMode::C64);
 }
+
+// -----------------------------------------------------------------------
+// B-register offset for stack operations
+// -----------------------------------------------------------------------
+
+// Test: In 8-bit stack mode (E set), stack page is B register
+TEST_CASE(mega65_b_register_stack_page) {
+    MapTestFixture f;
+
+    // TAB sets B=0x03, SEE sets E flag, PHA pushes A to page $03xx
+    uint8_t code[] = {
+        0xA9, 0x03,   // LDA #$03
+        0x5B,         // TAB  (B = $03)
+        0xA9, 0x42,   // LDA #$42
+        0x03,         // SEE  (set E flag — 8-bit stack mode)
+        0x48,         // PHA
+    };
+    f.loadCode(0x0200, code, sizeof(code));
+
+    for (int i = 0; i < 5; i++) f.cpu.step();
+
+    // After SEE, push8 should constrain SP to B-page ($03xx)
+    // SP started at $01FF. After SEE, push writes to current SP then decrements within B-page.
+    // push8 writes to SP=$01FF, then SP = (B<<8) | ((SP-1) & 0xFF) = $03FE
+    uint16_t sp = (uint16_t)f.cpu.sp();
+    ASSERT_EQ(sp >> 8, 0x03);   // Stack page is B
+    ASSERT_EQ(sp & 0xFF, 0xFE); // Decremented once
+
+    // Value $42 should be at $01FF (where PHA wrote before page switch)
+    ASSERT_EQ(f.physBus.read8(0x01FF), 0x42);
+}
+
+// Test: In 16-bit stack mode (E clear), B does not affect stack
+TEST_CASE(mega65_b_register_no_effect_16bit_stack) {
+    MapTestFixture f;
+
+    // Set B=0x05 but keep E clear (16-bit stack mode)
+    uint8_t code[] = {
+        0xA9, 0x05,   // LDA #$05
+        0x5B,         // TAB  (B = $05)
+        0xA9, 0x77,   // LDA #$77
+        0x48,         // PHA  (should use full 16-bit SP, not B-page)
+    };
+    f.loadCode(0x0200, code, sizeof(code));
+
+    // SP starts at $01FF after reset
+    uint16_t spBefore = (uint16_t)f.cpu.sp();
+    ASSERT_EQ(spBefore, 0x01FF);
+
+    for (int i = 0; i < 4; i++) f.cpu.step();
+
+    // SP should be $01FE (decremented in 16-bit mode, page unchanged)
+    uint16_t sp = (uint16_t)f.cpu.sp();
+    ASSERT_EQ(sp, 0x01FE);
+
+    // Value $77 should be at $01FF
+    ASSERT_EQ(f.physBus.read8(0x01FF), 0x77);
+}
+
+// Test: PLA in 8-bit stack mode respects B register
+TEST_CASE(mega65_b_register_pull_respects_b) {
+    MapTestFixture f;
+
+    // Pre-store a value at $0400 (B=4 page, offset $00)
+    f.physBus.write8(0x0400, 0xAB);
+
+    // Set B=4, E flag, SP to page $04 offset $FF (so pull increments to $00)
+    uint8_t code[] = {
+        0xA9, 0x04,   // LDA #$04
+        0x5B,         // TAB  (B = $04)
+        0x03,         // SEE  (set E flag)
+        0x68,         // PLA  (should pull from $0400 since SP wraps to $00)
+    };
+    f.loadCode(0x0200, code, sizeof(code));
+
+    for (int i = 0; i < 3; i++) f.cpu.step();  // LDA, TAB, SEE
+
+    // Now force SP to $04FF (B-page with offset FF — pull will increment to $00)
+    f.cpu.regWrite(5, 0x04FF);
+
+    f.cpu.step();  // PLA
+
+    // A should have value from $0400
+    ASSERT_EQ(f.cpu.regRead(0), 0xAB);
+    // SP should be $0400 after pull
+    ASSERT_EQ((uint16_t)f.cpu.sp(), 0x0400);
+}
+
+// -----------------------------------------------------------------------
+// Interrupt handling and vector redirection via MMU
+// -----------------------------------------------------------------------
+
+// Test: IRQ triggers when line is asserted and I flag is clear
+TEST_CASE(mega65_irq_basic) {
+    MapTestFixture f;
+
+    // Set up IRQ vector at $FFFE/$FFFF pointing to $0300
+    f.physBus.write8(0xFFFE, 0x00);
+    f.physBus.write8(0xFFFF, 0x03);
+
+    // Write a NOP at $0300 so we can verify PC lands there
+    f.physBus.write8(0x0300, 0xEA);
+
+    // Clear I flag so IRQs are enabled
+    uint8_t code[] = {
+        0x58,         // CLI
+        0xEA,         // NOP (IRQ should fire before this executes)
+    };
+    f.loadCode(0x0200, code, sizeof(code));
+
+    f.cpu.step();  // CLI — clears I flag
+
+    // Assert IRQ line
+    f.cpu.setIrqLine(true);
+
+    f.cpu.step();  // Should service IRQ instead of executing NOP at $0201
+
+    // PC should be at $0300 (IRQ handler) + 1 if NOP executed, but let's check $0300
+    // Actually step() services the IRQ and returns — PC is now at $0300
+    ASSERT_EQ((uint16_t)f.cpu.pc(), 0x0300);
+
+    // I flag should be set (interrupts disabled during handler)
+    ASSERT(f.cpu.regRead(7) & 0x04);
+
+    // Return address ($0201) and status should be on stack
+    // SP was $01FF, pushed 3 bytes → SP = $01FC
+    ASSERT_EQ((uint16_t)f.cpu.sp(), 0x01FC);
+    // Check pushed PC high, PC low, P
+    ASSERT_EQ(f.physBus.read8(0x01FF), 0x02);  // PCH
+    ASSERT_EQ(f.physBus.read8(0x01FE), 0x01);  // PCL
+}
+
+// Test: IRQ does NOT trigger when I flag is set
+TEST_CASE(mega65_irq_masked_by_i_flag) {
+    MapTestFixture f;
+
+    f.physBus.write8(0xFFFE, 0x00);
+    f.physBus.write8(0xFFFF, 0x03);
+
+    // I flag is set by default after reset
+    uint8_t code[] = { 0xEA };  // NOP
+    f.loadCode(0x0200, code, sizeof(code));
+
+    f.cpu.setIrqLine(true);
+    f.cpu.step();  // Should execute NOP, not take IRQ
+
+    ASSERT_EQ((uint16_t)f.cpu.pc(), 0x0201);  // Past the NOP
+}
+
+// Test: NMI triggers regardless of I flag (edge-sensitive)
+TEST_CASE(mega65_nmi_basic) {
+    MapTestFixture f;
+
+    // Set up NMI vector at $FFFA/$FFFB pointing to $0400
+    f.physBus.write8(0xFFFA, 0x00);
+    f.physBus.write8(0xFFFB, 0x04);
+
+    uint8_t code[] = { 0xEA };  // NOP
+    f.loadCode(0x0200, code, sizeof(code));
+
+    // I flag is set (default) — NMI should still fire
+    f.cpu.setNmiLine(true);
+    f.cpu.step();  // Should service NMI
+
+    ASSERT_EQ((uint16_t)f.cpu.pc(), 0x0400);
+}
+
+// Test: NMI is edge-sensitive (only fires once per 0→1 transition)
+TEST_CASE(mega65_nmi_edge_sensitive) {
+    MapTestFixture f;
+
+    f.physBus.write8(0xFFFA, 0x00);
+    f.physBus.write8(0xFFFB, 0x04);
+
+    // Put NOPs at $0400 onward
+    f.physBus.write8(0x0400, 0xEA);
+    f.physBus.write8(0x0401, 0xEA);
+
+    uint8_t code[] = { 0xEA, 0xEA, 0xEA };
+    f.loadCode(0x0200, code, sizeof(code));
+
+    f.cpu.setNmiLine(true);
+    f.cpu.step();  // NMI fires, PC → $0400
+
+    ASSERT_EQ((uint16_t)f.cpu.pc(), 0x0400);
+
+    // Step again with NMI still asserted — should NOT fire again
+    f.cpu.step();  // Executes NOP at $0400
+    ASSERT_EQ((uint16_t)f.cpu.pc(), 0x0401);  // Past the NOP, not re-vectored
+}
+
+// Test: Vector redirection via MAP (block 7 mapped redirects vectors)
+TEST_CASE(mega65_irq_vector_redirection_via_map) {
+    MapTestFixture f;
+
+    // Default (unmapped) IRQ vector points to $0300
+    f.physBus.write8(0xFFFE, 0x00);
+    f.physBus.write8(0xFFFF, 0x03);
+
+    // Map block 7 ($E000-$FFFF) to physical base via offset
+    // Translation: phys = (offset << 8) | (vaddr & 0x1FFF)
+    // For $FFFE: phys = (0x500 << 8) | ($FFFE & $1FFF) = $50000 | $1FFE = $51FFE
+    MapState state = {};
+    state.offsets[7] = 0x500;
+    state.enables = (1 << 7);
+    f.mmu.setMapState(state);
+
+    // Write redirected IRQ vector at physical $051FFE/$051FFF → $0500
+    f.physBus.write8(0x051FFE, 0x00);
+    f.physBus.write8(0x051FFF, 0x05);
+
+    // Clear I flag and trigger IRQ
+    uint8_t code[] = { 0x58, 0xEA };  // CLI, NOP
+    f.loadCode(0x0200, code, sizeof(code));
+
+    f.cpu.step();  // CLI
+    f.cpu.setIrqLine(true);
+    f.cpu.step();  // IRQ — should read vector from mapped address
+
+    // PC should be at $0500 (redirected vector), not $0300
+    ASSERT_EQ((uint16_t)f.cpu.pc(), 0x0500);
+}
+
+// Test: RTI restores PC and flags correctly after interrupt
+TEST_CASE(mega65_rti_restores_state) {
+    MapTestFixture f;
+
+    // IRQ vector → $0300, handler is just RTI
+    f.physBus.write8(0xFFFE, 0x00);
+    f.physBus.write8(0xFFFF, 0x03);
+    f.physBus.write8(0x0300, 0x40);  // RTI
+
+    // CLI then NOP
+    uint8_t code[] = { 0x58, 0xEA, 0xEA };
+    f.loadCode(0x0200, code, sizeof(code));
+
+    f.cpu.step();  // CLI — I flag clear
+    uint8_t pBeforeIrq = (uint8_t)f.cpu.regRead(7);
+
+    f.cpu.setIrqLine(true);
+    f.cpu.step();  // IRQ fires, PC → $0300
+
+    // Clear IRQ line before RTI so it doesn't immediately re-trigger
+    f.cpu.setIrqLine(false);
+
+    f.cpu.step();  // RTI — restores PC and P
+
+    // PC should return to $0201 (where it was when IRQ fired)
+    ASSERT_EQ((uint16_t)f.cpu.pc(), 0x0201);
+
+    // I flag should be restored to pre-IRQ state (clear)
+    ASSERT_EQ(f.cpu.regRead(7) & 0x04, pBeforeIrq & 0x04);
+}

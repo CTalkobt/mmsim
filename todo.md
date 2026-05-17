@@ -78,8 +78,8 @@
 [x] - 32-bit indirect pointers ($EA prefix for [$zp],Z)
 [x] - Stack-relative indirect addressing (d,S),Y
 [x] - 8-bit / 16-bit stack mode switching (CLE/SEE)
-[ ] - B-register offset for stack operations
-[ ] - Interrupt masking / vector redirection via MMU
+[x] - B-register offset for stack operations
+[x] - Interrupt masking / vector redirection via MMU
 
 ## MCP Server Expansion (0.8.1) - COMPLETED
 [x] - Assembler Support: `asm` tool for 6502/45GS02 code generation with error diagnostics

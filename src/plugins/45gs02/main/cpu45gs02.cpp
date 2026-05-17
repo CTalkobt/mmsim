@@ -24,7 +24,8 @@ MOS45GS02::MOS45GS02() : m_bus(nullptr) {
 
 void MOS45GS02::reset() {
     m_state.a = 0; m_state.x = 0; m_state.y = 0; m_state.z = 0; m_state.b = 0;
-    m_state.sp = 0x01FF; m_state.p = FLAG_I; m_state.cycles = 0; m_state.haltLine = 0;
+    m_state.sp = 0x01FF; m_state.p = FLAG_I; m_state.cycles = 0;
+    m_state.irqLine = 0; m_state.nmiLine = 0; m_state.nmiPrev = 0; m_state.haltLine = 0;
     if (m_bus) {
         uint16_t lo = read8(0xFFFC); uint16_t hi = read8(0xFFFD);
         m_state.pc = lo | (hi << 8);
@@ -147,14 +148,14 @@ void MOS45GS02::doSbc8(uint8_t v) {
 void MOS45GS02::push8(uint8_t v) {
     write8(m_state.sp, v);
     if (m_state.p & FLAG_E) {
-        m_state.sp = 0x0100 | ((m_state.sp - 1) & 0xFF);
+        m_state.sp = ((uint16_t)m_state.b << 8) | ((m_state.sp - 1) & 0xFF);
     } else {
         m_state.sp--;
     }
 }
 uint8_t MOS45GS02::pull8() {
     if (m_state.p & FLAG_E) {
-        m_state.sp = 0x0100 | ((m_state.sp + 1) & 0xFF);
+        m_state.sp = ((uint16_t)m_state.b << 8) | ((m_state.sp + 1) & 0xFF);
     } else {
         m_state.sp++;
     }
@@ -166,7 +167,35 @@ uint16_t MOS45GS02::pull16() { uint8_t l = pull8(); uint8_t h = pull8(); return 
 int MOS45GS02::step() {
     if (m_state.haltLine) return 1;
     if (m_bus && m_bus->isHaltRequested()) { m_state.haltLine = 1; return 1; }
-    
+
+    // NMI handling (edge-sensitive: triggers on 0→1 transition)
+    if (m_state.nmiLine && !m_state.nmiPrev) {
+        m_state.nmiPrev = 1;
+        push8((uint8_t)(m_state.pc >> 8));
+        push8((uint8_t)(m_state.pc & 0xFF));
+        push8((m_state.p & ~FLAG_B) | FLAG_E);
+        m_state.p |= FLAG_I;
+        uint8_t lo = read8(0xFFFA);
+        uint8_t hi = read8(0xFFFB);
+        m_state.pc = (uint16_t)lo | ((uint16_t)hi << 8);
+        m_state.cycles += 7;
+        return 7;
+    }
+    m_state.nmiPrev = m_state.nmiLine;
+
+    // IRQ handling (level-sensitive: triggers while line asserted and I flag clear)
+    if (m_state.irqLine && !(m_state.p & FLAG_I)) {
+        push8((uint8_t)(m_state.pc >> 8));
+        push8((uint8_t)(m_state.pc & 0xFF));
+        push8((m_state.p & ~FLAG_B) | FLAG_E);
+        m_state.p |= FLAG_I;
+        uint8_t lo = read8(0xFFFE);
+        uint8_t hi = read8(0xFFFF);
+        m_state.pc = (uint16_t)lo | ((uint16_t)hi << 8);
+        m_state.cycles += 7;
+        return 7;
+    }
+
     uint16_t startPc = m_state.pc;
     bool isQuad = false;
     bool is32BitInd = false;
@@ -1133,8 +1162,12 @@ int MOS45GS02::step() {
     return 1;
 }
 
-void MOS45GS02::triggerIrq() {}
-void MOS45GS02::triggerNmi() {}
+void MOS45GS02::triggerIrq() {
+    m_state.irqLine = 1;
+}
+void MOS45GS02::triggerNmi() {
+    m_state.nmiLine = 1;
+}
 
 int MOS45GS02::disassembleOne(IBus* bus, uint32_t addr, char* buf, int bufsz) {
     uint32_t currentAddr = addr;
