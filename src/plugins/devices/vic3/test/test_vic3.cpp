@@ -373,3 +373,98 @@ TEST_CASE(vic3_attr_color_regs_8bit) {
     // VIC2 returns high nibble as 0xF
     ASSERT_EQ(val & 0xF0, (uint8_t)0xF0);
 }
+
+// --- Unlocked 40-col standard mode (no BPM, no H640) ---
+
+TEST_CASE(vic3_render_unlocked_40col) {
+    Vic3Fixture f;
+    f.unlock();
+
+    // Unlocked but no special mode bits → delegates to VIC2::renderFrame
+    f.vic.ioWrite(nullptr, 0xD031, 0x00); // no H640, no BPM
+    f.vic.ioWrite(nullptr, 0xD020, 0x01); // white border
+
+    uint32_t buf[VIC2::FRAME_W * VIC2::FRAME_H];
+    f.vic.renderFrame(buf);
+
+    // Should render like VIC2 — border pixel is white
+    ASSERT_EQ(buf[0], (uint32_t)0xFFFFFFFF);
+}
+
+// --- 80-col with ATTR mode (full 8-bit palette color in color RAM) ---
+
+TEST_CASE(vic3_render_80col_attr_mode) {
+    Vic3Fixture f;
+    f.unlock();
+
+    // Enable H640 + ATTR
+    f.vic.ioWrite(nullptr, 0xD031, VIC3::D031_H640 | VIC3::D031_ATTR);
+    f.vic.ioWrite(nullptr, 0xD020, 0x00); // black border
+    f.vic.ioWrite(nullptr, 0xD021, 0x00); // black background
+
+    // Set palette entry 42 to a known color
+    f.vic.ioWrite(nullptr, 0xD100 + 42, 0x11); // R
+    f.vic.ioWrite(nullptr, 0xD200 + 42, 0x22); // G
+    f.vic.ioWrite(nullptr, 0xD300 + 42, 0x33); // B
+
+    // Screen char = 1
+    f.bus.write8(0x0400, 1);
+    // Char ROM: char 1, row 0 = 0xFF
+    f.charRom[1 * 8 + 0] = 0xFF;
+    // Color RAM: full 8-bit index = 42 (ATTR mode uses all 8 bits)
+    f.colorRam[0] = 42;
+
+    uint32_t buf[VIC2::FRAME_W * VIC2::FRAME_H];
+    f.vic.renderFrame(buf);
+
+    int px = VIC2::DISPLAY_X;
+    int py = VIC2::DISPLAY_Y;
+    ASSERT_EQ(buf[py * VIC2::FRAME_W + px], f.vic.getPaletteRGBA(42));
+}
+
+// --- 80-col with DMA char fetch (not char ROM) ---
+
+TEST_CASE(vic3_render_80col_dma_chars) {
+    Vic3Fixture f;
+    f.unlock();
+
+    // H640 mode, bank 1 (no char ROM shadow)
+    f.vic.setBankBase(0x4000);
+    f.vic.ioWrite(nullptr, 0xD031, VIC3::D031_H640);
+
+    // VMEM: screen at offset $0400 → $4400, char at offset $0000 → $4000
+    f.vic.ioWrite(nullptr, 0xD018, 0x10);
+    f.vic.ioWrite(nullptr, 0xD020, 0x00);
+    f.vic.ioWrite(nullptr, 0xD021, 0x00);
+
+    // Screen at $4400: char code 3
+    f.bus.write8(0x4400, 3);
+    // Char data in RAM at $4000 + 3*8 = $4018, row 0 = 0xFF
+    f.bus.write8(0x4018, 0xFF);
+    // Color RAM: fg = white (1)
+    f.colorRam[0] = 0x01;
+
+    uint32_t buf[VIC2::FRAME_W * VIC2::FRAME_H];
+    f.vic.renderFrame(buf);
+
+    int px = VIC2::DISPLAY_X;
+    int py = VIC2::DISPLAY_Y;
+    ASSERT_EQ(buf[py * VIC2::FRAME_W + px], f.vic.getPaletteRGBA(1));
+}
+
+// --- Write to $D048-$D0FF range (VIC-IV reserved, silently ignored) ---
+
+TEST_CASE(vic3_write_reserved_range) {
+    Vic3Fixture f;
+    f.unlock();
+
+    // Writes to $D048-$D0FF should be silently accepted
+    f.vic.ioWrite(nullptr, 0xD048, 0x42);
+    f.vic.ioWrite(nullptr, 0xD0FF, 0xFF);
+
+    // Reads from that range return $FF
+    uint8_t val;
+    f.vic.ioRead(nullptr, 0xD048, &val);
+    ASSERT_EQ(val, (uint8_t)0xFF);
+}
+
