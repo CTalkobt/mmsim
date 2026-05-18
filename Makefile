@@ -1,6 +1,6 @@
 # mmemu — Multi Machine Emulator
 # Top-level Makefile
-.PHONY: all cli gui mcp libs test test-mcp plugins clean man serve cppcheck
+.PHONY: all cli gui mcp libs test test-mcp plugins clean man serve cppcheck coverage
 
 all: cli gui mcp plugins
 
@@ -274,7 +274,15 @@ TEST_SRCS = tests/src/test_main.cpp \
 	tests/src/test_d81_directory_listing.cpp \
 	tests/src/test_plugin_validation.cpp \
 	tests/src/test_ffd0_bug.cpp \
-	src/plugins/devices/sid_pair/test/test_sid_pair.cpp
+	src/plugins/devices/sid_pair/test/test_sid_pair.cpp \
+	src/libdebug/test/test_stack_trace.cpp \
+	src/libdebug/test/test_breakpoint_list.cpp \
+	src/libtoolchain/test/test_source_map.cpp \
+	src/plugins/cbm-loader/test/test_tap_parser.cpp \
+	src/plugins/devices/mega65_math/test/test_mega65_math.cpp \
+	src/plugins/devices/datasette/test/test_datasette.cpp \
+	src/plugins/devices/crtc6545/test/test_crtc6545.cpp \
+	src/libcore/test/test_sim_config.cpp
 
 LIBDEBUG_TEST_SRCS = src/libdebug/test/test_breakpoints.cpp
 LIBCORE_TEST_SRCS = src/libcore/test/test_c_compatibility.c
@@ -638,6 +646,37 @@ test-mega65: $(CLI_BIN) plugins
 	./tests/45gs02/validate.py tests/45gs02/advanced.s
 	./tests/45gs02/validate.py tests/45gs02/quad.s
 
+COVDIR = coverage
+
+COV_CXXFLAGS = -std=c++17 -Wall -Wextra -Wpedantic -Wno-unused-parameter -O0 -g --coverage -fPIC -fvisibility=default -MMD -MP
+COV_CFLAGS   = -O0 -g --coverage
+
+coverage:
+	@echo "=== Building with coverage instrumentation ==="
+	$(MAKE) clean
+	$(MAKE) $(TEST_BIN) $(CLI_BIN) plugins CXXFLAGS="$(COV_CXXFLAGS)" CFLAGS="$(COV_CFLAGS)"
+	@echo "=== Running unit tests ==="
+	-./$(TEST_BIN)
+	@echo "=== Running 45GS02 validation ==="
+	-$(MAKE) test-mega65
+	@echo ""
+	@echo "=== Collecting coverage data ==="
+	@mkdir -p $(COVDIR)
+	@if command -v lcov >/dev/null 2>&1; then \
+		lcov --capture --directory src --output-file $(COVDIR)/coverage.info --ignore-errors mismatch; \
+		lcov --remove $(COVDIR)/coverage.info '*/test/*' '/usr/*' --output-file $(COVDIR)/coverage.info; \
+		genhtml $(COVDIR)/coverage.info --output-directory $(COVDIR)/html; \
+		echo ""; \
+		echo "=== HTML report: $(COVDIR)/html/index.html ==="; \
+	else \
+		echo "(lcov not found — generating text summary via gcov)"; \
+		find src -name '*.gcno' -exec gcov -r {} + > $(COVDIR)/gcov.log 2>&1; \
+		mv *.gcov $(COVDIR)/ 2>/dev/null || true; \
+		echo "=== Coverage Summary ==="; \
+		awk '/^File.*src\//{file=$$0} /^Lines executed:/{if(file){print file; print $$0; print ""; file=""}}' $(COVDIR)/gcov.log; \
+		echo "=== Full details: $(COVDIR)/gcov.log ==="; \
+	fi
+
 cppcheck:
 	@echo "Running cppcheck..."
 	cppcheck --enable=all --suppress=missingIncludeSystem --inline-suppr --quiet --force $(INCLUDES) src
@@ -686,9 +725,8 @@ man:
 	@pandoc -s -t man README.md -o $(MANDIR)/mmemu.1
 
 clean:
-	rm -rf $(BINDIR) $(LIBDIR) $(ILIBDIR) $(MANDIR)
-	find src -name "*.o" -delete
-	find src -name "*.d" -delete
+	rm -rf $(BINDIR) $(LIBDIR) $(ILIBDIR) $(MANDIR) $(COVDIR)
+	find src tests -name "*.o" -o -name "*.d" -o -name "*.gcno" -o -name "*.gcda" | xargs rm -f 2>/dev/null; true
 
 # Auto-generated header dependency files (produced by -MMD -MP).
 # The leading dash suppresses errors when .d files don't exist yet.
