@@ -34,11 +34,14 @@ public:
 
 private:
     // VIC-IV extended register accessors (28-bit physical addresses)
+    // $D060-$D063: SCRNPTR — screen RAM base (28-bit)
+    // $D064-$D065: COLPTR  — colour RAM base
+    // $D068-$D06A: CHARPTR — character set base (24-bit)
     uint32_t getScreenBase() const;
     uint32_t getCharBase() const;
 
-    // Extended registers $D048-$D07F (56 bytes, VIC-IV only)
-    uint8_t m_extRegs[64]; // indexed as offset - 0x40
+    // Extended registers $D048-$D07F (indexed as $D0xx - $D040)
+    uint8_t m_extRegs[64];
 
     // Internal color RAM (32 KB)
     std::vector<uint8_t> m_colorRamExt;

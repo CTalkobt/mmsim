@@ -12,21 +12,21 @@ void VIC4::reset() {
     VIC3::reset();
     std::memset(m_extRegs, 0, sizeof(m_extRegs));
 
-    // Default VIC-IV extended registers
-    m_extRegs[0x0C] = 0x00; // Screen RAM base ($D04C-$D04F)
-    m_extRegs[0x0D] = 0x00;
-    m_extRegs[0x0E] = 0x00;
-    m_extRegs[0x0F] = 0x00;
+    // Default VIC-IV extended registers (indexed as $D0xx - $D040)
+    // $D060-$D063: SCRNPTR — screen RAM base (28-bit), default $0000
+    m_extRegs[0x20] = 0x00; // SCRNPTRLSB
+    m_extRegs[0x21] = 0x00; // SCRNPTRMSB
+    m_extRegs[0x22] = 0x00; // SCRNPTRBNK
+    m_extRegs[0x23] = 0x00; // SCRNPTRMB (bits 27-24)
 
-    m_extRegs[0x10] = 0x00; // Char base ($D050-$D053)
-    m_extRegs[0x11] = 0x00;
-    m_extRegs[0x12] = 0x00;
-    m_extRegs[0x13] = 0x00;
+    // $D064-$D065: COLPTR — colour RAM base, default $0000
+    m_extRegs[0x24] = 0x00; // COLPTRLSB
+    m_extRegs[0x25] = 0x00; // COLPTRMSB
 
-    m_extRegs[0x18] = 0x00; // Color RAM base ($D058-$D05B) default $FF80000
-    m_extRegs[0x19] = 0x80;
-    m_extRegs[0x1A] = 0xF8;
-    m_extRegs[0x1B] = 0x0F;
+    // $D068-$D06A: CHARPTR — character set base (24-bit), default $0000
+    m_extRegs[0x28] = 0x00; // CHARPTRLSB
+    m_extRegs[0x29] = 0x00; // CHARPTRMSB
+    m_extRegs[0x2A] = 0x00; // CHARPTRBNK
 }
 
 void VIC4::tick(uint64_t cycles) {
@@ -67,14 +67,20 @@ bool VIC4::ioWrite(IBus* bus, uint32_t addr, uint8_t val) {
 
 uint32_t VIC4::getScreenBase() const {
     if (isLocked()) return VIC2::screenBase();
-    return (m_extRegs[0x0F] << 24) | (m_extRegs[0x0E] << 16) |
-           (m_extRegs[0x0D] << 8)  | m_extRegs[0x0C];
+    // $D060-$D063: SCRNPTR (28-bit physical address)
+    // m_extRegs indexed as $D0xx - $D040
+    return ((uint32_t)(m_extRegs[0x23] & 0x0F) << 24) |
+           ((uint32_t)m_extRegs[0x22] << 16) |
+           ((uint32_t)m_extRegs[0x21] << 8) |
+           (uint32_t)m_extRegs[0x20];
 }
 
 uint32_t VIC4::getCharBase() const {
     if (isLocked()) return VIC2::charBitmapBase();
-    return (m_extRegs[0x13] << 24) | (m_extRegs[0x12] << 16) |
-           (m_extRegs[0x11] << 8)  | m_extRegs[0x10];
+    // $D068-$D06A: CHARPTR (24-bit physical address)
+    return ((uint32_t)m_extRegs[0x2A] << 16) |
+           ((uint32_t)m_extRegs[0x29] << 8) |
+           (uint32_t)m_extRegs[0x28];
 }
 
 void VIC4::renderFrame(uint32_t* buffer) {
