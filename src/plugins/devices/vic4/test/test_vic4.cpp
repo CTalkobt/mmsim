@@ -1,6 +1,8 @@
 #include "test_harness.h"
 #include "plugins/devices/vic4/main/vic4.h"
 #include "plugins/devices/map_mmu/main/key_register.h"
+#include "libmem/main/memory_bus.h"
+#include <vector>
 
 TEST_CASE(vic4_personality_lock) {
     VIC4 vic;
@@ -81,4 +83,249 @@ TEST_CASE(vic4_key_integration) {
     keyReg.ioWrite(nullptr, 0xD02F, 0x00);
 
     ASSERT(vic.isLocked());
+}
+
+// --- Rendering tests ---
+
+namespace {
+
+struct Vic4Fixture {
+    FlatMemoryBus bus{"system", 16};
+    std::vector<uint8_t> charRom = std::vector<uint8_t>(4096, 0);
+    std::vector<uint8_t> colorRam = std::vector<uint8_t>(1024, 0);
+    VIC4 vic;
+
+    Vic4Fixture() {
+        vic.setDmaBus(&bus);
+        vic.setCharRom(charRom.data(), charRom.size());
+        vic.setColorRam(colorRam.data());
+        vic.reset();
+    }
+
+    void unlock() { vic.setLocked(false); }
+};
+
+} // namespace
+
+TEST_CASE(vic4_render_locked) {
+    Vic4Fixture f;
+    f.vic.ioWrite(nullptr, 0xD020, 0x01); // white border
+
+    uint32_t buf[VIC2::FRAME_W * VIC2::FRAME_H];
+    f.vic.renderFrame(buf);
+    ASSERT_EQ(buf[0], (uint32_t)0xFFFFFFFF); // VIC2 rendering
+}
+
+TEST_CASE(vic4_render_unlocked_vic3_fallback) {
+    Vic4Fixture f;
+    f.unlock();
+
+    // No FCM bits → falls through to VIC3
+    f.vic.ioWrite(nullptr, 0xD054, 0x00);
+    f.vic.ioWrite(nullptr, 0xD020, 0x01);
+
+    uint32_t buf[VIC2::FRAME_W * VIC2::FRAME_H];
+    f.vic.renderFrame(buf);
+    ASSERT_EQ(buf[0], f.vic.getPaletteRGBA(1));
+}
+
+TEST_CASE(vic4_tick) {
+    Vic4Fixture f;
+    // Tick should advance raster via VIC3→VIC2
+    f.vic.tick(VIC2::CYCLES_PER_LINE);
+    uint8_t val;
+    f.vic.ioRead(nullptr, 0xD012, &val);
+    ASSERT_EQ(val, (uint8_t)1);
+}
+
+TEST_CASE(vic4_screen_base_register) {
+    Vic4Fixture f;
+    f.unlock();
+
+    // $D060-$D063: SCRNPTR
+    f.vic.ioWrite(nullptr, 0xD060, 0x00);
+    f.vic.ioWrite(nullptr, 0xD061, 0x04);
+    f.vic.ioWrite(nullptr, 0xD062, 0x00);
+    f.vic.ioWrite(nullptr, 0xD063, 0x00);
+    ASSERT_EQ(f.vic.getScreenBase(), (uint32_t)0x0400);
+
+    // 28-bit address
+    f.vic.ioWrite(nullptr, 0xD063, 0x01);
+    ASSERT_EQ(f.vic.getScreenBase(), (uint32_t)0x01000400);
+}
+
+TEST_CASE(vic4_char_base_register) {
+    Vic4Fixture f;
+    f.unlock();
+
+    // $D068-$D06A: CHARPTR
+    f.vic.ioWrite(nullptr, 0xD068, 0x00);
+    f.vic.ioWrite(nullptr, 0xD069, 0x10);
+    f.vic.ioWrite(nullptr, 0xD06A, 0x00);
+    ASSERT_EQ(f.vic.getCharBase(), (uint32_t)0x1000);
+}
+
+TEST_CASE(vic4_col_base_register) {
+    Vic4Fixture f;
+    f.unlock();
+
+    f.vic.ioWrite(nullptr, 0xD064, 0x00);
+    f.vic.ioWrite(nullptr, 0xD065, 0x08);
+    ASSERT_EQ(f.vic.getColBase(), (uint16_t)0x0800);
+}
+
+TEST_CASE(vic4_d054_bits) {
+    Vic4Fixture f;
+    f.unlock();
+
+    f.vic.ioWrite(nullptr, 0xD054, VIC4::D054_CHR16 | VIC4::D054_FCLRLO);
+    ASSERT_EQ(f.vic.d054(), (uint8_t)(VIC4::D054_CHR16 | VIC4::D054_FCLRLO));
+}
+
+// --- FCM tests ---
+
+TEST_CASE(vic4_fcm_basic) {
+    Vic4Fixture f;
+    f.unlock();
+
+    // Enable FCLRLO (FCM for char ≤ $FF)
+    f.vic.ioWrite(nullptr, 0xD054, VIC4::D054_FCLRLO);
+
+    // Set border/bg
+    f.vic.ioWrite(nullptr, 0xD020, 0x00); // black border
+    f.vic.ioWrite(nullptr, 0xD021, 0x00); // black bg
+
+    // SCRNPTR at $0400 (default VIC-II screen area)
+    f.vic.ioWrite(nullptr, 0xD060, 0x00);
+    f.vic.ioWrite(nullptr, 0xD061, 0x04);
+    f.vic.ioWrite(nullptr, 0xD062, 0x00);
+    f.vic.ioWrite(nullptr, 0xD063, 0x00);
+
+    // CHARPTR at $2000
+    f.vic.ioWrite(nullptr, 0xD068, 0x00);
+    f.vic.ioWrite(nullptr, 0xD069, 0x20);
+    f.vic.ioWrite(nullptr, 0xD06A, 0x00);
+
+    // Screen RAM: char 1 at position (0,0)
+    f.bus.write8(0x0400, 1);
+
+    // FCM char data: char 1 at $2000 + 1*64 = $2040
+    // Row 0, pixel 0 = palette index 5 (green)
+    f.bus.write8(0x2040, 5);
+    // Row 0, pixel 1 = palette index 0 (bg)
+    f.bus.write8(0x2041, 0);
+
+    // Color RAM: fg color for $FF substitution (not used here)
+    f.colorRam[0] = 0x01;
+
+    uint32_t buf[VIC2::FRAME_W * VIC2::FRAME_H];
+    f.vic.renderFrame(buf);
+
+    int px = VIC2::DISPLAY_X;
+    int py = VIC2::DISPLAY_Y;
+
+    // Pixel 0 = palette 5 (green)
+    ASSERT_EQ(buf[py * VIC2::FRAME_W + px], f.vic.getPaletteRGBA(5));
+    // Pixel 1 = palette 0 (bg = black)
+    ASSERT_EQ(buf[py * VIC2::FRAME_W + px + 1], f.vic.getPaletteRGBA(0));
+}
+
+TEST_CASE(vic4_fcm_ff_uses_color_ram) {
+    Vic4Fixture f;
+    f.unlock();
+
+    f.vic.ioWrite(nullptr, 0xD054, VIC4::D054_FCLRLO);
+    f.vic.ioWrite(nullptr, 0xD020, 0x00);
+    f.vic.ioWrite(nullptr, 0xD021, 0x00);
+
+    f.vic.ioWrite(nullptr, 0xD060, 0x00);
+    f.vic.ioWrite(nullptr, 0xD061, 0x04);
+    f.vic.ioWrite(nullptr, 0xD062, 0x00);
+    f.vic.ioWrite(nullptr, 0xD063, 0x00);
+    f.vic.ioWrite(nullptr, 0xD068, 0x00);
+    f.vic.ioWrite(nullptr, 0xD069, 0x20);
+    f.vic.ioWrite(nullptr, 0xD06A, 0x00);
+
+    // Screen: char 0
+    f.bus.write8(0x0400, 0);
+
+    // FCM char data for char 0: row 0, pixel 0 = $FF
+    f.bus.write8(0x2000, 0xFF);
+
+    // Color RAM: fg = palette index 7 (yellow)
+    f.colorRam[0] = 7;
+
+    uint32_t buf[VIC2::FRAME_W * VIC2::FRAME_H];
+    f.vic.renderFrame(buf);
+
+    int px = VIC2::DISPLAY_X;
+    int py = VIC2::DISPLAY_Y;
+
+    // $FF pixel → uses colour RAM fg (index 7)
+    ASSERT_EQ(buf[py * VIC2::FRAME_W + px], f.vic.getPaletteRGBA(7));
+}
+
+TEST_CASE(vic4_fcm_chr16) {
+    Vic4Fixture f;
+    f.unlock();
+
+    // CHR16 + FCLRHI (FCM for char > $FF)
+    f.vic.ioWrite(nullptr, 0xD054, VIC4::D054_CHR16 | VIC4::D054_FCLRHI);
+    f.vic.ioWrite(nullptr, 0xD020, 0x00);
+    f.vic.ioWrite(nullptr, 0xD021, 0x00);
+
+    f.vic.ioWrite(nullptr, 0xD060, 0x00);
+    f.vic.ioWrite(nullptr, 0xD061, 0x04);
+    f.vic.ioWrite(nullptr, 0xD062, 0x00);
+    f.vic.ioWrite(nullptr, 0xD063, 0x00);
+    f.vic.ioWrite(nullptr, 0xD068, 0x00);
+    f.vic.ioWrite(nullptr, 0xD069, 0x00);
+    f.vic.ioWrite(nullptr, 0xD06A, 0x00);
+
+    // 16-bit char number: $0100 (> $FF → FCLRHI applies)
+    f.bus.write8(0x0400, 0x00); // lo byte
+    f.bus.write8(0x0401, 0x01); // hi byte → char 256
+
+    // FCM data for char 256: at charBase + 256*64 = $0000 + $4000 = $4000
+    f.bus.write8(0x4000, 3); // pixel 0 = palette 3 (cyan)
+
+    f.colorRam[0] = 0x01;
+
+    uint32_t buf[VIC2::FRAME_W * VIC2::FRAME_H];
+    f.vic.renderFrame(buf);
+
+    int px = VIC2::DISPLAY_X;
+    int py = VIC2::DISPLAY_Y;
+    ASSERT_EQ(buf[py * VIC2::FRAME_W + px], f.vic.getPaletteRGBA(3));
+}
+
+TEST_CASE(vic4_fcm_fclrlo_only) {
+    Vic4Fixture f;
+    f.unlock();
+
+    // FCLRLO only — char > $FF should NOT be rendered as FCM
+    f.vic.ioWrite(nullptr, 0xD054, VIC4::D054_CHR16 | VIC4::D054_FCLRLO);
+    f.vic.ioWrite(nullptr, 0xD020, 0x00);
+    f.vic.ioWrite(nullptr, 0xD021, 0x00);
+
+    f.vic.ioWrite(nullptr, 0xD060, 0x00);
+    f.vic.ioWrite(nullptr, 0xD061, 0x04);
+    f.vic.ioWrite(nullptr, 0xD068, 0x00);
+    f.vic.ioWrite(nullptr, 0xD069, 0x20);
+    f.vic.ioWrite(nullptr, 0xD06A, 0x00);
+
+    // 16-bit char $0100 (> $FF, FCLRHI not set → not FCM)
+    f.bus.write8(0x0400, 0x00);
+    f.bus.write8(0x0401, 0x01);
+
+    // Put something visible in FCM data
+    f.bus.write8(0x2000 + 256 * 64, 5);
+
+    uint32_t buf[VIC2::FRAME_W * VIC2::FRAME_H];
+    f.vic.renderFrame(buf);
+
+    int px = VIC2::DISPLAY_X;
+    int py = VIC2::DISPLAY_Y;
+    // Should be border (black), not palette 5 — FCM skipped this char
+    ASSERT_EQ(buf[py * VIC2::FRAME_W + px], f.vic.getPaletteRGBA(0));
 }
