@@ -89,15 +89,21 @@ uint16_t VIC4::getColBase() const {
 }
 
 // ---------------------------------------------------------------------------
-// Full-Colour Mode (FCM) rendering
+// Full-Colour Mode (FCM) and Nibble-Colour Mode (NCM) rendering
 //
-// Each character cell uses 64 bytes of pixel data (8 rows × 8 pixels × 1 byte).
-// Each byte is a palette index (0-255).
-// Pixel value $FF selects the foreground colour from colour RAM instead.
+// FCM: Each character cell uses 64 bytes (8 rows × 8 pixels × 1 byte).
+//      Each byte is a palette index. $FF = foreground from colour RAM.
+//
+// NCM: Each byte describes 2 pixels (high nibble = left, low nibble = right).
+//      Characters are 16 pixels wide. Lower 4 bits from char data nibble,
+//      upper 4 bits from colour RAM → full 8-bit palette index.
+//      Nibble $F = use full colour RAM colour.
+//      Selected per-character when colour RAM byte has bit 3 set (ncm_flag)
+//      in Super-Extended Attribute Mode (CHR16).
 //
 // Enabled by FCLRLO ($D054 bit 1) for char numbers ≤ $FF
 //      and/or FCLRHI ($D054 bit 2) for char numbers > $FF.
-// CHR16 ($D054 bit 0) enables 16-bit character numbers from screen RAM.
+// CHR16 ($D054 bit 0) enables 16-bit char numbers and per-char NCM flag.
 // ---------------------------------------------------------------------------
 
 void VIC4::renderFCM(uint32_t* buf) {
@@ -118,7 +124,6 @@ void VIC4::renderFCM(uint32_t* buf) {
 
     bool h640 = (m_regs[REG_D031] & D031_H640) != 0;
     int cols = h640 ? 80 : 40;
-    int charW = h640 ? 4 : 8; // pixel width per character on screen
 
     int bytesPerChar = chr16 ? 2 : 1;
 
@@ -137,13 +142,11 @@ void VIC4::renderFCM(uint32_t* buf) {
                 charNum = m_dmaBus ? m_dmaBus->peek8(scrAddr) : 0;
             }
 
-            // Check if FCM applies to this character
+            // Check if FCM/NCM applies to this character
             bool isFCM = (charNum <= 0xFF) ? fclrLo : fclrHi;
-            if (!isFCM) continue; // Not FCM — leave as border (or VIC-III would render it)
+            if (!isFCM) continue;
 
-            // Get foreground colour from colour RAM.
-            // Prefer VIC2 color RAM pointer for backward compatibility
-            // when colBase is 0 and the cell fits in the 1KB/2KB window.
+            // Read colour RAM byte for this cell
             uint8_t fgColor = 0;
             uint16_t colAddr = colBase + cellIdx;
             if (m_colorRam && colBase == 0 && cellIdx < 2048) {
@@ -152,40 +155,90 @@ void VIC4::renderFCM(uint32_t* buf) {
                 fgColor = m_colorRamExt[colAddr];
             }
 
-            // FCM char data: 64 bytes at charBase + charNum * 64
+            // NCM flag: colour RAM bit 3 when CHR16 is enabled
+            bool isNCM = chr16 && (fgColor & 0x08);
+
+            // Character data: 64 bytes at charBase + charNum * 64
             uint32_t dataAddr = charBase + (uint32_t)charNum * 64;
 
-            int px = DISPLAY_X + col * charW;
             int py = DISPLAY_Y + row * 8;
 
-            for (int r = 0; r < 8; ++r) {
-                int fy = py + r;
-                if (fy < DISPLAY_Y || fy >= DISPLAY_Y + DISPLAY_H) continue;
+            if (isNCM) {
+                // --- Nibble-Colour Mode ---
+                // 16 pixels wide: 8 bytes per row, 2 pixels per byte
+                // Upper 4 bits of colour = colour RAM (masked, bit 3 excluded)
+                uint8_t colHigh = (fgColor & 0xF0); // upper nibble from colour RAM
+                int charW = h640 ? 8 : 16; // NCM chars are 16px in 40-col, 8px in 80-col
+                int px = DISPLAY_X + col * (h640 ? 4 : 8); // screen position for this cell
+                // In NCM, each char occupies double width in the character grid
+                // but we position based on the cell index
 
-                for (int c = 0; c < 8; ++c) {
-                    uint8_t pixVal = m_dmaBus ? m_dmaBus->peek8(dataAddr + r * 8 + c) : 0;
+                for (int r = 0; r < 8; ++r) {
+                    int fy = py + r;
+                    if (fy < DISPLAY_Y || fy >= DISPLAY_Y + DISPLAY_H) continue;
 
-                    uint32_t color;
-                    if (pixVal == 0xFF) {
-                        // $FF = use foreground colour from colour RAM
-                        color = getPaletteRGBA(fgColor);
-                    } else if (pixVal == 0x00) {
-                        color = bgCol;
-                    } else {
-                        color = getPaletteRGBA(pixVal);
-                    }
+                    for (int c = 0; c < 8; ++c) {
+                        uint8_t byteVal = m_dmaBus ? m_dmaBus->peek8(dataAddr + r * 8 + c) : 0;
+                        uint8_t hiNib = (byteVal >> 4) & 0x0F;
+                        uint8_t loNib = byteVal & 0x0F;
 
-                    if (h640) {
-                        // In H640: 8 glyph pixels → 4 screen pixels (pair OR)
-                        if (c & 1) continue; // skip odd pixels, handled by even
-                        int fx = px + (c / 2);
-                        if (fx >= DISPLAY_X && fx < DISPLAY_X + DISPLAY_W) {
-                            buf[fy * FRAME_W + fx] = color;
+                        // Left pixel (high nibble)
+                        uint32_t colorL;
+                        if (hiNib == 0x0F) {
+                            colorL = getPaletteRGBA(fgColor);
+                        } else if (hiNib == 0x00) {
+                            colorL = bgCol;
+                        } else {
+                            colorL = getPaletteRGBA(colHigh | hiNib);
                         }
-                    } else {
-                        int fx = px + c;
-                        if (fx >= DISPLAY_X && fx < DISPLAY_X + DISPLAY_W) {
-                            buf[fy * FRAME_W + fx] = color;
+
+                        // Right pixel (low nibble)
+                        uint32_t colorR;
+                        if (loNib == 0x0F) {
+                            colorR = getPaletteRGBA(fgColor);
+                        } else if (loNib == 0x00) {
+                            colorR = bgCol;
+                        } else {
+                            colorR = getPaletteRGBA(colHigh | loNib);
+                        }
+
+                        int fx = px + c * 2;
+                        if (fx >= DISPLAY_X && fx < DISPLAY_X + DISPLAY_W)
+                            buf[fy * FRAME_W + fx] = colorL;
+                        if (fx + 1 >= DISPLAY_X && fx + 1 < DISPLAY_X + DISPLAY_W)
+                            buf[fy * FRAME_W + fx + 1] = colorR;
+                    }
+                }
+            } else {
+                // --- Full-Colour Mode ---
+                int charW = h640 ? 4 : 8;
+                int px = DISPLAY_X + col * charW;
+
+                for (int r = 0; r < 8; ++r) {
+                    int fy = py + r;
+                    if (fy < DISPLAY_Y || fy >= DISPLAY_Y + DISPLAY_H) continue;
+
+                    for (int c = 0; c < 8; ++c) {
+                        uint8_t pixVal = m_dmaBus ? m_dmaBus->peek8(dataAddr + r * 8 + c) : 0;
+
+                        uint32_t color;
+                        if (pixVal == 0xFF) {
+                            color = getPaletteRGBA(fgColor);
+                        } else if (pixVal == 0x00) {
+                            color = bgCol;
+                        } else {
+                            color = getPaletteRGBA(pixVal);
+                        }
+
+                        if (h640) {
+                            if (c & 1) continue;
+                            int fx = px + (c / 2);
+                            if (fx >= DISPLAY_X && fx < DISPLAY_X + DISPLAY_W)
+                                buf[fy * FRAME_W + fx] = color;
+                        } else {
+                            int fx = px + c;
+                            if (fx >= DISPLAY_X && fx < DISPLAY_X + DISPLAY_W)
+                                buf[fy * FRAME_W + fx] = color;
                         }
                     }
                 }

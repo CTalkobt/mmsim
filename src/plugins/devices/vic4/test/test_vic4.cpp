@@ -329,3 +329,142 @@ TEST_CASE(vic4_fcm_fclrlo_only) {
     // Should be border (black), not palette 5 — FCM skipped this char
     ASSERT_EQ(buf[py * VIC2::FRAME_W + px], f.vic.getPaletteRGBA(0));
 }
+
+// --- NCM tests ---
+
+TEST_CASE(vic4_ncm_basic) {
+    Vic4Fixture f;
+    f.unlock();
+
+    // CHR16 + FCLRLO → enables per-char NCM via colour RAM bit 3
+    f.vic.ioWrite(nullptr, 0xD054, VIC4::D054_CHR16 | VIC4::D054_FCLRLO);
+    f.vic.ioWrite(nullptr, 0xD020, 0x00);
+    f.vic.ioWrite(nullptr, 0xD021, 0x00);
+
+    f.vic.ioWrite(nullptr, 0xD060, 0x00);
+    f.vic.ioWrite(nullptr, 0xD061, 0x04);
+    f.vic.ioWrite(nullptr, 0xD062, 0x00);
+    f.vic.ioWrite(nullptr, 0xD063, 0x00);
+    f.vic.ioWrite(nullptr, 0xD068, 0x00);
+    f.vic.ioWrite(nullptr, 0xD069, 0x20);
+    f.vic.ioWrite(nullptr, 0xD06A, 0x00);
+
+    // 16-bit screen RAM: char 0 (lo=0, hi=0)
+    f.bus.write8(0x0400, 0x00);
+    f.bus.write8(0x0401, 0x00);
+
+    // Colour RAM: bit 3 set = NCM flag, upper nibble = $A0
+    // fgColor = 0xA8 (bit 3 set → NCM, upper nibble $A0)
+    f.colorRam[0] = 0xA8;
+
+    // NCM char data at $2000 + 0*64 = $2000
+    // Row 0, byte 0: high nibble=3, low nibble=5 → pixels: $A3, $A5
+    f.bus.write8(0x2000, 0x35);
+
+    uint32_t buf[VIC2::FRAME_W * VIC2::FRAME_H];
+    f.vic.renderFrame(buf);
+
+    int px = VIC2::DISPLAY_X;
+    int py = VIC2::DISPLAY_Y;
+
+    // Left pixel: upper 4 bits from colour RAM ($A0) | high nibble (3) = $A3
+    ASSERT_EQ(buf[py * VIC2::FRAME_W + px], f.vic.getPaletteRGBA(0xA3));
+    // Right pixel: $A0 | low nibble (5) = $A5
+    ASSERT_EQ(buf[py * VIC2::FRAME_W + px + 1], f.vic.getPaletteRGBA(0xA5));
+}
+
+TEST_CASE(vic4_ncm_nibble_f_uses_color_ram) {
+    Vic4Fixture f;
+    f.unlock();
+
+    f.vic.ioWrite(nullptr, 0xD054, VIC4::D054_CHR16 | VIC4::D054_FCLRLO);
+    f.vic.ioWrite(nullptr, 0xD020, 0x00);
+    f.vic.ioWrite(nullptr, 0xD021, 0x00);
+
+    f.vic.ioWrite(nullptr, 0xD060, 0x00);
+    f.vic.ioWrite(nullptr, 0xD061, 0x04);
+    f.vic.ioWrite(nullptr, 0xD068, 0x00);
+    f.vic.ioWrite(nullptr, 0xD069, 0x20);
+    f.vic.ioWrite(nullptr, 0xD06A, 0x00);
+
+    f.bus.write8(0x0400, 0x00);
+    f.bus.write8(0x0401, 0x00);
+
+    // Colour RAM: NCM flag set (bit 3), full value = 0x78
+    f.colorRam[0] = 0x78;
+
+    // NCM data: byte = $FF → high nibble=$F, low nibble=$F
+    f.bus.write8(0x2000, 0xFF);
+
+    uint32_t buf[VIC2::FRAME_W * VIC2::FRAME_H];
+    f.vic.renderFrame(buf);
+
+    int px = VIC2::DISPLAY_X;
+    int py = VIC2::DISPLAY_Y;
+
+    // Nibble $F → use full colour RAM value (0x78) as palette index
+    ASSERT_EQ(buf[py * VIC2::FRAME_W + px], f.vic.getPaletteRGBA(0x78));
+    ASSERT_EQ(buf[py * VIC2::FRAME_W + px + 1], f.vic.getPaletteRGBA(0x78));
+}
+
+TEST_CASE(vic4_ncm_zero_nibble_is_bg) {
+    Vic4Fixture f;
+    f.unlock();
+
+    f.vic.ioWrite(nullptr, 0xD054, VIC4::D054_CHR16 | VIC4::D054_FCLRLO);
+    f.vic.ioWrite(nullptr, 0xD020, 0x00);
+    f.vic.ioWrite(nullptr, 0xD021, 0x02); // bg = red (palette 2)
+
+    f.vic.ioWrite(nullptr, 0xD060, 0x00);
+    f.vic.ioWrite(nullptr, 0xD061, 0x04);
+    f.vic.ioWrite(nullptr, 0xD068, 0x00);
+    f.vic.ioWrite(nullptr, 0xD069, 0x20);
+    f.vic.ioWrite(nullptr, 0xD06A, 0x00);
+
+    f.bus.write8(0x0400, 0x00);
+    f.bus.write8(0x0401, 0x00);
+
+    f.colorRam[0] = 0xA8; // NCM flag set
+
+    // NCM data: $00 → both nibbles = 0 → background
+    f.bus.write8(0x2000, 0x00);
+
+    uint32_t buf[VIC2::FRAME_W * VIC2::FRAME_H];
+    f.vic.renderFrame(buf);
+
+    int px = VIC2::DISPLAY_X;
+    int py = VIC2::DISPLAY_Y;
+    ASSERT_EQ(buf[py * VIC2::FRAME_W + px], f.vic.getPaletteRGBA(2));
+}
+
+TEST_CASE(vic4_ncm_without_chr16_is_fcm) {
+    Vic4Fixture f;
+    f.unlock();
+
+    // FCLRLO but no CHR16 → NCM flag in colour RAM is ignored, all chars are FCM
+    f.vic.ioWrite(nullptr, 0xD054, VIC4::D054_FCLRLO);
+    f.vic.ioWrite(nullptr, 0xD020, 0x00);
+    f.vic.ioWrite(nullptr, 0xD021, 0x00);
+
+    f.vic.ioWrite(nullptr, 0xD060, 0x00);
+    f.vic.ioWrite(nullptr, 0xD061, 0x04);
+    f.vic.ioWrite(nullptr, 0xD068, 0x00);
+    f.vic.ioWrite(nullptr, 0xD069, 0x20);
+    f.vic.ioWrite(nullptr, 0xD06A, 0x00);
+
+    f.bus.write8(0x0400, 0x00); // char 0
+
+    // Colour RAM has bit 3 set, but CHR16 is off → treated as FCM
+    f.colorRam[0] = 0x08;
+
+    // FCM data: pixel 0 = palette 5
+    f.bus.write8(0x2000, 5);
+
+    uint32_t buf[VIC2::FRAME_W * VIC2::FRAME_H];
+    f.vic.renderFrame(buf);
+
+    int px = VIC2::DISPLAY_X;
+    int py = VIC2::DISPLAY_Y;
+    // Should render as FCM (byte=5 → palette 5), not NCM
+    ASSERT_EQ(buf[py * VIC2::FRAME_W + px], f.vic.getPaletteRGBA(5));
+}
